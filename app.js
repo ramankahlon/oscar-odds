@@ -1,10 +1,175 @@
+const schedule2026Films = [
+  "The Plague",
+  "The Mother and the Bear",
+  "We Bury the Dead",
+  "All That's Left of You",
+  "The Chronology of Water",
+  "Greenland 2: Migration",
+  "Is This Thing On?",
+  "Primate",
+  "Soulm8te",
+  "Dead Man's Wire",
+  "I Was A Stranger",
+  "Magellan",
+  "OBEX",
+  "People We Meet on Vacation",
+  "Starbright",
+  "Young Mothers",
+  "28 Years Later: The Bone Temple",
+  "Charlie the Wonderdog",
+  "Hamnet",
+  "All You Need Is Kill",
+  "Night Patrol",
+  "A Private Life",
+  "The RIP",
+  "Sound of Falling",
+  "A Useful Ghost",
+  "Clika",
+  "H is for Hawk",
+  "Mercy",
+  "Return to Silent Hill",
+  "The Testament of Ann Lee",
+  "In Cold Light",
+  "Send Help",
+  "Shelter",
+  "Islands",
+  "The Love That Remains",
+  "The Moment",
+  "A Poet",
+  "Dracula: A Love Tale",
+  "Scarlet",
+  "Solo Mio",
+  "The Strangers: Chapter 3",
+  "Whistle",
+  "Buffalo Kids",
+  "Calle Malaga",
+  "Jimpa",
+  "My Father's Shadow",
+  "Pillion",
+  "The President's Cake",
+  "Cold Storage",
+  "Broken Bird",
+  "Crime 101",
+  "GOAT",
+  "Good Luck, Have Fun, Don't Die",
+  "Wuthering Heights",
+  "The Mortuary Assistant",
+  "Nirvanna the Band the Show the Movie",
+  "How to Make a Killing",
+  "I Can Only Imagine 2",
+  "Psycho Killer",
+  "Midwinter Break",
+  "Protector",
+  "This Is Not a Test",
+  "EPiC: Elvis Presley in Concert",
+  "Scream 7",
+  "Dreams",
+  "Man on the Run",
+  "The Bride!",
+  "Pixar's Hoppers",
+  "Andre is an Idiot",
+  "Peaky Blinders: The Immortal Man",
+  "Youngblood",
+  "The Breadwinner",
+  "Reminders of Him",
+  "The Undertone",
+  "Slanted",
+  "Billie Eilish - Hit Me Hard and Soft: The Tour (Live in 3D)",
+  "Project Hail Mary",
+  "The Pout-Pout Fish",
+  "Whitney Springs",
+  "Miroirs No. 3",
+  "The Dog Stars",
+  "They Will Kill You",
+  "Alpha",
+  "Kontinental '25",
+  "Yes",
+  "The Drama",
+  "The Super Mario Galaxy Movie",
+  "A Great Awakening",
+  "The Third Parent",
+  "Ready or Not 2: Here I Come",
+  "You, Me & Tuscany",
+  "Normal",
+  "The Resurrected",
+  "Michael",
+  "Omaha",
+  "The Devil Wears Prada 2",
+  "Hokum",
+  "Mortal Kombat II",
+  "The Sheep Detectives",
+  "Is God Is",
+  "Obsession",
+  "Poetic License",
+  "I Love Boosters",
+  "The Mandalorian and Grogu",
+  "Stop! That! Train!",
+  "Animal Friends",
+  "Masters of the Universe",
+  "Power Ballad",
+  "Scary Movie 6",
+  "The Dish [Spielberg Movie]",
+  "Pixar's Toy Story 5",
+  "Supergirl",
+  "Mega Minions",
+  "Shiver",
+  "Young Washington",
+  "Moana [Live-Action]",
+  "Cut Off",
+  "Christopher Nolan's The Odyssey",
+  "Evil Dead Burn",
+  "Spider-Man: Brand New Day",
+  "Once Upon A Time in A Cinema",
+  "Super Troopers 3",
+  "Flowervale Street",
+  "PAW Patrol 3: The Dino Movie",
+  "Mutiny",
+  "Thread: An Insidious Tale",
+  "Cliffhanger",
+  "Coyote vs. Acme",
+  "How to Rob a Bank",
+  "Clayface",
+  "Sense and Sensibility",
+  "Practical Magic 2",
+  "Resident Evil",
+  "Charlie Harper",
+  "Forgotten Island",
+  "Judy [Inarritu Movie]",
+  "Verity",
+  "The Legend of Aang: The Last Airbender",
+  "Other Mommy",
+  "The Social Reckoning",
+  "Street Fighter",
+  "Whalefall",
+  "Remain",
+  "Shaun the Sheep: The Beast of Mossy Bottom",
+  "Archangel",
+  "Dr. Seuss' The Cat in the Hat",
+  "Ebenezer: A Christmas Carol",
+  "The Hunger Games: Sunrise on the Reaping",
+  "Hexed",
+  "Meet the Parents 4: Focker In-Law",
+  "Narnia",
+  "Violent Night 2",
+  "Jumanji 3",
+  "Avengers: Doomsday",
+  "Dune: Part Three"
+];
+
 const categories = [
   {
     id: "picture",
     name: "Best Picture",
     nominees: 10,
     winnerBase: 0.16,
-    films: [{ title: "The Bride!", studio: "Warner Bros.", precursor: 67, history: 61, buzz: 72, strength: "High" }]
+    films: schedule2026Films.map((title) => ({
+      title,
+      studio: "TBD",
+      precursor: 55,
+      history: 50,
+      buzz: 52,
+      strength: "Medium"
+    }))
   },
   {
     id: "director",
@@ -29,7 +194,84 @@ const categories = [
   }
 ];
 
-const STORAGE_KEY = "oscarOddsForecastState.v2";
+const letterboxdRanks = new Map([
+  ["Hamnet", 3],
+  ["The Bride!", 14],
+  ["The Testament of Ann Lee", 21],
+  ["Is This Thing On?", 23],
+  ["Magellan", 27],
+  ["Dr. Seuss' The Cat in the Hat", 42],
+  ["Is God Is", 43],
+  ["Pixar's Hoppers", 44],
+  ["Scream 7", 45],
+  ["The Dish [Spielberg Movie]", 49],
+  ["Christopher Nolan's The Odyssey", 50],
+  ["Young Mothers", 53],
+  ["Dune: Part Three", 54]
+]);
+
+const theGamerRanks = new Map([
+  ["The Dish [Spielberg Movie]", 4],
+  ["The Bride!", 5],
+  ["Michael", 8],
+  ["Hamnet", 10]
+]);
+
+const redditMentions = new Map([
+  ["Christopher Nolan's The Odyssey", 9],
+  ["Project Hail Mary", 6],
+  ["Dune: Part Three", 4],
+  ["Michael", 4],
+  ["The Social Reckoning", 3],
+  ["Narnia", 3],
+  ["Sense and Sensibility", 2],
+  ["The Bride!", 2],
+  ["The Drama", 2],
+  ["The Dish [Spielberg Movie]", 2],
+  ["The Dog Stars", 1],
+  ["Forgotten Island", 1],
+  ["Pixar's Hoppers", 1],
+  ["Avengers: Doomsday", 1],
+  ["Wuthering Heights", 1],
+  ["Clayface", 1]
+]);
+
+function rankToScore(rank, maxRank) {
+  if (!rank) return 0;
+  return clamp((maxRank - rank + 1) / maxRank, 0, 1);
+}
+
+function applyExternalPredictionSignals() {
+  const picture = categories.find((category) => category.id === "picture");
+  if (!picture) return;
+
+  const maxRedditMentions = Math.max(...redditMentions.values(), 1);
+
+  picture.films.forEach((film) => {
+    const letterboxdScore = rankToScore(letterboxdRanks.get(film.title), 54);
+    const theGamerScore = rankToScore(theGamerRanks.get(film.title), 10);
+    const redditScore = clamp((redditMentions.get(film.title) || 0) / maxRedditMentions, 0, 1);
+    const composite = letterboxdScore * 0.45 + theGamerScore * 0.25 + redditScore * 0.3;
+
+    if (composite <= 0) return;
+
+    film.precursor = clamp(Math.round(55 + composite * 35), 0, 100);
+    film.history = clamp(Math.round(50 + (letterboxdScore * 0.7 + theGamerScore * 0.3) * 28), 0, 100);
+    film.buzz = clamp(Math.round(52 + (redditScore * 0.55 + Math.max(letterboxdScore, theGamerScore) * 0.45) * 36), 0, 100);
+
+    if (composite >= 0.62 || redditScore >= 0.8) {
+      film.strength = "High";
+    } else if (composite >= 0.34) {
+      film.strength = "Medium";
+    } else {
+      film.strength = "Low";
+    }
+  });
+}
+
+applyExternalPredictionSignals();
+
+const STORAGE_KEY = "oscarOddsForecastState.v4";
 
 const state = {
   categoryId: categories[0].id,
