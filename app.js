@@ -379,6 +379,7 @@ const categoryTabs = document.querySelector("#categoryTabs");
 const categoryTitle = document.querySelector("#categoryTitle");
 const candidateCards = document.querySelector("#candidateCards");
 const resultsBody = document.querySelector("#resultsBody");
+const resultsPrimaryHeader = document.querySelector("#resultsPrimaryHeader");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const importCsvButton = document.querySelector("#importCsvButton");
 const csvFileInput = document.querySelector("#csvFileInput");
@@ -539,6 +540,29 @@ function getDisplayLimit(category) {
   return category.id === "picture" ? 10 : 5;
 }
 
+function getPrimaryColumnLabel(categoryId) {
+  const personCategoryLabels = {
+    director: "Director",
+    actor: "Actor",
+    actress: "Actress",
+    "supporting-actor": "Supporting Actor",
+    "supporting-actress": "Supporting Actress"
+  };
+  return personCategoryLabels[categoryId] || "Film";
+}
+
+function getDisplayTitle(categoryId, title, studio) {
+  const isPersonCategory =
+    categoryId === "director" ||
+    categoryId === "actor" ||
+    categoryId === "actress" ||
+    categoryId === "supporting-actor" ||
+    categoryId === "supporting-actress";
+
+  if (!isPersonCategory) return title;
+  return `${title} (${studio})`;
+}
+
 function buildProjections(category) {
   const normalized = normalizeWeights();
 
@@ -563,7 +587,7 @@ function buildProjections(category) {
 
       return {
         index: film.index,
-        title: film.title,
+        title: getDisplayTitle(category.id, film.title, film.studio),
         nomination,
         winner
       };
@@ -581,6 +605,7 @@ function renderCandidates(category, projections) {
 }
 
 function renderResults(category, projections) {
+  resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   resultsBody.innerHTML = "";
   projections.slice(0, getDisplayLimit(category)).forEach((entry) => {
     const row = document.createElement("tr");
