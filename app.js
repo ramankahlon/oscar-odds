@@ -185,7 +185,7 @@ const categorySeeds = {
     contender("Dune: Part Three", "Warner Bros.", 86, 81, 90, "High"),
     contender("Project Hail Mary", "Amazon MGM", 82, 74, 87, "High"),
     contender("The Social Reckoning", "A24", 80, 76, 83, "High"),
-    contender("Hamnet", "Focus Features", 78, 82, 74, "High"),
+    contender("The Dog Stars", "20th Century Studios", 78, 82, 74, "High"),
     contender("The Bride!", "Warner Bros.", 77, 72, 81, "Medium"),
     contender("Michael", "Lionsgate", 75, 66, 88, "Medium"),
     contender("Sense and Sensibility", "Focus Features", 71, 73, 70, "Medium"),
@@ -202,7 +202,7 @@ const categorySeeds = {
   actor: [
     contender("Tom Cruise", "Judy", 84, 78, 90, "High"),
     contender("Jaafar Jackson", "Michael", 81, 66, 92, "High"),
-    contender("Colman Domingo", "Michael", 79, 82, 76, "High"),
+    contender("Ryan Gosling", "Project Hail Mary", 79, 82, 76, "High"),
     contender("Jeffrey Wright", "Highest 2 Lowest", 74, 80, 70, "Medium"),
     contender("Jeremy Strong", "The Social Reckoning", 73, 75, 72, "Medium")
   ],
@@ -215,7 +215,7 @@ const categorySeeds = {
   ],
   "supporting-actor": [
     contender("Russell Crowe", "Nuremberg", 76, 82, 67, "High"),
-    contender("Jonathan Bailey", "Wicked: For Good", 74, 70, 78, "Medium"),
+    contender("Josh Brolin", "Dune: Part Three", 74, 70, 78, "Medium"),
     contender("John Malkovich", "Wild Horse Nine", 73, 77, 68, "Medium"),
     contender("John Goodman", "Judy", 71, 79, 66, "Medium"),
     contender("Will Poulter", "Saturn Return", 69, 64, 72, "Low")
@@ -235,7 +235,7 @@ const categorySeeds = {
     contender("Michael", "Lionsgate", 70, 64, 78, "Medium")
   ],
   "adapted-screenplay": [
-    contender("Hamnet", "Focus Features", 84, 86, 73, "High"),
+    contender("The Dog Stars", "20th Century Studios", 84, 86, 73, "High"),
     contender("Project Hail Mary", "Amazon MGM", 80, 72, 82, "High"),
     contender("Sense and Sensibility", "Focus Features", 77, 79, 68, "Medium"),
     contender("Narnia", "Netflix", 71, 66, 75, "Medium"),
@@ -295,7 +295,7 @@ const categorySeeds = {
     contender("Narnia", "Netflix", 79, 68, 83, "Medium"),
     contender("Toy Story 5", "Disney/Pixar", 76, 71, 80, "Medium"),
     contender("Moana [Live-Action]", "Disney", 74, 70, 85, "Medium"),
-    contender("Wicked: For Good", "Universal", 73, 74, 88, "Medium")
+    contender("The Bride!", "Warner Bros.", 73, 74, 88, "Medium")
   ],
   sound: [
     contender("Dune: Part Three", "Warner Bros.", 88, 86, 78, "High"),
@@ -314,7 +314,7 @@ const categorySeeds = {
   cinematography: [
     contender("The Odyssey", "Universal", 89, 88, 79, "High"),
     contender("Dune: Part Three", "Warner Bros.", 87, 86, 77, "High"),
-    contender("Hamnet", "Focus Features", 83, 84, 71, "High"),
+    contender("The Dog Stars", "20th Century Studios", 83, 84, 71, "High"),
     contender("The Bride!", "Warner Bros.", 79, 74, 70, "Medium"),
     contender("Judy [Inarritu Movie]", "Warner Bros.", 76, 82, 68, "Medium")
   ],
@@ -326,7 +326,7 @@ const categorySeeds = {
     contender("Clayface", "DC Studios", 73, 67, 79, "Low")
   ],
   "costume-design": [
-    contender("Hamnet", "Focus Features", 86, 89, 71, "High"),
+    contender("The Devil Wears Prada 2", "20th Century Studios", 86, 89, 71, "High"),
     contender("The Bride!", "Warner Bros.", 84, 81, 74, "High"),
     contender("Sense and Sensibility", "Focus Features", 80, 83, 68, "Medium"),
     contender("The Odyssey", "Universal", 78, 76, 72, "Medium"),
