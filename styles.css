@@ -18,7 +18,7 @@
 
 body {
   margin: 0;
-  font-family: "Manrope", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   color: var(--ink);
   background:
     radial-gradient(circle at 15% 20%, #fbe2bc 0%, transparent 30%),
@@ -44,7 +44,7 @@ body {
 
 .hero h1 {
   margin: 4px 0;
-  font-family: "Fraunces", serif;
+  font-family: "Literata", serif;
   font-size: clamp(2rem, 4vw, 3.4rem);
   letter-spacing: -0.02em;
 }
@@ -241,7 +241,7 @@ th {
 }
 
 td strong {
-  font-family: "Fraunces", serif;
+  font-family: "Literata", serif;
 }
 
 .methodology ul {

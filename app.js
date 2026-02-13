@@ -4,64 +4,32 @@ const categories = [
     name: "Best Picture",
     nominees: 10,
     winnerBase: 0.16,
-    films: [
-      { title: "Avatar: Fire and Ash", studio: "Disney", precursor: 69, history: 62, buzz: 76, strength: "High" },
-      { title: "Wicked: For Good", studio: "Universal", precursor: 72, history: 65, buzz: 82, strength: "High" },
-      { title: "Mickey 17", studio: "Warner Bros.", precursor: 74, history: 71, buzz: 78, strength: "High" },
-      { title: "Frankenstein", studio: "Netflix", precursor: 67, history: 58, buzz: 70, strength: "Medium" },
-      { title: "The Running Man", studio: "Paramount", precursor: 54, history: 48, buzz: 61, strength: "Medium" },
-      { title: "Superman", studio: "Warner Bros.", precursor: 57, history: 45, buzz: 79, strength: "Low" },
-      { title: "F1", studio: "Apple/Warner", precursor: 63, history: 57, buzz: 73, strength: "Medium" },
-      { title: "The Bride!", studio: "Warner Bros.", precursor: 59, history: 53, buzz: 68, strength: "Low" },
-      { title: "Bugonia", studio: "Focus", precursor: 66, history: 60, buzz: 64, strength: "Medium" },
-      { title: "Wake Up Dead Man", studio: "Netflix", precursor: 61, history: 51, buzz: 71, strength: "Low" }
-    ]
+    films: [{ title: "The Bride!", studio: "Warner Bros.", precursor: 67, history: 61, buzz: 72, strength: "High" }]
   },
   {
     id: "director",
     name: "Best Director",
     nominees: 5,
     winnerBase: 0.24,
-    films: [
-      { title: "Mickey 17", studio: "Bong Joon-ho", precursor: 76, history: 79, buzz: 78, strength: "High" },
-      { title: "Avatar: Fire and Ash", studio: "James Cameron", precursor: 65, history: 70, buzz: 77, strength: "Medium" },
-      { title: "Frankenstein", studio: "Guillermo del Toro", precursor: 71, history: 73, buzz: 72, strength: "High" },
-      { title: "Bugonia", studio: "Yorgos Lanthimos", precursor: 68, history: 67, buzz: 66, strength: "Medium" },
-      { title: "The Bride!", studio: "Maggie Gyllenhaal", precursor: 56, history: 52, buzz: 60, strength: "Low" },
-      { title: "Wicked: For Good", studio: "Jon M. Chu", precursor: 58, history: 49, buzz: 70, strength: "Low" }
-    ]
+    films: [{ title: "The Bride!", studio: "Maggie Gyllenhaal", precursor: 64, history: 60, buzz: 69, strength: "High" }]
   },
   {
     id: "actor",
     name: "Best Actor",
     nominees: 5,
     winnerBase: 0.25,
-    films: [
-      { title: "Mickey 17 (Robert Pattinson)", studio: "WB", precursor: 73, history: 68, buzz: 75, strength: "High" },
-      { title: "The Smashing Machine (Dwayne Johnson)", studio: "A24", precursor: 70, history: 63, buzz: 71, strength: "High" },
-      { title: "F1 (Brad Pitt)", studio: "Apple/Warner", precursor: 66, history: 65, buzz: 73, strength: "Medium" },
-      { title: "The Running Man (Glen Powell)", studio: "Paramount", precursor: 57, history: 54, buzz: 64, strength: "Low" },
-      { title: "Frankenstein (Oscar Isaac)", studio: "Netflix", precursor: 62, history: 59, buzz: 67, strength: "Medium" },
-      { title: "Wake Up Dead Man (Daniel Craig)", studio: "Netflix", precursor: 64, history: 56, buzz: 70, strength: "Medium" }
-    ]
+    films: [{ title: "The Bride!", studio: "Warner Bros.", precursor: 60, history: 55, buzz: 66, strength: "Medium" }]
   },
   {
     id: "actress",
     name: "Best Actress",
     nominees: 5,
     winnerBase: 0.24,
-    films: [
-      { title: "Wicked: For Good (Cynthia Erivo)", studio: "Universal", precursor: 77, history: 72, buzz: 82, strength: "High" },
-      { title: "The Bride! (Jessie Buckley)", studio: "WB", precursor: 68, history: 66, buzz: 69, strength: "Medium" },
-      { title: "Bugonia (Emma Stone)", studio: "Focus", precursor: 75, history: 74, buzz: 70, strength: "High" },
-      { title: "Frankenstein (Mia Goth)", studio: "Netflix", precursor: 61, history: 58, buzz: 65, strength: "Low" },
-      { title: "Avatar: Fire and Ash (Zoe Saldana)", studio: "Disney", precursor: 58, history: 53, buzz: 72, strength: "Low" },
-      { title: "Anora follow-up contender", studio: "Neon", precursor: 55, history: 60, buzz: 63, strength: "Low" }
-    ]
+    films: [{ title: "The Bride!", studio: "Jessie Buckley", precursor: 68, history: 66, buzz: 71, strength: "High" }]
   }
 ];
 
-const STORAGE_KEY = "oscarOddsForecastState.v1";
+const STORAGE_KEY = "oscarOddsForecastState.v2";
 
 const state = {
   categoryId: categories[0].id,
