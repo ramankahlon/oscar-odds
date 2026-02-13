@@ -236,9 +236,24 @@ const redditMentions = new Map([
   ["Clayface", 1]
 ]);
 
+const bovadaAmericanOdds = new Map([
+  ["Hamnet", 400]
+]);
+
+const kalshiImpliedOdds = new Map([
+  ["Hamnet", 0.05]
+]);
+
 function rankToScore(rank, maxRank) {
   if (!rank) return 0;
   return clamp((maxRank - rank + 1) / maxRank, 0, 1);
+}
+
+function americanOddsToProbability(odds) {
+  if (!Number.isFinite(odds) || odds === 0) return 0;
+  if (odds > 0) return 100 / (odds + 100);
+  const abs = Math.abs(odds);
+  return abs / (abs + 100);
 }
 
 function applyExternalPredictionSignals() {
@@ -251,15 +266,32 @@ function applyExternalPredictionSignals() {
     const letterboxdScore = rankToScore(letterboxdRanks.get(film.title), 54);
     const theGamerScore = rankToScore(theGamerRanks.get(film.title), 10);
     const redditScore = clamp((redditMentions.get(film.title) || 0) / maxRedditMentions, 0, 1);
-    const composite = letterboxdScore * 0.45 + theGamerScore * 0.25 + redditScore * 0.3;
+    const bovadaScore = americanOddsToProbability(bovadaAmericanOdds.get(film.title));
+    const kalshiScore = clamp(kalshiImpliedOdds.get(film.title) || 0, 0, 1);
+    const bettingScore =
+      bovadaScore > 0 && kalshiScore > 0
+        ? (bovadaScore + kalshiScore) / 2
+        : bovadaScore > 0
+          ? bovadaScore
+          : kalshiScore;
+
+    const composite =
+      letterboxdScore * 0.35 +
+      theGamerScore * 0.2 +
+      redditScore * 0.25 +
+      bettingScore * 0.2;
 
     if (composite <= 0) return;
 
     film.precursor = clamp(Math.round(55 + composite * 35), 0, 100);
     film.history = clamp(Math.round(50 + (letterboxdScore * 0.7 + theGamerScore * 0.3) * 28), 0, 100);
-    film.buzz = clamp(Math.round(52 + (redditScore * 0.55 + Math.max(letterboxdScore, theGamerScore) * 0.45) * 36), 0, 100);
+    film.buzz = clamp(
+      Math.round(52 + (redditScore * 0.4 + Math.max(letterboxdScore, theGamerScore, bettingScore) * 0.6) * 36),
+      0,
+      100
+    );
 
-    if (composite >= 0.62 || redditScore >= 0.8) {
+    if (composite >= 0.62 || redditScore >= 0.8 || bettingScore >= 0.35) {
       film.strength = "High";
     } else if (composite >= 0.34) {
       film.strength = "Medium";
@@ -271,7 +303,7 @@ function applyExternalPredictionSignals() {
 
 applyExternalPredictionSignals();
 
-const STORAGE_KEY = "oscarOddsForecastState.v4";
+const STORAGE_KEY = "oscarOddsForecastState.v5";
 
 const state = {
   categoryId: categories[0].id,
