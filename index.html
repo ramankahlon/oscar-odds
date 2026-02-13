@@ -26,24 +26,12 @@
       <section class="controls" aria-label="Categories">
         <div class="panel">
           <h2>Categories</h2>
-          <div class="category-list" id="categoryTabs" role="tablist" aria-label="Oscar categories"></div>
+          <div class="category-list" id="categoryTabs" aria-label="Oscar categories"></div>
         </div>
       </section>
 
       <section class="workspace">
-        <article class="panel candidates" id="candidatePanel">
-          <h2 id="categoryTitle">Best Picture</h2>
-          <p class="panel-copy">Edit each contender's expected precursor profile and context.</p>
-          <div class="data-tools" aria-label="Contender data tools">
-            <button id="exportCsvButton" class="action-button" type="button">Export CSV</button>
-            <button id="importCsvButton" class="action-button" type="button">Import CSV</button>
-            <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
-            <p class="tool-status" id="csvStatus" role="status" aria-live="polite"></p>
-          </div>
-          <div id="candidateCards"></div>
-        </article>
-
-        <article class="panel results" aria-live="polite">
+        <article class="panel results spotlight" aria-live="polite">
           <h2>Projected Odds</h2>
           <div class="table-wrap">
             <table>
@@ -57,6 +45,18 @@
               <tbody id="resultsBody"></tbody>
             </table>
           </div>
+        </article>
+
+        <article class="panel candidates" id="candidatePanel">
+          <h2 id="categoryTitle">Best Picture</h2>
+          <p class="panel-copy">Edit each contender's expected precursor profile and context.</p>
+          <div class="data-tools" aria-label="Contender data tools">
+            <button id="exportCsvButton" class="action-button" type="button">Export CSV</button>
+            <button id="importCsvButton" class="action-button" type="button">Import CSV</button>
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
+            <p class="tool-status" id="csvStatus" role="status" aria-live="polite"></p>
+          </div>
+          <div id="candidateCards"></div>
         </article>
       </section>
 

@@ -77,30 +77,22 @@ label {
 }
 
 .category-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: block;
 }
 
-.tab {
+.category-select {
+  width: 100%;
   border: 1px solid var(--line);
-  background: var(--surface-2);
-  color: var(--ink);
-  border-radius: 999px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.tab[aria-selected="true"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 10px 8px;
+  font: inherit;
+  background: #fff;
 }
 
 .workspace {
   display: grid;
   gap: 18px;
-  grid-template-columns: 1.35fr 1fr;
+  grid-template-columns: 1fr;
 }
 
 .panel-copy {
@@ -203,6 +195,38 @@ label {
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.spotlight {
+  border-width: 2px;
+  border-color: var(--accent);
+  background: linear-gradient(180deg, #fffdf8 0%, #fff8ec 100%);
+}
+
+.spotlight h2 {
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  margin-bottom: 14px;
+}
+
+.spotlight .table-wrap {
+  overflow-x: auto;
+}
+
+.spotlight th,
+.spotlight td {
+  padding: 14px 12px;
+}
+
+.spotlight th {
+  font-size: 0.92rem;
+}
+
+.spotlight td {
+  font-size: 1.05rem;
+}
+
+.spotlight td strong {
+  font-size: 1.16rem;
 }
 
 th,

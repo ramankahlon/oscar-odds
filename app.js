@@ -591,20 +591,25 @@ function scoreFilm(categoryId, film, normalizedWeights) {
 function renderTabs() {
   categoryTabs.innerHTML = "";
 
+  const select = document.createElement("select");
+  select.className = "category-select";
+  select.setAttribute("aria-label", "Oscar category");
+
   categories.forEach((category) => {
-    const tab = document.createElement("button");
-    tab.className = "tab";
-    tab.type = "button";
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-selected", String(category.id === state.categoryId));
-    tab.textContent = category.name;
-    tab.addEventListener("click", () => {
-      state.categoryId = category.id;
-      saveState();
-      render();
-    });
-    categoryTabs.appendChild(tab);
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    option.selected = category.id === state.categoryId;
+    select.appendChild(option);
   });
+
+  select.addEventListener("change", (event) => {
+    state.categoryId = event.target.value;
+    saveState();
+    render();
+  });
+
+  categoryTabs.appendChild(select);
 }
 
 function createCard(category, film, filmIndex) {
