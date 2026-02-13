@@ -209,7 +209,7 @@ const categorySeeds = {
   actress: [
     contender("Mikey Madison", "The Social Reckoning", 83, 76, 82, "High"),
     contender("Jessie Buckley", "The Bride!", 81, 79, 77, "High"),
-    contender("Renate Reinsve", "The Drama", 75, 73, 71, "Medium"),
+    contender("Zendaya", "The Drama", 75, 73, 71, "Medium"),
     contender("Daisy Edgar-Jones", "Sense and Sensibility", 72, 70, 69, "Medium"),
     contender("Amy Adams", "At the Sea", 70, 81, 64, "Medium")
   ],
@@ -364,7 +364,23 @@ const categories = categoryDefinitions.map((category) => ({
   films: categorySeeds[category.id] ? [...categorySeeds[category.id]] : createSeedFilms()
 }));
 
-const STORAGE_KEY = "oscarOddsForecastState.v8";
+const priorCategoryWins = {
+  director: {
+    "Christopher Nolan": 1,
+    "Steven Spielberg": 2,
+    "Alejandro G. Inarritu": 2
+  },
+  actor: {},
+  actress: {
+    "Mikey Madison": 1
+  },
+  "supporting-actor": {},
+  "supporting-actress": {
+    "Octavia Spencer": 1
+  }
+};
+
+const STORAGE_KEY = "oscarOddsForecastState.v9";
 
 const state = {
   categoryId: categories[0].id,
@@ -408,6 +424,11 @@ function strengthBoost(strength) {
   return 0.94;
 }
 
+function winnerExperienceBoost(categoryId, contenderName) {
+  const wins = priorCategoryWins[categoryId]?.[contenderName] || 0;
+  return 1 + wins * 0.07;
+}
+
 function sanitizeStrength(value) {
   if (value === "High" || value === "Medium" || value === "Low") return value;
   return "Low";
@@ -434,7 +455,7 @@ function getActiveCategory() {
   return categories.find((category) => category.id === state.categoryId);
 }
 
-function scoreFilm(film, normalizedWeights) {
+function scoreFilm(categoryId, film, normalizedWeights) {
   const linear =
     film.precursor * normalizedWeights.precursor +
     film.history * normalizedWeights.history +
@@ -442,7 +463,7 @@ function scoreFilm(film, normalizedWeights) {
 
   const centered = (linear - 55) / 12;
   const nominationRaw = logistic(centered) * strengthBoost(film.strength);
-  const winnerRaw = nominationRaw * (0.6 + film.precursor / 190);
+  const winnerRaw = nominationRaw * (0.6 + film.precursor / 190) * winnerExperienceBoost(categoryId, film.title);
 
   return {
     nominationRaw,
@@ -567,7 +588,7 @@ function buildProjections(category) {
   const normalized = normalizeWeights();
 
   const scored = category.films.map((film, index) => {
-    const scores = scoreFilm(film, normalized);
+    const scores = scoreFilm(category.id, film, normalized);
     return { ...film, ...scores, index };
   });
 
