@@ -383,8 +383,8 @@ const priorCategoryWins = {
 
 const recentWinnerPenalty = {
   actress: {
-    "Mikey Madison": 1,
-    "Jessie Buckley": 1
+    "Mikey Madison": 2,
+    "Jessie Buckley": 2
   }
 };
 
@@ -461,19 +461,19 @@ function winnerExperienceBoost(categoryId, contenderName) {
   if (!isPersonCategory) return 1;
 
   const wins = priorCategoryWins[categoryId]?.[contenderName] || 0;
-  const hasRecentPenalty = Boolean(recentWinnerPenalty[categoryId]?.[contenderName]);
+  const recentPenaltyLevel = Number(recentWinnerPenalty[categoryId]?.[contenderName] || 0);
   const hasOverdueNarrative = Boolean(overdueNarrativeBoost[categoryId]?.[contenderName]);
 
   let boost = 1;
   if (wins === 0) {
     boost += 0.06;
   } else {
-    boost += Math.min(wins, 2) * 0.03;
+    boost -= 0.08 + Math.min(wins, 3) * 0.03;
   }
 
-  if (hasRecentPenalty) boost -= 0.12;
+  if (recentPenaltyLevel > 0) boost -= 0.12 * recentPenaltyLevel;
   if (hasOverdueNarrative) boost += 0.08;
-  return clamp(boost, 0.8, 1.2);
+  return clamp(boost, 0.55, 1.15);
 }
 
 function sanitizeStrength(value) {
@@ -706,6 +706,44 @@ function getDisplayTitle(categoryId, title, studio) {
   return `${title} (${studio})`;
 }
 
+function rebalanceFieldTotal(entries, field, options) {
+  const { minTotal, maxTotal, targetTotal, minValue, maxValue } = options;
+  if (!entries.length) return;
+
+  const clampedTarget = clamp(targetTotal, minTotal, maxTotal);
+  let total = entries.reduce((sum, entry) => sum + entry[field], 0);
+
+  if (total <= 0) {
+    const evenValue = clamp(clampedTarget / entries.length, minValue, maxValue);
+    entries.forEach((entry) => {
+      entry[field] = evenValue;
+    });
+    total = entries.reduce((sum, entry) => sum + entry[field], 0);
+  }
+
+  const scale = clampedTarget / total;
+  entries.forEach((entry) => {
+    entry[field] = clamp(entry[field] * scale, minValue, maxValue);
+  });
+
+  for (let i = 0; i < 2; i += 1) {
+    const currentTotal = entries.reduce((sum, entry) => sum + entry[field], 0);
+    if (currentTotal >= minTotal && currentTotal <= maxTotal) return;
+
+    const target = clamp(currentTotal < minTotal ? minTotal : maxTotal, minTotal, maxTotal);
+    const delta = target - currentTotal;
+    const adjustable = entries.filter((entry) =>
+      delta > 0 ? entry[field] < maxValue - 0.001 : entry[field] > minValue + 0.001
+    );
+    if (!adjustable.length) return;
+
+    const perEntry = delta / adjustable.length;
+    adjustable.forEach((entry) => {
+      entry[field] = clamp(entry[field] + perEntry, minValue, maxValue);
+    });
+  }
+}
+
 function buildProjections(category) {
   const normalized = normalizeWeights();
 
@@ -718,7 +756,7 @@ function buildProjections(category) {
   const winnerTotal = scored.reduce((sum, item) => sum + item.winnerRaw, 0) || 1;
   const nomineeScale = category.nominees / Math.max(1, scored.length);
 
-  return scored
+  const projections = scored
     .map((film) => {
       const nomination = clamp((film.nominationRaw / nominationTotal) * 100 * nomineeScale, 0.4, 99);
       const winner = clamp(
@@ -736,6 +774,27 @@ function buildProjections(category) {
       };
     })
     .sort((a, b) => b.winner - a.winner);
+
+  const displayLimit = getDisplayLimit(category);
+  const topContenders = projections.slice(0, displayLimit);
+
+  rebalanceFieldTotal(topContenders, "nomination", {
+    minTotal: 80,
+    maxTotal: 95,
+    targetTotal: 88,
+    minValue: 0.4,
+    maxValue: 45
+  });
+
+  rebalanceFieldTotal(topContenders, "winner", {
+    minTotal: 80,
+    maxTotal: 95,
+    targetTotal: 86,
+    minValue: 0.2,
+    maxValue: 42
+  });
+
+  return [...topContenders, ...projections.slice(displayLimit)];
 }
 
 function renderCandidates(category, projections) {
