@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oscar Odds 2027</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">Forecast Lab</p>
+        <h1>Oscar Odds 2027</h1>
+        <p class="subtitle">
+          Percentage chances for <strong>nominations</strong> and <strong>wins</strong> at the 99th Academy Awards,
+          estimated from precursor momentum and historical-style weighting.
+        </p>
+      </header>
+
+      <section class="controls" aria-label="Model settings">
+        <div class="panel">
+          <h2>Model Inputs</h2>
+          <p class="panel-copy">Adjust global assumptions. These inputs affect every category forecast.</p>
+
+          <div class="input-grid">
+            <label>
+              Precursor Signal Weight
+              <input id="precursorWeight" type="range" min="35" max="75" value="58" />
+              <span class="value" id="precursorWeightValue">58%</span>
+            </label>
+            <label>
+              Historical Baseline Weight
+              <input id="historyWeight" type="range" min="20" max="55" value="30" />
+              <span class="value" id="historyWeightValue">30%</span>
+            </label>
+            <label>
+              Industry Buzz Weight
+              <input id="buzzWeight" type="range" min="5" max="25" value="12" />
+              <span class="value" id="buzzWeightValue">12%</span>
+            </label>
+          </div>
+          <p class="disclaimer">Weights are normalized automatically.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Categories</h2>
+          <div class="category-list" id="categoryTabs" role="tablist" aria-label="Oscar categories"></div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <article class="panel candidates" id="candidatePanel">
+          <h2 id="categoryTitle">Best Picture</h2>
+          <p class="panel-copy">Edit each contender's expected precursor profile and context.</p>
+          <div id="candidateCards"></div>
+        </article>
+
+        <article class="panel results" aria-live="polite">
+          <h2>Projected Odds</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Film</th>
+                  <th>Nomination %</th>
+                  <th>Winner %</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel methodology">
+        <h2>Methodology Snapshot</h2>
+        <ul>
+          <li><strong>Precursor momentum:</strong> blend of Golden Globes, Critics Choice, SAG, BAFTA, PGA/DGA/WGA relevance.</li>
+          <li><strong>Historical fit:</strong> genre/branch affinity, distributor track record, release corridor timing, and campaign capacity.</li>
+          <li><strong>Buzz:</strong> festival reaction, critic sentiment, and social/industry chatter.</li>
+          <li><strong>Nomination odds:</strong> calibrated by a logistic transform and normalized within category.</li>
+          <li><strong>Winner odds:</strong> nomination odds multiplied by conversion factors learned from recent Academy cycles.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
