@@ -372,7 +372,8 @@ const priorCategoryWins = {
   },
   actor: {},
   actress: {
-    "Mikey Madison": 1
+    "Mikey Madison": 1,
+    "Jessie Buckley": 1
   },
   "supporting-actor": {},
   "supporting-actress": {
