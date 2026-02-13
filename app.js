@@ -61,6 +61,8 @@ const categories = [
   }
 ];
 
+const STORAGE_KEY = "oscarOddsForecastState.v1";
+
 const state = {
   categoryId: categories[0].id,
   weights: {
@@ -80,6 +82,10 @@ const buzzWeight = document.querySelector("#buzzWeight");
 const precursorWeightValue = document.querySelector("#precursorWeightValue");
 const historyWeightValue = document.querySelector("#historyWeightValue");
 const buzzWeightValue = document.querySelector("#buzzWeightValue");
+const exportCsvButton = document.querySelector("#exportCsvButton");
+const importCsvButton = document.querySelector("#importCsvButton");
+const csvFileInput = document.querySelector("#csvFileInput");
+const csvStatus = document.querySelector("#csvStatus");
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -102,6 +108,28 @@ function strengthBoost(strength) {
   if (strength === "High") return 1.06;
   if (strength === "Medium") return 1.0;
   return 0.94;
+}
+
+function sanitizeStrength(value) {
+  if (value === "High" || value === "Medium" || value === "Low") return value;
+  return "Low";
+}
+
+function parseFilmRecord(record) {
+  if (!record || typeof record !== "object") return null;
+
+  const title = String(record.title || "").trim();
+  const studio = String(record.studio || "").trim();
+  if (!title || !studio) return null;
+
+  return {
+    title,
+    studio,
+    precursor: clamp(Number(record.precursor || 0), 0, 100),
+    history: clamp(Number(record.history || 0), 0, 100),
+    buzz: clamp(Number(record.buzz || 0), 0, 100),
+    strength: sanitizeStrength(String(record.strength || "").trim())
+  };
 }
 
 function getActiveCategory() {
@@ -136,6 +164,7 @@ function renderTabs() {
     tab.textContent = category.name;
     tab.addEventListener("click", () => {
       state.categoryId = category.id;
+      saveState();
       render();
     });
     categoryTabs.appendChild(tab);
@@ -178,6 +207,7 @@ function createCard(category, film, filmIndex) {
     input.value = String(film[field.key]);
     input.addEventListener("input", (event) => {
       film[field.key] = clamp(Number(event.target.value || 0), 0, 100);
+      saveState();
       renderResults(category);
     });
     wrapper.appendChild(input);
@@ -198,6 +228,7 @@ function createCard(category, film, filmIndex) {
     categories
       .find((c) => c.id === category.id)
       .films[filmIndex].strength = event.target.value;
+    saveState();
     renderResults(category);
   });
   strengthLabel.appendChild(strengthSelect);
@@ -256,6 +287,9 @@ function renderResults(category) {
 }
 
 function syncWeightLabels() {
+  precursorWeight.value = String(state.weights.precursor);
+  historyWeight.value = String(state.weights.history);
+  buzzWeight.value = String(state.weights.buzz);
   precursorWeightValue.textContent = `${state.weights.precursor}%`;
   historyWeightValue.textContent = `${state.weights.history}%`;
   buzzWeightValue.textContent = `${state.weights.buzz}%`;
@@ -272,9 +306,225 @@ function bindWeightInputs() {
     input.addEventListener("input", (event) => {
       state.weights[key] = clamp(Number(event.target.value || 0), 1, 95);
       syncWeightLabels();
+      saveState();
       renderResults(getActiveCategory());
     });
   });
+}
+
+function setCsvStatus(message, type = "") {
+  csvStatus.textContent = message;
+  csvStatus.className = `tool-status${type ? ` ${type}` : ""}`;
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  if (!/[",\n]/.test(text)) return text;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function exportContendersCsv() {
+  const header = ["category_id", "category_name", "title", "studio", "precursor", "history", "buzz", "strength"];
+  const rows = [header.join(",")];
+
+  categories.forEach((category) => {
+    category.films.forEach((film) => {
+      rows.push(
+        [
+          csvEscape(category.id),
+          csvEscape(category.name),
+          csvEscape(film.title),
+          csvEscape(film.studio),
+          film.precursor,
+          film.history,
+          film.buzz,
+          csvEscape(film.strength)
+        ].join(",")
+      );
+    });
+  });
+
+  return rows.join("\n");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let i = 0;
+  let inQuotes = false;
+
+  while (i < text.length) {
+    const char = text[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          value += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        value += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(value);
+      value = "";
+    } else if (char === "\n") {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+    } else if (char !== "\r") {
+      value += char;
+    }
+
+    i += 1;
+  }
+
+  if (value.length > 0 || row.length > 0) {
+    row.push(value);
+    rows.push(row);
+  }
+
+  return rows.filter((entry) => entry.some((cell) => cell.trim() !== ""));
+}
+
+function importContendersCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) throw new Error("CSV is empty or missing rows.");
+
+  const headerMap = rows[0].map((name) => name.trim().toLowerCase());
+  const requiredColumns = ["category_id", "title", "studio", "precursor", "history", "buzz", "strength"];
+  const missingColumns = requiredColumns.filter((name) => !headerMap.includes(name));
+  if (missingColumns.length > 0) {
+    throw new Error(`Missing required columns: ${missingColumns.join(", ")}`);
+  }
+
+  const indexOf = (name) => headerMap.indexOf(name);
+  const filmsByCategory = new Map();
+
+  rows.slice(1).forEach((entry, rowIndex) => {
+    const categoryId = String(entry[indexOf("category_id")] || "").trim();
+    const category = categories.find((item) => item.id === categoryId);
+    if (!category) {
+      throw new Error(`Unknown category_id "${categoryId}" on row ${rowIndex + 2}.`);
+    }
+
+    const film = parseFilmRecord({
+      title: entry[indexOf("title")],
+      studio: entry[indexOf("studio")],
+      precursor: entry[indexOf("precursor")],
+      history: entry[indexOf("history")],
+      buzz: entry[indexOf("buzz")],
+      strength: entry[indexOf("strength")]
+    });
+
+    if (!film) {
+      throw new Error(`Invalid contender data on row ${rowIndex + 2}.`);
+    }
+
+    if (!filmsByCategory.has(categoryId)) filmsByCategory.set(categoryId, []);
+    filmsByCategory.get(categoryId).push(film);
+  });
+
+  if (filmsByCategory.size === 0) throw new Error("CSV did not include any contenders.");
+
+  categories.forEach((category) => {
+    const importedFilms = filmsByCategory.get(category.id);
+    if (importedFilms && importedFilms.length > 0) {
+      category.films = importedFilms;
+    }
+  });
+}
+
+function bindCsvControls() {
+  exportCsvButton.addEventListener("click", () => {
+    const csvText = exportContendersCsv();
+    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `contenders-${dateStamp}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    setCsvStatus("Contender CSV exported.", "success");
+  });
+
+  importCsvButton.addEventListener("click", () => {
+    csvFileInput.click();
+  });
+
+  csvFileInput.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      importContendersCsv(await file.text());
+      saveState();
+      render();
+      setCsvStatus(`Imported ${file.name}.`, "success");
+    } catch (error) {
+      setCsvStatus(error.message || "CSV import failed.", "error");
+    } finally {
+      csvFileInput.value = "";
+    }
+  });
+}
+
+function saveState() {
+  try {
+    const payload = {
+      categoryId: state.categoryId,
+      weights: state.weights,
+      categories: categories.map((category) => ({
+        id: category.id,
+        films: category.films
+      }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures (private mode or blocked storage).
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+
+    if (parsed.weights && typeof parsed.weights === "object") {
+      state.weights.precursor = clamp(Number(parsed.weights.precursor || state.weights.precursor), 1, 95);
+      state.weights.history = clamp(Number(parsed.weights.history || state.weights.history), 1, 95);
+      state.weights.buzz = clamp(Number(parsed.weights.buzz || state.weights.buzz), 1, 95);
+    }
+
+    if (typeof parsed.categoryId === "string" && categories.some((category) => category.id === parsed.categoryId)) {
+      state.categoryId = parsed.categoryId;
+    }
+
+    if (Array.isArray(parsed.categories)) {
+      parsed.categories.forEach((storedCategory) => {
+        if (!storedCategory || typeof storedCategory !== "object") return;
+        const target = categories.find((category) => category.id === storedCategory.id);
+        if (!target || !Array.isArray(storedCategory.films)) return;
+
+        const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
+        if (films.length > 0) target.films = films;
+      });
+    }
+  } catch {
+    // Ignore malformed state.
+  }
 }
 
 function render() {
@@ -284,6 +534,8 @@ function render() {
   renderResults(activeCategory);
 }
 
+loadState();
 bindWeightInputs();
+bindCsvControls();
 syncWeightLabels();
 render();

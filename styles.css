@@ -129,6 +129,43 @@ input[type="range"] {
   color: var(--muted);
 }
 
+.data-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.action-button {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.action-button:hover {
+  border-color: var(--accent);
+}
+
+.tool-status {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.tool-status.error {
+  color: #8b2b1f;
+}
+
+.tool-status.success {
+  color: var(--accent);
+}
+
 #candidateCards {
   display: grid;
   gap: 12px;
