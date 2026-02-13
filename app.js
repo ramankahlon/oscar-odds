@@ -1,11 +1,7 @@
 const schedule2026Films = [
-  "The Plague",
   "The Mother and the Bear",
   "We Bury the Dead",
-  "All That's Left of You",
-  "The Chronology of Water",
   "Greenland 2: Migration",
-  "Is This Thing On?",
   "Primate",
   "Soulm8te",
   "Dead Man's Wire",
@@ -17,7 +13,6 @@ const schedule2026Films = [
   "Young Mothers",
   "28 Years Later: The Bone Temple",
   "Charlie the Wonderdog",
-  "Hamnet",
   "All You Need Is Kill",
   "Night Patrol",
   "A Private Life",
@@ -28,7 +23,6 @@ const schedule2026Films = [
   "H is for Hawk",
   "Mercy",
   "Return to Silent Hill",
-  "The Testament of Ann Lee",
   "In Cold Light",
   "Send Help",
   "Shelter",
@@ -45,7 +39,6 @@ const schedule2026Films = [
   "Calle Malaga",
   "Jimpa",
   "My Father's Shadow",
-  "Pillion",
   "The President's Cake",
   "Cold Storage",
   "Broken Bird",
@@ -78,7 +71,6 @@ const schedule2026Films = [
   "Project Hail Mary",
   "The Pout-Pout Fish",
   "Whitney Springs",
-  "Miroirs No. 3",
   "The Dog Stars",
   "They Will Kill You",
   "Alpha",
@@ -303,7 +295,7 @@ function applyExternalPredictionSignals() {
 
 applyExternalPredictionSignals();
 
-const STORAGE_KEY = "oscarOddsForecastState.v5";
+const STORAGE_KEY = "oscarOddsForecastState.v6";
 
 const state = {
   categoryId: categories[0].id,
