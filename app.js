@@ -175,130 +175,196 @@ const categoryDefinitions = [
   { id: "casting", name: "Best Casting", nominees: 5, winnerBase: 0.19 }
 ];
 
+function contender(title, studio, precursor, history, buzz, strength) {
+  return { title, studio, precursor, history, buzz, strength };
+}
+
+const categorySeeds = {
+  picture: [
+    contender("Christopher Nolan's The Odyssey", "Universal", 88, 84, 92, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 86, 81, 90, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 82, 74, 87, "High"),
+    contender("The Social Reckoning", "A24", 80, 76, 83, "High"),
+    contender("Hamnet", "Focus Features", 78, 82, 74, "High"),
+    contender("The Bride!", "Warner Bros.", 77, 72, 81, "Medium"),
+    contender("Michael", "Lionsgate", 75, 66, 88, "Medium"),
+    contender("Sense and Sensibility", "Focus Features", 71, 73, 70, "Medium"),
+    contender("Narnia", "Netflix", 68, 64, 79, "Medium"),
+    contender("The Dish [Spielberg Movie]", "Universal", 69, 70, 72, "Medium")
+  ],
+  director: [
+    contender("Christopher Nolan", "The Odyssey", 90, 88, 94, "High"),
+    contender("Denis Villeneuve", "Dune: Part Three", 86, 84, 89, "High"),
+    contender("Maggie Gyllenhaal", "The Bride!", 79, 73, 82, "High"),
+    contender("Steven Spielberg", "The Dish", 78, 90, 72, "High"),
+    contender("Alejandro G. Inarritu", "Judy", 74, 85, 68, "Medium")
+  ],
+  actor: [
+    contender("Tom Cruise", "Judy", 84, 78, 90, "High"),
+    contender("Jaafar Jackson", "Michael", 81, 66, 92, "High"),
+    contender("Colman Domingo", "Michael", 79, 82, 76, "High"),
+    contender("Jeffrey Wright", "Highest 2 Lowest", 74, 80, 70, "Medium"),
+    contender("Jeremy Strong", "The Social Reckoning", 73, 75, 72, "Medium")
+  ],
+  actress: [
+    contender("Mikey Madison", "The Social Reckoning", 83, 76, 82, "High"),
+    contender("Jessie Buckley", "The Bride!", 81, 79, 77, "High"),
+    contender("Renate Reinsve", "The Drama", 75, 73, 71, "Medium"),
+    contender("Daisy Edgar-Jones", "Sense and Sensibility", 72, 70, 69, "Medium"),
+    contender("Amy Adams", "At the Sea", 70, 81, 64, "Medium")
+  ],
+  "supporting-actor": [
+    contender("Russell Crowe", "Nuremberg", 76, 82, 67, "High"),
+    contender("Jonathan Bailey", "Wicked: For Good", 74, 70, 78, "Medium"),
+    contender("John Malkovich", "Wild Horse Nine", 73, 77, 68, "Medium"),
+    contender("John Goodman", "Judy", 71, 79, 66, "Medium"),
+    contender("Will Poulter", "Saturn Return", 69, 64, 72, "Low")
+  ],
+  "supporting-actress": [
+    contender("Sandra Huller", "Judy", 78, 86, 70, "High"),
+    contender("Octavia Spencer", "Death of a Salesman", 76, 83, 65, "High"),
+    contender("Mariana di Girolamo", "Wild Horse Nine", 72, 69, 71, "Medium"),
+    contender("Charlize Theron", "The Odyssey", 70, 74, 73, "Medium"),
+    contender("Parker Posey", "Wild Horse Nine", 68, 66, 67, "Low")
+  ],
+  "original-screenplay": [
+    contender("The Social Reckoning", "A24", 82, 78, 80, "High"),
+    contender("The Bride!", "Warner Bros.", 78, 71, 76, "High"),
+    contender("The Drama", "A24", 75, 73, 72, "Medium"),
+    contender("The Dish [Spielberg Movie]", "Universal", 73, 77, 69, "Medium"),
+    contender("Michael", "Lionsgate", 70, 64, 78, "Medium")
+  ],
+  "adapted-screenplay": [
+    contender("Hamnet", "Focus Features", 84, 86, 73, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 80, 72, 82, "High"),
+    contender("Sense and Sensibility", "Focus Features", 77, 79, 68, "Medium"),
+    contender("Narnia", "Netflix", 71, 66, 75, "Medium"),
+    contender("Dune: Part Three", "Warner Bros.", 72, 74, 70, "Medium")
+  ],
+  "animated-feature": [
+    contender("Pixar's Toy Story 5", "Disney/Pixar", 86, 89, 90, "High"),
+    contender("Pixar's Hoppers", "Disney/Pixar", 82, 75, 84, "High"),
+    contender("The Super Mario Galaxy Movie", "Universal/Illumination", 78, 67, 88, "Medium"),
+    contender("Dr. Seuss' The Cat in the Hat", "Warner Bros.", 74, 69, 76, "Medium"),
+    contender("PAW Patrol 3: The Dino Movie", "Paramount", 68, 60, 71, "Low")
+  ],
+  "international-feature": [
+    contender("The Love That Remains", "Nordisk", 81, 83, 69, "High"),
+    contender("A Poet", "Mubi", 78, 80, 65, "High"),
+    contender("Calle Malaga", "Sony Pictures Classics", 74, 76, 63, "Medium"),
+    contender("Islands", "Neon", 71, 72, 62, "Medium"),
+    contender("The Mother and the Bear", "Janus Films", 69, 74, 60, "Low")
+  ],
+  "documentary-feature": [
+    contender("Andre is an Idiot", "A24", 79, 76, 74, "High"),
+    contender("EPiC: Elvis Presley in Concert", "Sony", 75, 70, 82, "Medium"),
+    contender("Man on the Run", "Neon", 73, 71, 68, "Medium"),
+    contender("Whalefall", "Participant", 70, 69, 65, "Medium"),
+    contender("Archangel", "Netflix", 68, 66, 63, "Low")
+  ],
+  "documentary-short": [
+    contender("The President's Cake", "ShortsTV", 74, 73, 67, "High"),
+    contender("Stop! That! Train!", "ShortsTV", 72, 68, 64, "Medium"),
+    contender("Other Mommy", "ShortsTV", 70, 65, 63, "Medium"),
+    contender("Broken Bird", "ShortsTV", 68, 64, 60, "Low"),
+    contender("Charlie Harper", "ShortsTV", 66, 62, 58, "Low")
+  ],
+  "live-action-short": [
+    contender("The Third Parent", "ShortsTV", 75, 72, 66, "High"),
+    contender("A Great Awakening", "ShortsTV", 73, 70, 64, "Medium"),
+    contender("This Is Not a Test", "ShortsTV", 71, 66, 61, "Medium"),
+    contender("Thread: An Insidious Tale", "ShortsTV", 69, 63, 65, "Low"),
+    contender("The Resurrected", "ShortsTV", 67, 62, 60, "Low")
+  ],
+  "animated-short": [
+    contender("Buffalo Kids", "ShortsTV", 74, 73, 68, "High"),
+    contender("The Sheep Detectives", "ShortsTV", 72, 69, 66, "Medium"),
+    contender("Shaun the Sheep: The Beast of Mossy Bottom", "Aardman", 70, 71, 69, "Medium"),
+    contender("Whistle", "ShortsTV", 68, 64, 61, "Low"),
+    contender("The Pout-Pout Fish", "DreamWorks", 67, 63, 62, "Low")
+  ],
+  "original-score": [
+    contender("Dune: Part Three", "Warner Bros.", 87, 88, 80, "High"),
+    contender("The Odyssey", "Universal", 83, 86, 78, "High"),
+    contender("The Bride!", "Warner Bros.", 78, 76, 72, "Medium"),
+    contender("Project Hail Mary", "Amazon MGM", 76, 73, 75, "Medium"),
+    contender("Michael", "Lionsgate", 74, 68, 82, "Medium")
+  ],
+  "original-song": [
+    contender("Michael", "Lionsgate", 84, 72, 91, "High"),
+    contender("Narnia", "Netflix", 79, 68, 83, "Medium"),
+    contender("Toy Story 5", "Disney/Pixar", 76, 71, 80, "Medium"),
+    contender("Moana [Live-Action]", "Disney", 74, 70, 85, "Medium"),
+    contender("Wicked: For Good", "Universal", 73, 74, 88, "Medium")
+  ],
+  sound: [
+    contender("Dune: Part Three", "Warner Bros.", 88, 86, 78, "High"),
+    contender("The Odyssey", "Universal", 84, 80, 76, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 80, 74, 79, "Medium"),
+    contender("Avengers: Doomsday", "Marvel", 77, 68, 86, "Medium"),
+    contender("Spider-Man: Brand New Day", "Sony", 73, 64, 84, "Low")
+  ],
+  "production-design": [
+    contender("The Odyssey", "Universal", 87, 85, 78, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 85, 83, 75, "High"),
+    contender("The Bride!", "Warner Bros.", 82, 77, 73, "Medium"),
+    contender("Narnia", "Netflix", 78, 69, 79, "Medium"),
+    contender("The Dish [Spielberg Movie]", "Universal", 74, 72, 67, "Low")
+  ],
+  cinematography: [
+    contender("The Odyssey", "Universal", 89, 88, 79, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 87, 86, 77, "High"),
+    contender("Hamnet", "Focus Features", 83, 84, 71, "High"),
+    contender("The Bride!", "Warner Bros.", 79, 74, 70, "Medium"),
+    contender("Judy [Inarritu Movie]", "Warner Bros.", 76, 82, 68, "Medium")
+  ],
+  "makeup-hairstyling": [
+    contender("The Bride!", "Warner Bros.", 86, 80, 75, "High"),
+    contender("The Odyssey", "Universal", 82, 77, 73, "High"),
+    contender("Michael", "Lionsgate", 80, 70, 84, "Medium"),
+    contender("Supergirl", "DC Studios", 76, 64, 81, "Medium"),
+    contender("Clayface", "DC Studios", 73, 67, 79, "Low")
+  ],
+  "costume-design": [
+    contender("Hamnet", "Focus Features", 86, 89, 71, "High"),
+    contender("The Bride!", "Warner Bros.", 84, 81, 74, "High"),
+    contender("Sense and Sensibility", "Focus Features", 80, 83, 68, "Medium"),
+    contender("The Odyssey", "Universal", 78, 76, 72, "Medium"),
+    contender("Narnia", "Netflix", 75, 69, 76, "Low")
+  ],
+  "film-editing": [
+    contender("The Odyssey", "Universal", 85, 84, 79, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 83, 82, 76, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 80, 75, 78, "Medium"),
+    contender("The Social Reckoning", "A24", 78, 77, 73, "Medium"),
+    contender("Michael", "Lionsgate", 74, 69, 82, "Low")
+  ],
+  "visual-effects": [
+    contender("Dune: Part Three", "Warner Bros.", 91, 88, 82, "High"),
+    contender("The Odyssey", "Universal", 87, 83, 80, "High"),
+    contender("Avengers: Doomsday", "Marvel", 85, 73, 90, "Medium"),
+    contender("Project Hail Mary", "Amazon MGM", 82, 76, 84, "Medium"),
+    contender("Spider-Man: Brand New Day", "Sony", 79, 68, 88, "Low")
+  ],
+  casting: [
+    contender("The Social Reckoning", "A24", 82, 79, 75, "High"),
+    contender("Michael", "Lionsgate", 80, 73, 88, "High"),
+    contender("The Odyssey", "Universal", 78, 77, 74, "Medium"),
+    contender("The Bride!", "Warner Bros.", 76, 72, 73, "Medium"),
+    contender("Narnia", "Netflix", 72, 67, 78, "Low")
+  ]
+};
+
 function createSeedFilms() {
-  return schedule2026Films.map((title) => ({
-    title,
-    studio: "TBD",
-    precursor: 55,
-    history: 50,
-    buzz: 52,
-    strength: "Medium"
-  }));
+  return schedule2026Films.map((title) => contender(title, "TBD", 55, 50, 52, "Medium"));
 }
 
 const categories = categoryDefinitions.map((category) => ({
   ...category,
-  films: createSeedFilms()
+  films: categorySeeds[category.id] ? [...categorySeeds[category.id]] : createSeedFilms()
 }));
 
-const letterboxdRanks = new Map([
-  ["Hamnet", 3],
-  ["The Bride!", 14],
-  ["The Testament of Ann Lee", 21],
-  ["Is This Thing On?", 23],
-  ["Magellan", 27],
-  ["Dr. Seuss' The Cat in the Hat", 42],
-  ["Is God Is", 43],
-  ["Pixar's Hoppers", 44],
-  ["Scream 7", 45],
-  ["The Dish [Spielberg Movie]", 49],
-  ["Christopher Nolan's The Odyssey", 50],
-  ["Young Mothers", 53],
-  ["Dune: Part Three", 54]
-]);
-
-const theGamerRanks = new Map([
-  ["The Dish [Spielberg Movie]", 4],
-  ["The Bride!", 5],
-  ["Michael", 8],
-  ["Hamnet", 10]
-]);
-
-const redditMentions = new Map([
-  ["Christopher Nolan's The Odyssey", 9],
-  ["Project Hail Mary", 6],
-  ["Dune: Part Three", 4],
-  ["Michael", 4],
-  ["The Social Reckoning", 3],
-  ["Narnia", 3],
-  ["Sense and Sensibility", 2],
-  ["The Bride!", 2],
-  ["The Drama", 2],
-  ["The Dish [Spielberg Movie]", 2],
-  ["The Dog Stars", 1],
-  ["Forgotten Island", 1],
-  ["Pixar's Hoppers", 1],
-  ["Avengers: Doomsday", 1],
-  ["Wuthering Heights", 1],
-  ["Clayface", 1]
-]);
-
-const bovadaAmericanOdds = new Map([
-  ["Hamnet", 400]
-]);
-
-const kalshiImpliedOdds = new Map([
-  ["Hamnet", 0.05]
-]);
-
-function rankToScore(rank, maxRank) {
-  if (!rank) return 0;
-  return clamp((maxRank - rank + 1) / maxRank, 0, 1);
-}
-
-function americanOddsToProbability(odds) {
-  if (!Number.isFinite(odds) || odds === 0) return 0;
-  if (odds > 0) return 100 / (odds + 100);
-  const abs = Math.abs(odds);
-  return abs / (abs + 100);
-}
-
-function applyExternalPredictionSignals() {
-  const maxRedditMentions = Math.max(...redditMentions.values(), 1);
-  categories.forEach((category) => {
-    category.films.forEach((film) => {
-      const letterboxdScore = rankToScore(letterboxdRanks.get(film.title), 54);
-      const theGamerScore = rankToScore(theGamerRanks.get(film.title), 10);
-      const redditScore = clamp((redditMentions.get(film.title) || 0) / maxRedditMentions, 0, 1);
-      const bovadaScore = americanOddsToProbability(bovadaAmericanOdds.get(film.title));
-      const kalshiScore = clamp(kalshiImpliedOdds.get(film.title) || 0, 0, 1);
-      const bettingScore =
-        bovadaScore > 0 && kalshiScore > 0
-          ? (bovadaScore + kalshiScore) / 2
-          : bovadaScore > 0
-            ? bovadaScore
-            : kalshiScore;
-
-      const composite =
-        letterboxdScore * 0.35 +
-        theGamerScore * 0.2 +
-        redditScore * 0.25 +
-        bettingScore * 0.2;
-
-      if (composite <= 0) return;
-
-      film.precursor = clamp(Math.round(55 + composite * 35), 0, 100);
-      film.history = clamp(Math.round(50 + (letterboxdScore * 0.7 + theGamerScore * 0.3) * 28), 0, 100);
-      film.buzz = clamp(
-        Math.round(52 + (redditScore * 0.4 + Math.max(letterboxdScore, theGamerScore, bettingScore) * 0.6) * 36),
-        0,
-        100
-      );
-
-      if (composite >= 0.62 || redditScore >= 0.8 || bettingScore >= 0.35) {
-        film.strength = "High";
-      } else if (composite >= 0.34) {
-        film.strength = "Medium";
-      } else {
-        film.strength = "Low";
-      }
-    });
-  });
-}
-
-applyExternalPredictionSignals();
-
-const STORAGE_KEY = "oscarOddsForecastState.v7";
+const STORAGE_KEY = "oscarOddsForecastState.v8";
 
 const state = {
   categoryId: categories[0].id,
