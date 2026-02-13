@@ -203,7 +203,7 @@ const categorySeeds = {
     contender("Tom Cruise", "Judy", 84, 78, 90, "High"),
     contender("Jaafar Jackson", "Michael", 81, 66, 92, "High"),
     contender("Ryan Gosling", "Project Hail Mary", 79, 82, 76, "High"),
-    contender("Jacob Elordi", "Wuthering Heights", 74, 80, 70, "Medium"),
+    contender("Matt Damon", "The Odyssey", 76, 82, 74, "High"),
     contender("Jeremy Strong", "The Social Reckoning", 73, 75, 72, "Medium")
   ],
   actress: [
@@ -211,10 +211,10 @@ const categorySeeds = {
     contender("Jessie Buckley", "The Bride!", 81, 79, 77, "High"),
     contender("Zendaya", "The Drama", 75, 73, 71, "Medium"),
     contender("Daisy Edgar-Jones", "Sense and Sensibility", 72, 70, 69, "Medium"),
-    contender("Amy Adams", "At the Sea", 70, 81, 64, "Medium")
+    contender("Amy Adams", "At the Sea", 77, 86, 70, "High")
   ],
   "supporting-actor": [
-    contender("Matt Damon", "The Odyssey", 76, 82, 67, "High"),
+    contender("John Magaro", "Nuremberg", 74, 80, 65, "Medium"),
     contender("Josh Brolin", "Dune: Part Three", 74, 70, 78, "Medium"),
     contender("John Malkovich", "Wild Horse Nine", 73, 77, 68, "Medium"),
     contender("John Goodman", "Judy", 71, 79, 66, "Medium"),
@@ -388,7 +388,13 @@ const recentWinnerPenalty = {
   }
 };
 
-const STORAGE_KEY = "oscarOddsForecastState.v10";
+const overdueNarrativeBoost = {
+  actress: {
+    "Amy Adams": 1
+  }
+};
+
+const STORAGE_KEY = "oscarOddsForecastState.v11";
 
 const state = {
   categoryId: categories[0].id,
@@ -443,6 +449,7 @@ function winnerExperienceBoost(categoryId, contenderName) {
 
   const wins = priorCategoryWins[categoryId]?.[contenderName] || 0;
   const hasRecentPenalty = Boolean(recentWinnerPenalty[categoryId]?.[contenderName]);
+  const hasOverdueNarrative = Boolean(overdueNarrativeBoost[categoryId]?.[contenderName]);
 
   let boost = 1;
   if (wins === 0) {
@@ -452,6 +459,7 @@ function winnerExperienceBoost(categoryId, contenderName) {
   }
 
   if (hasRecentPenalty) boost -= 0.12;
+  if (hasOverdueNarrative) boost += 0.08;
   return clamp(boost, 0.8, 1.2);
 }
 
