@@ -395,6 +395,8 @@ const overdueNarrativeBoost = {
 };
 
 const STORAGE_KEY = "oscarOddsForecastState.v11";
+const EXTERNAL_SIGNALS_URL = "data/source-signals.json";
+const EXTERNAL_SIGNALS_POLL_MS = 5 * 60 * 1000;
 
 const state = {
   categoryId: categories[0].id,
@@ -404,6 +406,7 @@ const state = {
     buzz: 12
   }
 };
+let appliedExternalSnapshotId = null;
 
 const categoryTabs = document.querySelector("#categoryTabs");
 const categoryTitle = document.querySelector("#categoryTitle");
@@ -417,6 +420,16 @@ const csvStatus = document.querySelector("#csvStatus");
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeSignalKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\[[^\]]*]/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9']+/g, " ")
+    .trim();
 }
 
 function normalizeWeights() {
@@ -466,6 +479,76 @@ function winnerExperienceBoost(categoryId, contenderName) {
 function sanitizeStrength(value) {
   if (value === "High" || value === "Medium" || value === "Low") return value;
   return "Low";
+}
+
+function applyExternalSignalSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.aggregate)) return false;
+  if (!snapshot.generatedAt || snapshot.generatedAt === appliedExternalSnapshotId) return false;
+
+  const aggregateMap = new Map();
+  snapshot.aggregate.forEach((entry) => {
+    if (!entry || typeof entry !== "object") return;
+    const key = normalizeSignalKey(entry.title);
+    if (!key) return;
+    aggregateMap.set(key, entry);
+  });
+
+  if (aggregateMap.size === 0) return false;
+
+  let updated = 0;
+  categories.forEach((category) => {
+    category.films.forEach((film) => {
+      const match =
+        aggregateMap.get(normalizeSignalKey(film.title)) ||
+        aggregateMap.get(normalizeSignalKey(film.studio));
+
+      if (!match) return;
+
+      const combined = clamp(Number(match.combinedScore || 0), 0, 1);
+      const letterboxdScore = clamp(Number(match.letterboxdScore || 0), 0, 1);
+      const redditScore = clamp(Number(match.redditScore || 0), 0, 1);
+      const thegamerScore = clamp(Number(match.thegamerScore || 0), 0, 1);
+
+      film.precursor = clamp(film.precursor + Math.round((combined - 0.35) * 10), 0, 100);
+      film.history = clamp(film.history + Math.round((letterboxdScore + thegamerScore - 0.55) * 8), 0, 100);
+      film.buzz = clamp(film.buzz + Math.round((redditScore + thegamerScore - 0.5) * 10), 0, 100);
+
+      if (combined >= 0.7 || redditScore >= 0.75) {
+        film.strength = "High";
+      } else if (combined >= 0.45) {
+        film.strength = "Medium";
+      } else {
+        film.strength = "Low";
+      }
+
+      updated += 1;
+    });
+  });
+
+  if (updated === 0) return false;
+  appliedExternalSnapshotId = snapshot.generatedAt;
+  return true;
+}
+
+async function fetchAndApplyExternalSignals() {
+  try {
+    const response = await fetch(`${EXTERNAL_SIGNALS_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const snapshot = await response.json();
+    const changed = applyExternalSignalSnapshot(snapshot);
+    if (!changed) return;
+    saveState();
+    render();
+  } catch {
+    // Ignore unavailable local scrape output (e.g. before first poll run).
+  }
+}
+
+function startExternalSignalPolling() {
+  fetchAndApplyExternalSignals();
+  setInterval(() => {
+    fetchAndApplyExternalSignals();
+  }, EXTERNAL_SIGNALS_POLL_MS);
 }
 
 function parseFilmRecord(record) {
@@ -895,3 +978,4 @@ function render() {
 loadState();
 bindCsvControls();
 render();
+startExternalSignalPolling();

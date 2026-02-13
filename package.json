@@ -1,0 +1,13 @@
+{
+  "name": "oscar-odds",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape:sources": "node scripts/poll-sources.mjs --once",
+    "poll:sources": "node scripts/poll-sources.mjs --interval-minutes 30"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  }
+}
