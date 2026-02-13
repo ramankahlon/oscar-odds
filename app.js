@@ -203,7 +203,7 @@ const categorySeeds = {
     contender("Tom Cruise", "Judy", 84, 78, 90, "High"),
     contender("Jaafar Jackson", "Michael", 81, 66, 92, "High"),
     contender("Ryan Gosling", "Project Hail Mary", 79, 82, 76, "High"),
-    contender("Jeffrey Wright", "Highest 2 Lowest", 74, 80, 70, "Medium"),
+    contender("Jacob Elordi", "Wuthering Heights", 74, 80, 70, "Medium"),
     contender("Jeremy Strong", "The Social Reckoning", 73, 75, 72, "Medium")
   ],
   actress: [
@@ -214,7 +214,7 @@ const categorySeeds = {
     contender("Amy Adams", "At the Sea", 70, 81, 64, "Medium")
   ],
   "supporting-actor": [
-    contender("Russell Crowe", "Nuremberg", 76, 82, 67, "High"),
+    contender("Matt Damon", "The Odyssey", 76, 82, 67, "High"),
     contender("Josh Brolin", "Dune: Part Three", 74, 70, 78, "Medium"),
     contender("John Malkovich", "Wild Horse Nine", 73, 77, 68, "Medium"),
     contender("John Goodman", "Judy", 71, 79, 66, "Medium"),
@@ -380,7 +380,14 @@ const priorCategoryWins = {
   }
 };
 
-const STORAGE_KEY = "oscarOddsForecastState.v9";
+const recentWinnerPenalty = {
+  actress: {
+    "Mikey Madison": 1,
+    "Jessie Buckley": 1
+  }
+};
+
+const STORAGE_KEY = "oscarOddsForecastState.v10";
 
 const state = {
   categoryId: categories[0].id,
@@ -425,8 +432,26 @@ function strengthBoost(strength) {
 }
 
 function winnerExperienceBoost(categoryId, contenderName) {
+  const isPersonCategory =
+    categoryId === "director" ||
+    categoryId === "actor" ||
+    categoryId === "actress" ||
+    categoryId === "supporting-actor" ||
+    categoryId === "supporting-actress";
+  if (!isPersonCategory) return 1;
+
   const wins = priorCategoryWins[categoryId]?.[contenderName] || 0;
-  return 1 + wins * 0.07;
+  const hasRecentPenalty = Boolean(recentWinnerPenalty[categoryId]?.[contenderName]);
+
+  let boost = 1;
+  if (wins === 0) {
+    boost += 0.06;
+  } else {
+    boost += Math.min(wins, 2) * 0.03;
+  }
+
+  if (hasRecentPenalty) boost -= 0.12;
+  return clamp(boost, 0.8, 1.2);
 }
 
 function sanitizeStrength(value) {
