@@ -148,43 +148,48 @@ const schedule2026Films = [
   "Dune: Part Three"
 ];
 
-const categories = [
-  {
-    id: "picture",
-    name: "Best Picture",
-    nominees: 10,
-    winnerBase: 0.16,
-    films: schedule2026Films.map((title) => ({
-      title,
-      studio: "TBD",
-      precursor: 55,
-      history: 50,
-      buzz: 52,
-      strength: "Medium"
-    }))
-  },
-  {
-    id: "director",
-    name: "Best Director",
-    nominees: 5,
-    winnerBase: 0.24,
-    films: [{ title: "The Bride!", studio: "Maggie Gyllenhaal", precursor: 64, history: 60, buzz: 69, strength: "High" }]
-  },
-  {
-    id: "actor",
-    name: "Best Actor",
-    nominees: 5,
-    winnerBase: 0.25,
-    films: [{ title: "The Bride!", studio: "Warner Bros.", precursor: 60, history: 55, buzz: 66, strength: "Medium" }]
-  },
-  {
-    id: "actress",
-    name: "Best Actress",
-    nominees: 5,
-    winnerBase: 0.24,
-    films: [{ title: "The Bride!", studio: "Jessie Buckley", precursor: 68, history: 66, buzz: 71, strength: "High" }]
-  }
+const categoryDefinitions = [
+  { id: "picture", name: "Best Picture", nominees: 10, winnerBase: 0.16 },
+  { id: "director", name: "Best Director", nominees: 5, winnerBase: 0.24 },
+  { id: "actor", name: "Best Actor", nominees: 5, winnerBase: 0.25 },
+  { id: "actress", name: "Best Actress", nominees: 5, winnerBase: 0.24 },
+  { id: "supporting-actor", name: "Best Supporting Actor", nominees: 5, winnerBase: 0.23 },
+  { id: "supporting-actress", name: "Best Supporting Actress", nominees: 5, winnerBase: 0.23 },
+  { id: "original-screenplay", name: "Best Original Screenplay", nominees: 5, winnerBase: 0.22 },
+  { id: "adapted-screenplay", name: "Best Adapted Screenplay", nominees: 5, winnerBase: 0.22 },
+  { id: "animated-feature", name: "Best Animated Feature Film", nominees: 5, winnerBase: 0.2 },
+  { id: "international-feature", name: "Best International Feature Film", nominees: 5, winnerBase: 0.2 },
+  { id: "documentary-feature", name: "Best Documentary Feature Film", nominees: 5, winnerBase: 0.2 },
+  { id: "documentary-short", name: "Best Documentary Short Film", nominees: 5, winnerBase: 0.18 },
+  { id: "live-action-short", name: "Best Live Action Short Film", nominees: 5, winnerBase: 0.18 },
+  { id: "animated-short", name: "Best Animated Short Film", nominees: 5, winnerBase: 0.18 },
+  { id: "original-score", name: "Best Original Score", nominees: 5, winnerBase: 0.21 },
+  { id: "original-song", name: "Best Original Song", nominees: 5, winnerBase: 0.2 },
+  { id: "sound", name: "Best Sound", nominees: 5, winnerBase: 0.2 },
+  { id: "production-design", name: "Best Production Design", nominees: 5, winnerBase: 0.2 },
+  { id: "cinematography", name: "Best Cinematography", nominees: 5, winnerBase: 0.2 },
+  { id: "makeup-hairstyling", name: "Best Makeup and Hairstyling", nominees: 5, winnerBase: 0.19 },
+  { id: "costume-design", name: "Best Costume Design", nominees: 5, winnerBase: 0.19 },
+  { id: "film-editing", name: "Best Film Editing", nominees: 5, winnerBase: 0.21 },
+  { id: "visual-effects", name: "Best Visual Effects", nominees: 5, winnerBase: 0.2 },
+  { id: "casting", name: "Best Casting", nominees: 5, winnerBase: 0.19 }
 ];
+
+function createSeedFilms() {
+  return schedule2026Films.map((title) => ({
+    title,
+    studio: "TBD",
+    precursor: 55,
+    history: 50,
+    buzz: 52,
+    strength: "Medium"
+  }));
+}
+
+const categories = categoryDefinitions.map((category) => ({
+  ...category,
+  films: createSeedFilms()
+}));
 
 const letterboxdRanks = new Map([
   ["Hamnet", 3],
@@ -249,53 +254,51 @@ function americanOddsToProbability(odds) {
 }
 
 function applyExternalPredictionSignals() {
-  const picture = categories.find((category) => category.id === "picture");
-  if (!picture) return;
-
   const maxRedditMentions = Math.max(...redditMentions.values(), 1);
+  categories.forEach((category) => {
+    category.films.forEach((film) => {
+      const letterboxdScore = rankToScore(letterboxdRanks.get(film.title), 54);
+      const theGamerScore = rankToScore(theGamerRanks.get(film.title), 10);
+      const redditScore = clamp((redditMentions.get(film.title) || 0) / maxRedditMentions, 0, 1);
+      const bovadaScore = americanOddsToProbability(bovadaAmericanOdds.get(film.title));
+      const kalshiScore = clamp(kalshiImpliedOdds.get(film.title) || 0, 0, 1);
+      const bettingScore =
+        bovadaScore > 0 && kalshiScore > 0
+          ? (bovadaScore + kalshiScore) / 2
+          : bovadaScore > 0
+            ? bovadaScore
+            : kalshiScore;
 
-  picture.films.forEach((film) => {
-    const letterboxdScore = rankToScore(letterboxdRanks.get(film.title), 54);
-    const theGamerScore = rankToScore(theGamerRanks.get(film.title), 10);
-    const redditScore = clamp((redditMentions.get(film.title) || 0) / maxRedditMentions, 0, 1);
-    const bovadaScore = americanOddsToProbability(bovadaAmericanOdds.get(film.title));
-    const kalshiScore = clamp(kalshiImpliedOdds.get(film.title) || 0, 0, 1);
-    const bettingScore =
-      bovadaScore > 0 && kalshiScore > 0
-        ? (bovadaScore + kalshiScore) / 2
-        : bovadaScore > 0
-          ? bovadaScore
-          : kalshiScore;
+      const composite =
+        letterboxdScore * 0.35 +
+        theGamerScore * 0.2 +
+        redditScore * 0.25 +
+        bettingScore * 0.2;
 
-    const composite =
-      letterboxdScore * 0.35 +
-      theGamerScore * 0.2 +
-      redditScore * 0.25 +
-      bettingScore * 0.2;
+      if (composite <= 0) return;
 
-    if (composite <= 0) return;
+      film.precursor = clamp(Math.round(55 + composite * 35), 0, 100);
+      film.history = clamp(Math.round(50 + (letterboxdScore * 0.7 + theGamerScore * 0.3) * 28), 0, 100);
+      film.buzz = clamp(
+        Math.round(52 + (redditScore * 0.4 + Math.max(letterboxdScore, theGamerScore, bettingScore) * 0.6) * 36),
+        0,
+        100
+      );
 
-    film.precursor = clamp(Math.round(55 + composite * 35), 0, 100);
-    film.history = clamp(Math.round(50 + (letterboxdScore * 0.7 + theGamerScore * 0.3) * 28), 0, 100);
-    film.buzz = clamp(
-      Math.round(52 + (redditScore * 0.4 + Math.max(letterboxdScore, theGamerScore, bettingScore) * 0.6) * 36),
-      0,
-      100
-    );
-
-    if (composite >= 0.62 || redditScore >= 0.8 || bettingScore >= 0.35) {
-      film.strength = "High";
-    } else if (composite >= 0.34) {
-      film.strength = "Medium";
-    } else {
-      film.strength = "Low";
-    }
+      if (composite >= 0.62 || redditScore >= 0.8 || bettingScore >= 0.35) {
+        film.strength = "High";
+      } else if (composite >= 0.34) {
+        film.strength = "Medium";
+      } else {
+        film.strength = "Low";
+      }
+    });
   });
 }
 
 applyExternalPredictionSignals();
 
-const STORAGE_KEY = "oscarOddsForecastState.v6";
+const STORAGE_KEY = "oscarOddsForecastState.v7";
 
 const state = {
   categoryId: categories[0].id,
@@ -310,12 +313,6 @@ const categoryTabs = document.querySelector("#categoryTabs");
 const categoryTitle = document.querySelector("#categoryTitle");
 const candidateCards = document.querySelector("#candidateCards");
 const resultsBody = document.querySelector("#resultsBody");
-const precursorWeight = document.querySelector("#precursorWeight");
-const historyWeight = document.querySelector("#historyWeight");
-const buzzWeight = document.querySelector("#buzzWeight");
-const precursorWeightValue = document.querySelector("#precursorWeightValue");
-const historyWeightValue = document.querySelector("#historyWeightValue");
-const buzzWeightValue = document.querySelector("#buzzWeightValue");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const importCsvButton = document.querySelector("#importCsvButton");
 const csvFileInput = document.querySelector("#csvFileInput");
@@ -442,7 +439,7 @@ function createCard(category, film, filmIndex) {
     input.addEventListener("input", (event) => {
       film[field.key] = clamp(Number(event.target.value || 0), 0, 100);
       saveState();
-      renderResults(category);
+      render();
     });
     wrapper.appendChild(input);
     grid.appendChild(wrapper);
@@ -463,7 +460,7 @@ function createCard(category, film, filmIndex) {
       .find((c) => c.id === category.id)
       .films[filmIndex].strength = event.target.value;
     saveState();
-    renderResults(category);
+    render();
   });
   strengthLabel.appendChild(strengthSelect);
   grid.appendChild(strengthLabel);
@@ -472,29 +469,23 @@ function createCard(category, film, filmIndex) {
   return card;
 }
 
-function renderCandidates(category) {
-  categoryTitle.textContent = category.name;
-  candidateCards.innerHTML = "";
-
-  category.films.forEach((film, index) => {
-    candidateCards.appendChild(createCard(category, film, index));
-  });
+function getDisplayLimit(category) {
+  return category.id === "picture" ? 10 : 5;
 }
 
-function renderResults(category) {
+function buildProjections(category) {
   const normalized = normalizeWeights();
 
-  const scored = category.films.map((film) => {
+  const scored = category.films.map((film, index) => {
     const scores = scoreFilm(film, normalized);
-    return { ...film, ...scores };
+    return { ...film, ...scores, index };
   });
 
   const nominationTotal = scored.reduce((sum, item) => sum + item.nominationRaw, 0) || 1;
   const winnerTotal = scored.reduce((sum, item) => sum + item.winnerRaw, 0) || 1;
-
   const nomineeScale = category.nominees / Math.max(1, scored.length);
 
-  const projections = scored
+  return scored
     .map((film) => {
       const nomination = clamp((film.nominationRaw / nominationTotal) * 100 * nomineeScale, 0.4, 99);
       const winner = clamp(
@@ -505,44 +496,30 @@ function renderResults(category) {
       );
 
       return {
+        index: film.index,
         title: film.title,
         nomination,
         winner
       };
     })
     .sort((a, b) => b.winner - a.winner);
+}
 
-  resultsBody.innerHTML = "";
-  projections.forEach((entry) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td><strong>${entry.title}</strong></td><td>${entry.nomination.toFixed(1)}%</td><td>${entry.winner.toFixed(1)}%</td>`;
-    resultsBody.appendChild(row);
+function renderCandidates(category, projections) {
+  categoryTitle.textContent = category.name;
+  candidateCards.innerHTML = "";
+
+  projections.slice(0, getDisplayLimit(category)).forEach((entry) => {
+    candidateCards.appendChild(createCard(category, category.films[entry.index], entry.index));
   });
 }
 
-function syncWeightLabels() {
-  precursorWeight.value = String(state.weights.precursor);
-  historyWeight.value = String(state.weights.history);
-  buzzWeight.value = String(state.weights.buzz);
-  precursorWeightValue.textContent = `${state.weights.precursor}%`;
-  historyWeightValue.textContent = `${state.weights.history}%`;
-  buzzWeightValue.textContent = `${state.weights.buzz}%`;
-}
-
-function bindWeightInputs() {
-  const map = [
-    { input: precursorWeight, key: "precursor" },
-    { input: historyWeight, key: "history" },
-    { input: buzzWeight, key: "buzz" }
-  ];
-
-  map.forEach(({ input, key }) => {
-    input.addEventListener("input", (event) => {
-      state.weights[key] = clamp(Number(event.target.value || 0), 1, 95);
-      syncWeightLabels();
-      saveState();
-      renderResults(getActiveCategory());
-    });
+function renderResults(category, projections) {
+  resultsBody.innerHTML = "";
+  projections.slice(0, getDisplayLimit(category)).forEach((entry) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td><strong>${entry.title}</strong></td><td>${entry.nomination.toFixed(1)}%</td><td>${entry.winner.toFixed(1)}%</td>`;
+    resultsBody.appendChild(row);
   });
 }
 
@@ -763,13 +740,12 @@ function loadState() {
 
 function render() {
   const activeCategory = getActiveCategory();
+  const projections = buildProjections(activeCategory);
   renderTabs();
-  renderCandidates(activeCategory);
-  renderResults(activeCategory);
+  renderCandidates(activeCategory, projections);
+  renderResults(activeCategory, projections);
 }
 
 loadState();
-bindWeightInputs();
 bindCsvControls();
-syncWeightLabels();
 render();

@@ -23,31 +23,7 @@
         </p>
       </header>
 
-      <section class="controls" aria-label="Model settings">
-        <div class="panel">
-          <h2>Model Inputs</h2>
-          <p class="panel-copy">Adjust global assumptions. These inputs affect every category forecast.</p>
-
-          <div class="input-grid">
-            <label>
-              Precursor Signal Weight
-              <input id="precursorWeight" type="range" min="35" max="75" value="58" />
-              <span class="value" id="precursorWeightValue">58%</span>
-            </label>
-            <label>
-              Historical Baseline Weight
-              <input id="historyWeight" type="range" min="20" max="55" value="30" />
-              <span class="value" id="historyWeightValue">30%</span>
-            </label>
-            <label>
-              Industry Buzz Weight
-              <input id="buzzWeight" type="range" min="5" max="25" value="12" />
-              <span class="value" id="buzzWeightValue">12%</span>
-            </label>
-          </div>
-          <p class="disclaimer">Weights are normalized automatically.</p>
-        </div>
-
+      <section class="controls" aria-label="Categories">
         <div class="panel">
           <h2>Categories</h2>
           <div class="category-list" id="categoryTabs" role="tablist" aria-label="Oscar categories"></div>
