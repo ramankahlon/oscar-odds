@@ -356,6 +356,108 @@ table {
   background: var(--accent);
 }
 
+.trend-panel {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.trend-panel h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.trend-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.trend-window-control {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.trend-window-control select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 7px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+
+.trend-meta {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.legend-dot.nomination {
+  background: #0f6f5f;
+}
+
+.legend-dot.winner {
+  background: #915c11;
+}
+
+.legend-dot.source {
+  background: #5f554a;
+}
+
+.trend-chart {
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf8;
+}
+
+.trend-source-moves {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.trend-source-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+}
+
+.trend-source-row .stamp {
+  color: var(--muted);
+}
+
 th,
 td {
   text-align: left;
@@ -408,5 +510,10 @@ td strong {
 
   .mini-grid {
     grid-template-columns: 1fr;
+  }
+
+  .trend-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

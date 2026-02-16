@@ -68,6 +68,27 @@
             <div id="explainBreakdown"></div>
             <p class="explain-notes" id="explainNotes"></p>
           </section>
+          <section class="trend-panel" aria-live="polite">
+            <div class="trend-head">
+              <h3 id="trendTitle">Trend Analytics</h3>
+              <label class="trend-window-control" for="trendWindowSelect">
+                Range
+                <select id="trendWindowSelect" aria-label="Trend history range">
+                  <option value="7">Last 7</option>
+                  <option value="15">Last 15</option>
+                  <option value="30" selected>Last 30</option>
+                </select>
+              </label>
+            </div>
+            <p class="trend-meta" id="trendMeta">Nomination and winner movement over recent model updates.</p>
+            <div class="trend-legend">
+              <span><i class="legend-dot nomination"></i> Nomination %</span>
+              <span><i class="legend-dot winner"></i> Winner %</span>
+              <span><i class="legend-dot source"></i> Source update</span>
+            </div>
+            <svg id="trendChart" class="trend-chart" viewBox="0 0 700 220" role="img" aria-label="Nomination and winner trend chart"></svg>
+            <div id="trendSourceMoves" class="trend-source-moves"></div>
+          </section>
         </article>
 
         <article class="panel candidates" id="candidatePanel">

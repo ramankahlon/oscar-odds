@@ -401,6 +401,8 @@ const API_PROFILE_LIST_URL = "/api/profiles";
 const API_FORECAST_BASE_URL = "/api/forecast";
 const EXTERNAL_SIGNALS_URL = "data/source-signals.json";
 const EXTERNAL_SIGNALS_POLL_MS = 5 * 60 * 1000;
+const TREND_HISTORY_LIMIT = 240;
+const TREND_WINDOW_OPTIONS = [7, 15, 30];
 
 const state = {
   profileId: "default",
@@ -409,9 +411,15 @@ const state = {
     precursor: 58,
     history: 30,
     buzz: 12
-  }
+  },
+  trendWindow: 30
 };
 let appliedExternalSnapshotId = null;
+const trendHistory = {
+  version: 1,
+  snapshots: [],
+  lastSignatureByCategory: {}
+};
 
 const categoryTabs = document.querySelector("#categoryTabs");
 const categoryTitle = document.querySelector("#categoryTitle");
@@ -423,6 +431,11 @@ const explainMeta = document.querySelector("#explainMeta");
 const explainDelta = document.querySelector("#explainDelta");
 const explainBreakdown = document.querySelector("#explainBreakdown");
 const explainNotes = document.querySelector("#explainNotes");
+const trendTitle = document.querySelector("#trendTitle");
+const trendMeta = document.querySelector("#trendMeta");
+const trendChart = document.querySelector("#trendChart");
+const trendSourceMoves = document.querySelector("#trendSourceMoves");
+const trendWindowSelect = document.querySelector("#trendWindowSelect");
 const movieDetailTitle = document.querySelector("#movieDetailTitle");
 const movieDetailDirector = document.querySelector("#movieDetailDirector");
 const movieDetailStars = document.querySelector("#movieDetailStars");
@@ -855,6 +868,204 @@ function getSelectedFilmTitle(categoryId, entry) {
   return isPersonCategory ? entry.rawStudio : entry.rawTitle;
 }
 
+function trendKeyForEntry(categoryId, entry) {
+  const isPersonCategory =
+    categoryId === "director" ||
+    categoryId === "actor" ||
+    categoryId === "actress" ||
+    categoryId === "supporting-actor" ||
+    categoryId === "supporting-actress";
+  const base = isPersonCategory ? `${entry.rawTitle}::${entry.rawStudio}` : entry.rawTitle;
+  return `${categoryId}::${normalizeSignalKey(base)}`;
+}
+
+function buildCategoryTrendSignature(category, displayProjections) {
+  const rows = displayProjections.map((entry) => {
+    return `${trendKeyForEntry(category.id, entry)}:${entry.nomination.toFixed(2)}:${entry.winner.toFixed(2)}`;
+  });
+  return `${category.id}|${appliedExternalSnapshotId || "manual"}|${rows.join("|")}`;
+}
+
+function captureTrendSnapshot(category, projections) {
+  const displayProjections = projections.slice(0, getDisplayLimit(category));
+  if (displayProjections.length === 0) return false;
+
+  const signature = buildCategoryTrendSignature(category, displayProjections);
+  if (trendHistory.lastSignatureByCategory[category.id] === signature) return false;
+  trendHistory.lastSignatureByCategory[category.id] = signature;
+
+  trendHistory.snapshots.push({
+    categoryId: category.id,
+    capturedAt: new Date().toISOString(),
+    sourceSnapshotId: appliedExternalSnapshotId || null,
+    entries: displayProjections.map((entry) => ({
+      key: trendKeyForEntry(category.id, entry),
+      title: entry.title,
+      nomination: Number(entry.nomination.toFixed(2)),
+      winner: Number(entry.winner.toFixed(2))
+    }))
+  });
+
+  if (trendHistory.snapshots.length > TREND_HISTORY_LIMIT) {
+    trendHistory.snapshots.splice(0, trendHistory.snapshots.length - TREND_HISTORY_LIMIT);
+  }
+  return true;
+}
+
+function pointsForEntryTrend(category, entry) {
+  const key = trendKeyForEntry(category.id, entry);
+  const pointLimit = TREND_WINDOW_OPTIONS.includes(Number(state.trendWindow)) ? Number(state.trendWindow) : 30;
+  return trendHistory.snapshots
+    .filter((snapshot) => snapshot.categoryId === category.id)
+    .map((snapshot) => {
+      const contender = (snapshot.entries || []).find((item) => item.key === key);
+      if (!contender) return null;
+      return {
+        capturedAt: snapshot.capturedAt,
+        sourceSnapshotId: snapshot.sourceSnapshotId || "",
+        nomination: Number(contender.nomination || 0),
+        winner: Number(contender.winner || 0)
+      };
+    })
+    .filter(Boolean)
+    .slice(-pointLimit);
+}
+
+function formatTrendStamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Unknown";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function buildPolylinePath(points, metric, width, height, minY, maxY) {
+  if (!points.length) return "";
+  const range = Math.max(maxY - minY, 1);
+  return points
+    .map((point, index) => {
+      const x = (index / Math.max(points.length - 1, 1)) * width;
+      const y = height - ((point[metric] - minY) / range) * height;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function renderTrendChart(points) {
+  if (!trendChart) return;
+  trendChart.innerHTML = "";
+
+  if (!points.length) {
+    trendChart.innerHTML = `<text x="20" y="40" fill="#5f554a" font-size="13">No trend data yet for this contender.</text>`;
+    return;
+  }
+
+  const width = 700;
+  const height = 220;
+  const padX = 26;
+  const padY = 16;
+  const chartWidth = width - padX * 2;
+  const chartHeight = height - padY * 2;
+  const values = points.flatMap((point) => [point.nomination, point.winner]);
+  const maxValue = Math.min(100, Math.max(...values, 10) + 4);
+  const minValue = Math.max(0, Math.min(...values, 95) - 4);
+
+  const nominationPath = buildPolylinePath(points, "nomination", chartWidth, chartHeight, minValue, maxValue);
+  const winnerPath = buildPolylinePath(points, "winner", chartWidth, chartHeight, minValue, maxValue);
+
+  const sourceMarkers = points
+    .map((point, index) => {
+      if (!point.sourceSnapshotId) return null;
+      const previous = points[index - 1];
+      if (previous?.sourceSnapshotId === point.sourceSnapshotId) return null;
+      return {
+        x: padX + (index / Math.max(points.length - 1, 1)) * chartWidth
+      };
+    })
+    .filter(Boolean);
+
+  const yTicks = [0, 25, 50, 75, 100].filter((tick) => tick >= minValue && tick <= maxValue);
+  const grid = yTicks
+    .map((tick) => {
+      const y = padY + chartHeight - ((tick - minValue) / Math.max(maxValue - minValue, 1)) * chartHeight;
+      return `<line x1="${padX}" y1="${y.toFixed(2)}" x2="${(padX + chartWidth).toFixed(2)}" y2="${y.toFixed(2)}" stroke="#eadfce" stroke-width="1"/><text x="4" y="${(y + 4).toFixed(2)}" fill="#7a6d5e" font-size="11">${tick}%</text>`;
+    })
+    .join("");
+
+  const markerLines = sourceMarkers
+    .map(
+      (marker) =>
+        `<line x1="${marker.x.toFixed(2)}" y1="${padY}" x2="${marker.x.toFixed(2)}" y2="${(padY + chartHeight).toFixed(
+          2
+        )}" stroke="#5f554a" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>`
+    )
+    .join("");
+
+  trendChart.innerHTML = `
+    ${grid}
+    ${markerLines}
+    <polyline fill="none" stroke="#0f6f5f" stroke-width="3" points="${nominationPath}" />
+    <polyline fill="none" stroke="#915c11" stroke-width="3" points="${winnerPath}" />
+  `;
+}
+
+function renderSourceMovement(points) {
+  if (!trendSourceMoves) return;
+  trendSourceMoves.innerHTML = "";
+
+  const sourcePointIndexes = points
+    .map((point, index) => {
+      if (!point.sourceSnapshotId) return null;
+      const previous = points[index - 1];
+      if (previous?.sourceSnapshotId === point.sourceSnapshotId) return null;
+      return index;
+    })
+    .filter((value) => Number.isInteger(value));
+
+  if (sourcePointIndexes.length === 0) {
+    trendSourceMoves.innerHTML = `<div class="trend-source-row"><span>No source refresh markers in this window.</span><span class="stamp">-</span></div>`;
+    return;
+  }
+
+  sourcePointIndexes.slice(-3).forEach((index) => {
+    const current = points[index];
+    const previous = points[Math.max(0, index - 1)];
+    const nominationDelta = current.nomination - previous.nomination;
+    const winnerDelta = current.winner - previous.winner;
+    const row = document.createElement("div");
+    row.className = "trend-source-row";
+    row.innerHTML = `<span>Source update impact: Nomination ${nominationDelta >= 0 ? "+" : ""}${nominationDelta.toFixed(1)}pp, Winner ${winnerDelta >= 0 ? "+" : ""}${winnerDelta.toFixed(1)}pp</span><span class="stamp">${formatTrendStamp(
+      current.capturedAt
+    )}</span>`;
+    trendSourceMoves.appendChild(row);
+  });
+}
+
+function renderTrendAnalytics(category, entry) {
+  if (!entry) {
+    trendTitle.textContent = "Trend Analytics";
+    trendMeta.textContent = "Select a contender to view movement over time.";
+    renderTrendChart([]);
+    renderSourceMovement([]);
+    return;
+  }
+
+  const points = pointsForEntryTrend(category, entry);
+  trendTitle.textContent = `Trend Analytics: ${entry.title}`;
+  if (points.length < 2) {
+    trendMeta.textContent = "Need at least two snapshots to show movement.";
+  } else {
+    const first = points[0];
+    const last = points[points.length - 1];
+    const nomDelta = last.nomination - first.nomination;
+    const winDelta = last.winner - first.winner;
+    trendMeta.textContent = `Last ${points.length} updates: Nomination ${nomDelta >= 0 ? "+" : ""}${nomDelta.toFixed(
+      1
+    )}pp, Winner ${winDelta >= 0 ? "+" : ""}${winDelta.toFixed(1)}pp.`;
+  }
+
+  renderTrendChart(points);
+  renderSourceMovement(points);
+}
+
 function setPosterState(posterUrl, movieUrl) {
   const src = posterUrl || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
   const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
@@ -1003,6 +1214,7 @@ function renderResults(category, projections) {
 
   renderExplanation(category, displayProjections[boundedIndex], displayProjections);
   renderMovieDetails(category, displayProjections[boundedIndex]);
+  renderTrendAnalytics(category, displayProjections[boundedIndex]);
 }
 
 function renderExplanation(category, entry, fieldEntries) {
@@ -1227,6 +1439,12 @@ function serializeStatePayload() {
   return {
     categoryId: state.categoryId,
     weights: state.weights,
+    trendWindow: state.trendWindow,
+    trendHistory: {
+      version: trendHistory.version,
+      snapshots: trendHistory.snapshots,
+      lastSignatureByCategory: trendHistory.lastSignatureByCategory
+    },
     categories: categories.map((category) => ({
       id: category.id,
       films: category.films
@@ -1243,19 +1461,61 @@ function applyStatePayload(parsed) {
     state.weights.buzz = clamp(Number(parsed.weights.buzz || state.weights.buzz), 1, 95);
   }
 
+  if (TREND_WINDOW_OPTIONS.includes(Number(parsed.trendWindow))) {
+    state.trendWindow = Number(parsed.trendWindow);
+  }
+
   if (typeof parsed.categoryId === "string" && categories.some((category) => category.id === parsed.categoryId)) {
     state.categoryId = parsed.categoryId;
   }
 
-  if (!Array.isArray(parsed.categories)) return;
-  parsed.categories.forEach((storedCategory) => {
-    if (!storedCategory || typeof storedCategory !== "object") return;
-    const target = categories.find((category) => category.id === storedCategory.id);
-    if (!target || !Array.isArray(storedCategory.films)) return;
+  if (Array.isArray(parsed.categories)) {
+    parsed.categories.forEach((storedCategory) => {
+      if (!storedCategory || typeof storedCategory !== "object") return;
+      const target = categories.find((category) => category.id === storedCategory.id);
+      if (!target || !Array.isArray(storedCategory.films)) return;
 
-    const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
-    if (films.length > 0) target.films = films;
-  });
+      const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
+      if (films.length > 0) target.films = films;
+    });
+  }
+
+  if (parsed.trendHistory && typeof parsed.trendHistory === "object") {
+    const snapshots = Array.isArray(parsed.trendHistory.snapshots) ? parsed.trendHistory.snapshots : [];
+    trendHistory.snapshots = snapshots
+      .map((snapshot) => {
+        if (!snapshot || typeof snapshot !== "object") return null;
+        if (typeof snapshot.categoryId !== "string") return null;
+        const capturedAt = String(snapshot.capturedAt || "");
+        const entries = Array.isArray(snapshot.entries)
+          ? snapshot.entries
+              .map((entry) => {
+                if (!entry || typeof entry !== "object") return null;
+                if (typeof entry.key !== "string") return null;
+                return {
+                  key: entry.key,
+                  title: String(entry.title || ""),
+                  nomination: clamp(Number(entry.nomination || 0), 0, 100),
+                  winner: clamp(Number(entry.winner || 0), 0, 100)
+                };
+              })
+              .filter(Boolean)
+          : [];
+        if (!entries.length) return null;
+        return {
+          categoryId: snapshot.categoryId,
+          capturedAt: capturedAt || new Date().toISOString(),
+          sourceSnapshotId: snapshot.sourceSnapshotId ? String(snapshot.sourceSnapshotId) : null,
+          entries
+        };
+      })
+      .filter(Boolean)
+      .slice(-TREND_HISTORY_LIMIT);
+    trendHistory.lastSignatureByCategory =
+      parsed.trendHistory.lastSignatureByCategory && typeof parsed.trendHistory.lastSignatureByCategory === "object"
+        ? { ...parsed.trendHistory.lastSignatureByCategory }
+        : {};
+  }
 }
 
 function getLocalStorageKeyForProfile(profileId = state.profileId) {
@@ -1366,12 +1626,26 @@ function bindProfileControls() {
   });
 }
 
+function bindTrendControls() {
+  if (!trendWindowSelect) return;
+  trendWindowSelect.value = String(state.trendWindow);
+  trendWindowSelect.addEventListener("change", (event) => {
+    const value = Number(event.target.value || 30);
+    state.trendWindow = TREND_WINDOW_OPTIONS.includes(value) ? value : 30;
+    saveState();
+    render();
+  });
+}
+
 function render() {
   const activeCategory = getActiveCategory();
   const projections = buildProjections(activeCategory);
+  const capturedTrend = captureTrendSnapshot(activeCategory, projections);
+  if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
   renderTabs();
   renderCandidates(activeCategory, projections);
   renderResults(activeCategory, projections);
+  if (capturedTrend) saveState();
 }
 
 async function bootstrap() {
@@ -1379,6 +1653,7 @@ async function bootstrap() {
   loadState();
   await loadStateFromApi();
   bindProfileControls();
+  bindTrendControls();
   bindCsvControls();
   render();
   startExternalSignalPolling();

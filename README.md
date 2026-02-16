@@ -10,6 +10,7 @@ A lightweight static site that estimates nomination and winner probabilities for
   - industry buzz
 - Outputs category-level nomination and winner percentages.
 - Lets you edit each contender's inputs and campaign strength in the UI.
+- Tracks contender trend lines over time for nomination/winner movement with source-update markers.
 
 ## Run locally
 Install dependencies:
@@ -64,6 +65,7 @@ Observability metrics are written to `data/scrape-observability.json` with:
 - rolling run history and last updated timestamps
 
 The app polls this file every 5 minutes and applies the latest aggregate signal deltas to contender inputs.
+Trend analytics snapshots are captured in the forecast payload and persisted per profile.
 
 ## Resume-focused 2-week plan
 Week 1:
