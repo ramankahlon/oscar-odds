@@ -439,6 +439,8 @@ const trendMeta = document.querySelector("#trendMeta");
 const trendChart = document.querySelector("#trendChart");
 const trendSourceMoves = document.querySelector("#trendSourceMoves");
 const trendWindowSelect = document.querySelector("#trendWindowSelect");
+const appStateNotice = document.querySelector("#appStateNotice");
+const resultsPanel = document.querySelector("#resultsPanel");
 const movieDetailTitle = document.querySelector("#movieDetailTitle");
 const movieDetailDirector = document.querySelector("#movieDetailDirector");
 const movieDetailStars = document.querySelector("#movieDetailStars");
@@ -455,6 +457,19 @@ const newProfileButton = document.querySelector("#newProfileButton");
 let profileOptions = ["default"];
 const explainSelectionByCategory = {};
 let activePosterRequestId = 0;
+let isBootstrapping = true;
+
+function setAppNotice(message = "", type = "") {
+  if (!appStateNotice) return;
+  appStateNotice.textContent = message;
+  appStateNotice.className = `app-notice${type ? ` ${type}` : ""}`;
+}
+
+function setPanelsBusy(isBusy) {
+  const busyValue = isBusy ? "true" : "false";
+  if (resultsPanel) resultsPanel.setAttribute("aria-busy", busyValue);
+  if (candidateCards) candidateCards.setAttribute("aria-busy", busyValue);
+}
 
 function normalizeMovieDetailKey(value) {
   return String(value || "")
@@ -680,15 +695,23 @@ function applyExternalSignalSnapshot(snapshot) {
 
 async function fetchAndApplyExternalSignals() {
   try {
+    setAppNotice("Syncing external source updates...", "loading");
     const response = await fetch(`${EXTERNAL_SIGNALS_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setAppNotice("External source snapshot unavailable. Showing latest saved forecast.", "error");
+      return;
+    }
     const snapshot = await response.json();
     const changed = applyExternalSignalSnapshot(snapshot);
-    if (!changed) return;
+    if (!changed) {
+      setAppNotice("");
+      return;
+    }
     saveState();
     render();
+    setAppNotice(`Applied source refresh from ${new Date(snapshot.generatedAt || Date.now()).toLocaleString()}.`);
   } catch {
-    // Ignore unavailable local scrape output (e.g. before first poll run).
+    setAppNotice("Could not load external source snapshot. Showing latest saved forecast.", "error");
   }
 }
 
@@ -1196,7 +1219,16 @@ function renderCandidates(category, projections) {
   categoryTitle.textContent = category.name;
   candidateCards.innerHTML = "";
 
-  projections.slice(0, getDisplayLimit(category)).forEach((entry) => {
+  const display = projections.slice(0, getDisplayLimit(category));
+  if (display.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "panel-copy";
+    empty.textContent = "No contenders available for this category. Import CSV or adjust source data.";
+    candidateCards.appendChild(empty);
+    return;
+  }
+
+  display.forEach((entry) => {
     candidateCards.appendChild(createCard(category, category.films[entry.index], entry.index));
   });
 }
@@ -1205,6 +1237,16 @@ function renderResults(category, projections) {
   resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   resultsBody.innerHTML = "";
   const displayProjections = projections.slice(0, getDisplayLimit(category));
+  if (displayProjections.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="results-empty" colspan="3">No projected contenders for this category.</td>`;
+    resultsBody.appendChild(row);
+    renderExplanation(category, null, []);
+    renderMovieDetails(category, null);
+    renderTrendAnalytics(category, null);
+    return;
+  }
+
   const selectedIndex = explainSelectionByCategory[category.id] ?? 0;
   const boundedIndex = clamp(selectedIndex, 0, Math.max(0, displayProjections.length - 1));
   explainSelectionByCategory[category.id] = boundedIndex;
@@ -1212,11 +1254,36 @@ function renderResults(category, projections) {
   displayProjections.forEach((entry, index) => {
     const row = document.createElement("tr");
     row.className = `results-row${index === boundedIndex ? " active" : ""}`;
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-selected", index === boundedIndex ? "true" : "false");
+    row.setAttribute("aria-label", `${entry.title}. Nomination ${entry.nomination.toFixed(1)} percent. Winner ${entry.winner.toFixed(1)} percent.`);
     row.addEventListener("click", () => {
       explainSelectionByCategory[category.id] = index;
       render();
     });
-    row.innerHTML = `<td><strong>${entry.title}</strong></td><td>${entry.nomination.toFixed(1)}%</td><td>${entry.winner.toFixed(1)}%</td>`;
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        explainSelectionByCategory[category.id] = index;
+        render();
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        explainSelectionByCategory[category.id] = clamp(index + 1, 0, displayProjections.length - 1);
+        render();
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        explainSelectionByCategory[category.id] = clamp(index - 1, 0, displayProjections.length - 1);
+        render();
+      }
+    });
+    row.innerHTML = `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td><td data-label="Nomination %">${entry.nomination.toFixed(
+      1
+    )}%</td><td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`;
     resultsBody.appendChild(row);
   });
 
@@ -1575,7 +1642,7 @@ async function saveStateToApi() {
       body: JSON.stringify(serializeStatePayload())
     });
   } catch {
-    // Ignore API unavailability; localStorage remains fallback.
+    setAppNotice("Autosave API unavailable. Working in local save mode.", "error");
   }
 }
 
@@ -1587,7 +1654,7 @@ async function loadStateFromApi() {
     if (!doc || typeof doc !== "object" || !doc.payload) return;
     applyStatePayload(doc.payload);
   } catch {
-    // Ignore API unavailability.
+    setAppNotice("Could not load profile from API. Using locally saved state.", "error");
   }
 }
 
@@ -1646,6 +1713,7 @@ function bindTrendControls() {
 }
 
 function render() {
+  setPanelsBusy(isBootstrapping);
   const activeCategory = getActiveCategory();
   const projections = buildProjections(activeCategory);
   const capturedTrend = captureTrendSnapshot(activeCategory, projections);
@@ -1657,12 +1725,17 @@ function render() {
 }
 
 async function bootstrap() {
+  setPanelsBusy(true);
+  setAppNotice("Loading forecast workspace...", "loading");
   await loadProfiles();
   loadState();
   await loadStateFromApi();
   bindProfileControls();
   bindTrendControls();
   bindCsvControls();
+  isBootstrapping = false;
+  setPanelsBusy(false);
+  setAppNotice("");
   render();
   startExternalSignalPolling();
 }

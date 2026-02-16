@@ -11,6 +11,7 @@ A lightweight static site that estimates nomination and winner probabilities for
 - Outputs category-level nomination and winner percentages.
 - Lets you edit each contender's inputs and campaign strength in the UI.
 - Tracks contender trend lines over time for nomination/winner movement with source-update markers.
+- Includes mobile-first odds table behavior and explicit loading/empty/error UX states with keyboard-accessible contender rows.
 
 ## Run locally
 Install dependencies:
