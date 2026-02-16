@@ -28,6 +28,7 @@ Then visit `http://localhost:3000`.
 
 API endpoints:
 - `GET /api/health`
+- `GET /api/scrape-observability`
 - `GET /api/profiles`
 - `GET /api/forecast/:profileId`
 - `PUT /api/forecast/:profileId`
@@ -56,6 +57,12 @@ npm run poll:sources
 ```
 
 The poller writes normalized source data to `data/source-signals.json`.
+Observability metrics are written to `data/scrape-observability.json` with:
+- source success/failure rates
+- freshness (`lastSuccessAt`, `freshnessMinutes`)
+- retry attempts and consecutive failures
+- rolling run history and last updated timestamps
+
 The app polls this file every 5 minutes and applies the latest aggregate signal deltas to contender inputs.
 
 ## Resume-focused 2-week plan

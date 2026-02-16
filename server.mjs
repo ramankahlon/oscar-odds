@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const STORE_PATH = path.join(__dirname, "data", "forecast-store.json");
+const SCRAPE_OBSERVABILITY_PATH = path.join(__dirname, "data", "scrape-observability.json");
 const DEFAULT_PROFILE_ID = "default";
 const posterCache = new Map();
 const TMDB_BASE_URL = "https://www.themoviedb.org";
@@ -50,6 +51,17 @@ async function readStore() {
 async function writeStore(document) {
   await fs.writeFile(STORE_PATH, `${JSON.stringify(document, null, 2)}\n`, "utf8");
   return document;
+}
+
+async function readScrapeObservability() {
+  try {
+    const raw = await fs.readFile(SCRAPE_OBSERVABILITY_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return { updatedAt: null };
+    return parsed;
+  } catch {
+    return { updatedAt: null };
+  }
 }
 
 function normalizePosterKey(value) {
@@ -263,6 +275,11 @@ async function fetchTmdbPoster(title) {
 
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, now: new Date().toISOString() });
+});
+
+app.get("/api/scrape-observability", async (_, res) => {
+  const doc = await readScrapeObservability();
+  res.json(doc);
 });
 
 app.get("/api/profiles", async (_, res) => {

@@ -1,0 +1,77 @@
+{
+  "updatedAt": "2026-02-16T09:57:27.754Z",
+  "runsTotal": 1,
+  "runsFailed": 1,
+  "runSuccessRate": 0,
+  "lastRunAt": "2026-02-16T09:57:27.754Z",
+  "lastRunStatus": "partial_failure",
+  "lastRunDurationMs": 2292,
+  "sources": {
+    "letterboxd": {
+      "attempts": 1,
+      "successes": 0,
+      "failures": 1,
+      "successRate": 0,
+      "consecutiveFailures": 1,
+      "lastAttemptAt": "2026-02-16T09:57:27.764Z",
+      "lastSuccessAt": null,
+      "lastFailureAt": "2026-02-16T09:57:27.764Z",
+      "lastDurationMs": 2281,
+      "averageDurationMs": 2281,
+      "lastError": "fetch failed"
+    },
+    "reddit": {
+      "attempts": 1,
+      "successes": 0,
+      "failures": 1,
+      "successRate": 0,
+      "consecutiveFailures": 1,
+      "lastAttemptAt": "2026-02-16T09:57:27.775Z",
+      "lastSuccessAt": null,
+      "lastFailureAt": "2026-02-16T09:57:27.775Z",
+      "lastDurationMs": 2270,
+      "averageDurationMs": 2270,
+      "lastError": "fetch failed"
+    },
+    "thegamer": {
+      "attempts": 1,
+      "successes": 0,
+      "failures": 1,
+      "successRate": 0,
+      "consecutiveFailures": 1,
+      "lastAttemptAt": "2026-02-16T09:57:27.776Z",
+      "lastSuccessAt": null,
+      "lastFailureAt": "2026-02-16T09:57:27.776Z",
+      "lastDurationMs": 2270,
+      "averageDurationMs": 2270,
+      "lastError": "fetch failed"
+    }
+  },
+  "recentRuns": [
+    {
+      "at": "2026-02-16T09:57:27.754Z",
+      "status": "partial_failure",
+      "durationMs": 2292,
+      "sources": {
+        "letterboxd": {
+          "ok": false,
+          "attempts": 3,
+          "durationMs": 2281,
+          "error": "fetch failed"
+        },
+        "reddit": {
+          "ok": false,
+          "attempts": 3,
+          "durationMs": 2270,
+          "error": "fetch failed"
+        },
+        "thegamer": {
+          "ok": false,
+          "attempts": 3,
+          "durationMs": 2270,
+          "error": "fetch failed"
+        }
+      }
+    }
+  ]
+}
