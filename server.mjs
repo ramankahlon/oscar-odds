@@ -2,6 +2,7 @@ import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 import * as cheerio from "cheerio";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,9 +17,88 @@ const TMDB_BASE_URL = "https://www.themoviedb.org";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BEARER = process.env.TMDB_API_READ_ACCESS_TOKEN || "";
+const FORCE_HTTPS = process.env.FORCE_HTTPS === "true";
+const ENABLE_SOURCE_POLLER = process.env.ENABLE_SOURCE_POLLER === "true";
+const SOURCE_POLL_INTERVAL_MINUTES = Math.max(5, Number(process.env.SOURCE_POLL_INTERVAL_MINUTES || 30));
+const bootAt = Date.now();
+const requestMetrics = {
+  total: 0,
+  byMethod: {},
+  byStatusClass: { "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0 }
+};
+let pollerProcess = null;
+let pollerState = { running: false, startedAt: null, lastExitCode: null, restarts: 0 };
 
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(__dirname));
+app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  requestMetrics.total += 1;
+  requestMetrics.byMethod[req.method] = (requestMetrics.byMethod[req.method] || 0) + 1;
+
+  const isForwardedHttps = req.get("x-forwarded-proto") === "https";
+  if (FORCE_HTTPS && !req.secure && !isForwardedHttps) {
+    const host = req.get("host");
+    if (host) {
+      res.redirect(301, `https://${host}${req.originalUrl}`);
+      return;
+    }
+  }
+
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https:;"
+  );
+  if (req.secure || isForwardedHttps) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  res.on("finish", () => {
+    const statusClass = `${Math.floor(res.statusCode / 100)}xx`;
+    if (requestMetrics.byStatusClass[statusClass] !== undefined) {
+      requestMetrics.byStatusClass[statusClass] += 1;
+    }
+  });
+
+  next();
+});
+
+app.use(
+  express.static(__dirname, {
+    maxAge: "1h",
+    etag: true
+  })
+);
+
+function startSourcePoller() {
+  if (!ENABLE_SOURCE_POLLER) return;
+  if (pollerProcess && !pollerProcess.killed) return;
+
+  const args = ["scripts/poll-sources.mjs", "--interval-minutes", String(SOURCE_POLL_INTERVAL_MINUTES)];
+  pollerProcess = spawn(process.execPath, args, {
+    cwd: __dirname,
+    env: process.env,
+    stdio: "inherit"
+  });
+  pollerState.running = true;
+  pollerState.startedAt = new Date().toISOString();
+
+  pollerProcess.on("exit", (code) => {
+    pollerState.running = false;
+    pollerState.lastExitCode = code;
+    pollerProcess = null;
+    if (ENABLE_SOURCE_POLLER) {
+      pollerState.restarts += 1;
+      setTimeout(() => {
+        startSourcePoller();
+      }, 5000);
+    }
+  });
+}
 
 async function readStore() {
   try {
@@ -274,7 +354,27 @@ async function fetchTmdbPoster(title) {
 }
 
 app.get("/api/health", (_, res) => {
-  res.json({ ok: true, now: new Date().toISOString() });
+  res.json({
+    ok: true,
+    now: new Date().toISOString(),
+    uptimeSeconds: Math.floor((Date.now() - bootAt) / 1000),
+    poller: {
+      enabled: ENABLE_SOURCE_POLLER,
+      ...pollerState
+    }
+  });
+});
+
+app.get("/api/metrics", (_, res) => {
+  res.json({
+    generatedAt: new Date().toISOString(),
+    uptimeSeconds: Math.floor((Date.now() - bootAt) / 1000),
+    requests: requestMetrics,
+    poller: {
+      enabled: ENABLE_SOURCE_POLLER,
+      ...pollerState
+    }
+  });
 });
 
 app.get("/api/scrape-observability", async (_, res) => {
@@ -336,6 +436,18 @@ app.get("*", (_, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  startSourcePoller();
 });
+
+function shutdown(signal) {
+  console.log(`[server] received ${signal}, shutting down...`);
+  if (pollerProcess && !pollerProcess.killed) pollerProcess.kill("SIGTERM");
+  server.close(() => {
+    process.exit(0);
+  });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

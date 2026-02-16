@@ -30,6 +30,7 @@ Then visit `http://localhost:3000`.
 
 API endpoints:
 - `GET /api/health`
+- `GET /api/metrics`
 - `GET /api/scrape-observability`
 - `GET /api/profiles`
 - `GET /api/forecast/:profileId`
@@ -86,3 +87,5 @@ Week 2:
 - `forecast-utils.test.js`: unit tests for utility logic
 - `scripts/poll-sources.mjs`: external source scraping + polling job
 - `data/source-signals.json`: latest normalized scrape snapshot
+- `render.yaml`: Render blueprint for public deployment
+- `DEPLOYMENT.md`: domain/HTTPS/monitoring deployment runbook
