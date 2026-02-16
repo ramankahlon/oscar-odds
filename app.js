@@ -403,6 +403,9 @@ const EXTERNAL_SIGNALS_URL = "data/source-signals.json";
 const EXTERNAL_SIGNALS_POLL_MS = 5 * 60 * 1000;
 const TREND_HISTORY_LIMIT = 240;
 const TREND_WINDOW_OPTIONS = [7, 15, 30];
+const NOMINATION_PERCENT_UPLIFT = 1.14;
+const WINNER_PERCENT_UPLIFT = 1.2;
+const WINNER_TO_NOMINATION_CAP = 0.5;
 
 const state = {
   profileId: "default",
@@ -1137,12 +1140,13 @@ function buildProjections(category) {
 
   const projections = scored
     .map((film) => {
-      const nomination = clamp((film.nominationRaw / nominationTotal) * 100 * nomineeScale, 0.4, 99);
+      const nomination = clamp((film.nominationRaw / nominationTotal) * 100 * nomineeScale * NOMINATION_PERCENT_UPLIFT, 0.6, 99);
       const winner = clamp(
-        ((film.winnerRaw / winnerTotal) * 100 + nomination * category.winnerBase) /
-          (1 + category.winnerBase),
-        0.2,
-        90
+        (((film.winnerRaw / winnerTotal) * 100 + nomination * category.winnerBase) /
+          (1 + category.winnerBase)) *
+          WINNER_PERCENT_UPLIFT,
+        0.4,
+        92
       );
 
       return {
@@ -1166,19 +1170,23 @@ function buildProjections(category) {
   const topContenders = projections.slice(0, displayLimit);
 
   rebalanceFieldTotal(topContenders, "nomination", {
-    minTotal: 80,
+    minTotal: 90,
     maxTotal: 95,
-    targetTotal: 88,
-    minValue: 0.4,
-    maxValue: 45
+    targetTotal: 93,
+    minValue: 0.6,
+    maxValue: 50
   });
 
   rebalanceFieldTotal(topContenders, "winner", {
-    minTotal: 80,
-    maxTotal: 95,
-    targetTotal: 86,
-    minValue: 0.2,
-    maxValue: 42
+    minTotal: 30,
+    maxTotal: 45,
+    targetTotal: 38,
+    minValue: 0.4,
+    maxValue: 24
+  });
+
+  topContenders.forEach((entry) => {
+    entry.winner = Math.min(entry.winner, entry.nomination * WINNER_TO_NOMINATION_CAP);
   });
 
   return [...topContenders, ...projections.slice(displayLimit)];
