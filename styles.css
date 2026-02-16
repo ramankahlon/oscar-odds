@@ -251,6 +251,54 @@ table {
   font-size: 1.16rem;
 }
 
+.results-row {
+  cursor: pointer;
+}
+
+.results-row.active {
+  background: var(--accent-soft);
+}
+
+.explain-panel {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.explain-panel h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.explain-meta,
+.explain-notes {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.explain-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 52px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+}
+
+.explain-bar {
+  background: #e9dece;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.explain-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
 th,
 td {
   text-align: left;

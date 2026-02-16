@@ -418,6 +418,11 @@ const categoryTitle = document.querySelector("#categoryTitle");
 const candidateCards = document.querySelector("#candidateCards");
 const resultsBody = document.querySelector("#resultsBody");
 const resultsPrimaryHeader = document.querySelector("#resultsPrimaryHeader");
+const explainTitle = document.querySelector("#explainTitle");
+const explainMeta = document.querySelector("#explainMeta");
+const explainDelta = document.querySelector("#explainDelta");
+const explainBreakdown = document.querySelector("#explainBreakdown");
+const explainNotes = document.querySelector("#explainNotes");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const importCsvButton = document.querySelector("#importCsvButton");
 const csvFileInput = document.querySelector("#csvFileInput");
@@ -425,6 +430,7 @@ const csvStatus = document.querySelector("#csvStatus");
 const profileSelect = document.querySelector("#profileSelect");
 const newProfileButton = document.querySelector("#newProfileButton");
 let profileOptions = ["default"];
+const explainSelectionByCategory = {};
 
 function normalizeSignalKey(value) {
   return String(value || "")
@@ -577,18 +583,25 @@ function getActiveCategory() {
 }
 
 function scoreFilm(categoryId, film, normalizedWeights) {
-  const linear =
-    film.precursor * normalizedWeights.precursor +
-    film.history * normalizedWeights.history +
-    film.buzz * normalizedWeights.buzz;
+  const precursorContribution = film.precursor * normalizedWeights.precursor;
+  const historyContribution = film.history * normalizedWeights.history;
+  const buzzContribution = film.buzz * normalizedWeights.buzz;
+  const linear = precursorContribution + historyContribution + buzzContribution;
 
   const centered = (linear - 55) / 12;
-  const nominationRaw = logistic(centered) * strengthBoost(film.strength);
-  const winnerRaw = nominationRaw * (0.6 + film.precursor / 190) * winnerExperienceBoost(categoryId, film.title);
+  const strengthMultiplier = strengthBoost(film.strength);
+  const winnerHistoryMultiplier = winnerExperienceBoost(categoryId, film.title);
+  const nominationRaw = logistic(centered) * strengthMultiplier;
+  const winnerRaw = nominationRaw * (0.6 + film.precursor / 190) * winnerHistoryMultiplier;
 
   return {
     nominationRaw,
-    winnerRaw
+    winnerRaw,
+    precursorContribution,
+    historyContribution,
+    buzzContribution,
+    strengthMultiplier,
+    winnerHistoryMultiplier
   };
 }
 
@@ -734,9 +747,17 @@ function buildProjections(category) {
 
       return {
         index: film.index,
+        categoryId: category.id,
+        rawTitle: film.title,
+        rawStudio: film.studio,
         title: getDisplayTitle(category.id, film.title, film.studio),
         nomination,
-        winner
+        winner,
+        precursorContribution: film.precursorContribution,
+        historyContribution: film.historyContribution,
+        buzzContribution: film.buzzContribution,
+        strengthMultiplier: film.strengthMultiplier,
+        winnerHistoryMultiplier: film.winnerHistoryMultiplier
       };
     })
     .sort((a, b) => b.winner - a.winner);
@@ -775,11 +796,75 @@ function renderCandidates(category, projections) {
 function renderResults(category, projections) {
   resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   resultsBody.innerHTML = "";
-  projections.slice(0, getDisplayLimit(category)).forEach((entry) => {
+  const displayProjections = projections.slice(0, getDisplayLimit(category));
+  const selectedIndex = explainSelectionByCategory[category.id] ?? 0;
+  const boundedIndex = clamp(selectedIndex, 0, Math.max(0, displayProjections.length - 1));
+  explainSelectionByCategory[category.id] = boundedIndex;
+
+  displayProjections.forEach((entry, index) => {
     const row = document.createElement("tr");
+    row.className = `results-row${index === boundedIndex ? " active" : ""}`;
+    row.addEventListener("click", () => {
+      explainSelectionByCategory[category.id] = index;
+      render();
+    });
     row.innerHTML = `<td><strong>${entry.title}</strong></td><td>${entry.nomination.toFixed(1)}%</td><td>${entry.winner.toFixed(1)}%</td>`;
     resultsBody.appendChild(row);
   });
+
+  renderExplanation(category, displayProjections[boundedIndex], displayProjections);
+}
+
+function renderExplanation(category, entry, fieldEntries) {
+  if (!entry) {
+    explainTitle.textContent = "Why this %";
+    explainMeta.textContent = "No contender selected.";
+    explainDelta.textContent = "";
+    explainBreakdown.innerHTML = "";
+    explainNotes.textContent = "";
+    return;
+  }
+
+  explainTitle.textContent = `Why this %: ${entry.title}`;
+  explainMeta.textContent = `${category.name} projection factors`;
+  const nominationAvg = (fieldEntries.reduce((sum, item) => sum + item.nomination, 0) || 0) / Math.max(fieldEntries.length, 1);
+  const winnerAvg = (fieldEntries.reduce((sum, item) => sum + item.winner, 0) || 0) / Math.max(fieldEntries.length, 1);
+
+  const contributionTotal =
+    entry.precursorContribution + entry.historyContribution + entry.buzzContribution || 1;
+  const breakdown = [
+    { label: "Precursor", value: (entry.precursorContribution / contributionTotal) * 100 },
+    { label: "Historical Fit", value: (entry.historyContribution / contributionTotal) * 100 },
+    { label: "Buzz", value: (entry.buzzContribution / contributionTotal) * 100 }
+  ];
+  const avgContribution = fieldEntries.reduce(
+    (acc, item) => {
+      const total = item.precursorContribution + item.historyContribution + item.buzzContribution || 1;
+      acc.precursor += (item.precursorContribution / total) * 100;
+      acc.history += (item.historyContribution / total) * 100;
+      acc.buzz += (item.buzzContribution / total) * 100;
+      return acc;
+    },
+    { precursor: 0, history: 0, buzz: 0 }
+  );
+  avgContribution.precursor /= Math.max(fieldEntries.length, 1);
+  avgContribution.history /= Math.max(fieldEntries.length, 1);
+  avgContribution.buzz /= Math.max(fieldEntries.length, 1);
+
+  explainDelta.textContent = `Delta vs category avg: Nomination ${entry.nomination - nominationAvg >= 0 ? "+" : ""}${(entry.nomination - nominationAvg).toFixed(1)}pp, Winner ${entry.winner - winnerAvg >= 0 ? "+" : ""}${(entry.winner - winnerAvg).toFixed(1)}pp`;
+
+  explainBreakdown.innerHTML = "";
+  breakdown.forEach((item) => {
+    const avgValue =
+      item.label === "Precursor" ? avgContribution.precursor : item.label === "Historical Fit" ? avgContribution.history : avgContribution.buzz;
+    const delta = item.value - avgValue;
+    const row = document.createElement("div");
+    row.className = "explain-row";
+    row.innerHTML = `<span>${item.label}</span><div class="explain-bar"><span style="width:${item.value.toFixed(1)}%"></span></div><strong>${item.value.toFixed(0)}% (${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp)</strong>`;
+    explainBreakdown.appendChild(row);
+  });
+
+  explainNotes.textContent = `Strength multiplier ${entry.strengthMultiplier.toFixed(2)}x, winner-history factor ${entry.winnerHistoryMultiplier.toFixed(2)}x.`;
 }
 
 function setCsvStatus(message, type = "") {
