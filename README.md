@@ -12,25 +12,31 @@ A lightweight static site that estimates nomination and winner probabilities for
 - Lets you edit each contender's inputs and campaign strength in the UI.
 
 ## Run locally
-Because this is a static site, open `index.html` directly, or run a local server:
+Install dependencies:
 
 ```bash
-python3 -m http.server 8000
+npm install
 ```
 
-Then visit `http://localhost:8000`.
+Start the app server (serves UI + API):
+
+```bash
+npm run dev
+```
+
+Then visit `http://localhost:3000`.
+
+API endpoints:
+- `GET /api/health`
+- `GET /api/profiles`
+- `GET /api/forecast/:profileId`
+- `PUT /api/forecast/:profileId`
 
 ## Scraping and polling external sources
 This project includes a polling scraper for:
 - `https://letterboxd.com/000_leo/list/oscars-2027/`
 - `https://reddit.com/r/oscarrace/`
 - `https://www.thegamer.com/oscars-predictions-2026-2027/`
-
-Install dependencies:
-
-```bash
-npm install
-```
 
 Run one scrape pass:
 
@@ -47,9 +53,21 @@ npm run poll:sources
 The poller writes normalized source data to `data/source-signals.json`.
 The app polls this file every 5 minutes and applies the latest aggregate signal deltas to contender inputs.
 
+## Resume-focused 2-week plan
+Week 1:
+1. Backend/API persistence (implemented): server-side forecast storage endpoint and frontend API integration with local fallback.
+2. Test harness (implemented): unit tests for forecast utility logic.
+
+Week 2:
+1. Auth + multi-profile forecast workspaces.
+2. Explainability panel for each contender (`why this %` feature attribution).
+
 ## Files
 - `index.html`: app structure and content
 - `styles.css`: visual design and responsive layout
 - `app.js`: data model and probability calculations
+- `server.mjs`: Express server with forecast API
+- `forecast-utils.js`: shared scoring/rebalancing helpers
+- `forecast-utils.test.js`: unit tests for utility logic
 - `scripts/poll-sources.mjs`: external source scraping + polling job
 - `data/source-signals.json`: latest normalized scrape snapshot

@@ -80,6 +80,28 @@ label {
   display: block;
 }
 
+.profile-tools {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.profile-tools label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.profile-tools select {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  font: inherit;
+  background: #fff;
+}
+
 .category-select {
   width: 100%;
   border: 1px solid var(--line);
@@ -258,6 +280,11 @@ td strong {
   .controls,
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .profile-tools {
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   .mini-grid {

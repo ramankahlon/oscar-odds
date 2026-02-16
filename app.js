@@ -1,3 +1,5 @@
+import { clamp, rebalanceFieldTotal } from "./forecast-utils.js";
+
 const schedule2026Films = [
   "The Mother and the Bear",
   "We Bury the Dead",
@@ -395,10 +397,13 @@ const overdueNarrativeBoost = {
 };
 
 const STORAGE_KEY = "oscarOddsForecastState.v11";
+const API_PROFILE_LIST_URL = "/api/profiles";
+const API_FORECAST_BASE_URL = "/api/forecast";
 const EXTERNAL_SIGNALS_URL = "data/source-signals.json";
 const EXTERNAL_SIGNALS_POLL_MS = 5 * 60 * 1000;
 
 const state = {
+  profileId: "default",
   categoryId: categories[0].id,
   weights: {
     precursor: 58,
@@ -417,10 +422,9 @@ const exportCsvButton = document.querySelector("#exportCsvButton");
 const importCsvButton = document.querySelector("#importCsvButton");
 const csvFileInput = document.querySelector("#csvFileInput");
 const csvStatus = document.querySelector("#csvStatus");
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+const profileSelect = document.querySelector("#profileSelect");
+const newProfileButton = document.querySelector("#newProfileButton");
+let profileOptions = ["default"];
 
 function normalizeSignalKey(value) {
   return String(value || "")
@@ -706,44 +710,6 @@ function getDisplayTitle(categoryId, title, studio) {
   return `${title} (${studio})`;
 }
 
-function rebalanceFieldTotal(entries, field, options) {
-  const { minTotal, maxTotal, targetTotal, minValue, maxValue } = options;
-  if (!entries.length) return;
-
-  const clampedTarget = clamp(targetTotal, minTotal, maxTotal);
-  let total = entries.reduce((sum, entry) => sum + entry[field], 0);
-
-  if (total <= 0) {
-    const evenValue = clamp(clampedTarget / entries.length, minValue, maxValue);
-    entries.forEach((entry) => {
-      entry[field] = evenValue;
-    });
-    total = entries.reduce((sum, entry) => sum + entry[field], 0);
-  }
-
-  const scale = clampedTarget / total;
-  entries.forEach((entry) => {
-    entry[field] = clamp(entry[field] * scale, minValue, maxValue);
-  });
-
-  for (let i = 0; i < 2; i += 1) {
-    const currentTotal = entries.reduce((sum, entry) => sum + entry[field], 0);
-    if (currentTotal >= minTotal && currentTotal <= maxTotal) return;
-
-    const target = clamp(currentTotal < minTotal ? minTotal : maxTotal, minTotal, maxTotal);
-    const delta = target - currentTotal;
-    const adjustable = entries.filter((entry) =>
-      delta > 0 ? entry[field] < maxValue - 0.001 : entry[field] > minValue + 0.001
-    );
-    if (!adjustable.length) return;
-
-    const perEntry = delta / adjustable.length;
-    adjustable.forEach((entry) => {
-      entry[field] = clamp(entry[field] + perEntry, minValue, maxValue);
-    });
-  }
-}
-
 function buildProjections(category) {
   const normalized = normalizeWeights();
 
@@ -982,53 +948,147 @@ function bindCsvControls() {
   });
 }
 
+function serializeStatePayload() {
+  return {
+    categoryId: state.categoryId,
+    weights: state.weights,
+    categories: categories.map((category) => ({
+      id: category.id,
+      films: category.films
+    }))
+  };
+}
+
+function applyStatePayload(parsed) {
+  if (!parsed || typeof parsed !== "object") return;
+
+  if (parsed.weights && typeof parsed.weights === "object") {
+    state.weights.precursor = clamp(Number(parsed.weights.precursor || state.weights.precursor), 1, 95);
+    state.weights.history = clamp(Number(parsed.weights.history || state.weights.history), 1, 95);
+    state.weights.buzz = clamp(Number(parsed.weights.buzz || state.weights.buzz), 1, 95);
+  }
+
+  if (typeof parsed.categoryId === "string" && categories.some((category) => category.id === parsed.categoryId)) {
+    state.categoryId = parsed.categoryId;
+  }
+
+  if (!Array.isArray(parsed.categories)) return;
+  parsed.categories.forEach((storedCategory) => {
+    if (!storedCategory || typeof storedCategory !== "object") return;
+    const target = categories.find((category) => category.id === storedCategory.id);
+    if (!target || !Array.isArray(storedCategory.films)) return;
+
+    const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
+    if (films.length > 0) target.films = films;
+  });
+}
+
+function getLocalStorageKeyForProfile(profileId = state.profileId) {
+  return `${STORAGE_KEY}.${profileId}`;
+}
+
+function getForecastApiUrl(profileId = state.profileId) {
+  return `${API_FORECAST_BASE_URL}/${encodeURIComponent(profileId)}`;
+}
+
+function renderProfileOptions() {
+  profileSelect.innerHTML = "";
+  profileOptions.forEach((id) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = id;
+    option.selected = id === state.profileId;
+    profileSelect.appendChild(option);
+  });
+}
+
+async function loadProfiles() {
+  try {
+    const response = await fetch(API_PROFILE_LIST_URL, { cache: "no-store" });
+    if (!response.ok) {
+      renderProfileOptions();
+      return;
+    }
+    const doc = await response.json();
+    const ids = Array.isArray(doc.profiles) ? doc.profiles.map((entry) => entry.id).filter(Boolean) : [];
+    if (!ids.length) ids.push("default");
+    profileOptions = [...new Set(ids)];
+    if (typeof doc.activeProfileId === "string" && profileOptions.includes(doc.activeProfileId)) {
+      state.profileId = doc.activeProfileId;
+    } else if (!profileOptions.includes(state.profileId)) {
+      state.profileId = profileOptions[0];
+    }
+    renderProfileOptions();
+  } catch {
+    renderProfileOptions();
+  }
+}
+
+async function saveStateToApi() {
+  try {
+    await fetch(getForecastApiUrl(), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(serializeStatePayload())
+    });
+  } catch {
+    // Ignore API unavailability; localStorage remains fallback.
+  }
+}
+
+async function loadStateFromApi() {
+  try {
+    const response = await fetch(getForecastApiUrl(), { cache: "no-store" });
+    if (!response.ok) return;
+    const doc = await response.json();
+    if (!doc || typeof doc !== "object" || !doc.payload) return;
+    applyStatePayload(doc.payload);
+  } catch {
+    // Ignore API unavailability.
+  }
+}
+
 function saveState() {
   try {
-    const payload = {
-      categoryId: state.categoryId,
-      weights: state.weights,
-      categories: categories.map((category) => ({
-        id: category.id,
-        films: category.films
-      }))
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(getLocalStorageKeyForProfile(), JSON.stringify(serializeStatePayload()));
   } catch {
     // Ignore storage failures (private mode or blocked storage).
   }
+
+  void saveStateToApi();
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getLocalStorageKeyForProfile());
     if (!raw) return;
 
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return;
-
-    if (parsed.weights && typeof parsed.weights === "object") {
-      state.weights.precursor = clamp(Number(parsed.weights.precursor || state.weights.precursor), 1, 95);
-      state.weights.history = clamp(Number(parsed.weights.history || state.weights.history), 1, 95);
-      state.weights.buzz = clamp(Number(parsed.weights.buzz || state.weights.buzz), 1, 95);
-    }
-
-    if (typeof parsed.categoryId === "string" && categories.some((category) => category.id === parsed.categoryId)) {
-      state.categoryId = parsed.categoryId;
-    }
-
-    if (Array.isArray(parsed.categories)) {
-      parsed.categories.forEach((storedCategory) => {
-        if (!storedCategory || typeof storedCategory !== "object") return;
-        const target = categories.find((category) => category.id === storedCategory.id);
-        if (!target || !Array.isArray(storedCategory.films)) return;
-
-        const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
-        if (films.length > 0) target.films = films;
-      });
-    }
+    applyStatePayload(parsed);
   } catch {
     // Ignore malformed state.
   }
+}
+
+function bindProfileControls() {
+  profileSelect.addEventListener("change", async (event) => {
+    state.profileId = event.target.value;
+    loadState();
+    await loadStateFromApi();
+    render();
+  });
+
+  newProfileButton.addEventListener("click", async () => {
+    const name = window.prompt("New profile name:");
+    if (!name) return;
+    const profileId = name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+    if (!profileId) return;
+    if (!profileOptions.includes(profileId)) profileOptions.push(profileId);
+    state.profileId = profileId;
+    renderProfileOptions();
+    saveState();
+    await loadProfiles();
+  });
 }
 
 function render() {
@@ -1039,7 +1099,14 @@ function render() {
   renderResults(activeCategory, projections);
 }
 
-loadState();
-bindCsvControls();
-render();
-startExternalSignalPolling();
+async function bootstrap() {
+  await loadProfiles();
+  loadState();
+  await loadStateFromApi();
+  bindProfileControls();
+  bindCsvControls();
+  render();
+  startExternalSignalPolling();
+}
+
+bootstrap();

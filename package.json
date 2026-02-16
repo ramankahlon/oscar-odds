@@ -4,10 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
     "scrape:sources": "node scripts/poll-sources.mjs --once",
-    "poll:sources": "node scripts/poll-sources.mjs --interval-minutes 30"
+    "poll:sources": "node scripts/poll-sources.mjs --interval-minutes 30",
+    "test": "vitest run"
   },
   "dependencies": {
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }
