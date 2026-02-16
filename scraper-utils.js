@@ -1,5 +1,62 @@
 import * as cheerio from "cheerio";
 
+const BANNED_EXACT_PHRASES = new Set([
+  "best picture",
+  "best actor",
+  "best actress",
+  "best director",
+  "academy awards",
+  "oscar predictions",
+  "oscars 2027",
+  "top contenders",
+  "prediction chatter"
+]);
+
+const BANNED_TOKENS = new Set([
+  "oscars",
+  "oscar",
+  "academy",
+  "awards",
+  "predictions",
+  "prediction",
+  "contenders",
+  "category",
+  "categories",
+  "reddit",
+  "thread"
+]);
+
+const BANNED_PATTERN_MATCHERS = [
+  /\boscars?\s+\d{4}\s+predictions?\b/i,
+  /\b(best|academy)\s+(picture|actor|actress|director|supporting)\b/i
+];
+
+const KNOWN_ENTITY_ALIASES = new Map([
+  ["odyssey", "The Odyssey"],
+  ["the odyssey", "The Odyssey"],
+  ["christopher nolan s the odyssey", "The Odyssey"],
+  ["christopher nolans the odyssey", "The Odyssey"],
+  ["nolan odyssey", "The Odyssey"],
+  ["dune part three", "Dune: Part Three"],
+  ["dune 3", "Dune: Part Three"],
+  ["the dish", "The Dish"],
+  ["spielberg the dish", "The Dish"],
+  ["project hail mary", "Project Hail Mary"],
+  ["the social reckoning", "The Social Reckoning"],
+  ["michael", "Michael"],
+  ["the bride", "The Bride!"],
+  ["the bride!", "The Bride!"],
+  ["narnia", "Narnia"],
+  ["sense and sensibility", "Sense and Sensibility"],
+  ["wuthering heights", "Wuthering Heights"],
+  ["the dog stars", "The Dog Stars"],
+  ["judy", "Judy"],
+  ["moana live action", "Moana Live-Action"],
+  ["moana", "Moana Live-Action"]
+]);
+
+const KNOWN_ENTITIES = [...new Set(KNOWN_ENTITY_ALIASES.values())];
+
 export function normalizeTitle(value) {
   return String(value || "")
     .toLowerCase()
@@ -8,6 +65,27 @@ export function normalizeTitle(value) {
     .replace(/\([^)]*\)/g, " ")
     .replace(/[^a-z0-9']+/g, " ")
     .trim();
+}
+
+function aliasLookupKey(value) {
+  return normalizeTitle(value).replace(/'/g, "");
+}
+
+function tokenSet(value) {
+  return new Set(normalizeTitle(value).split(/\s+/).filter(Boolean));
+}
+
+function jaccardSimilarity(aValue, bValue) {
+  const a = tokenSet(aValue);
+  const b = tokenSet(bValue);
+  if (!a.size || !b.size) return 0;
+
+  let intersection = 0;
+  a.forEach((token) => {
+    if (b.has(token)) intersection += 1;
+  });
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
 }
 
 export function titleCaseWords(text) {
@@ -26,6 +104,57 @@ export function dedupeByNormalized(items, keySelector) {
     map.set(key, item);
   });
   return [...map.values()];
+}
+
+export function isValidEntityCandidate(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return false;
+  if (text.length < 3 || text.length > 80) return false;
+
+  const normalized = normalizeTitle(text);
+  if (!normalized) return false;
+  if (BANNED_EXACT_PHRASES.has(normalized)) return false;
+  if (BANNED_PATTERN_MATCHERS.some((pattern) => pattern.test(text))) return false;
+
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  if (tokens.every((token) => BANNED_TOKENS.has(token))) return false;
+  const bannedTokenCount = tokens.reduce((count, token) => count + (BANNED_TOKENS.has(token) ? 1 : 0), 0);
+  if (tokens.length >= 2 && bannedTokenCount / tokens.length >= 0.6) return false;
+
+  const alphaCount = (text.match(/[A-Za-z]/g) || []).length;
+  if (alphaCount < 3) return false;
+
+  if (/^(the|a|an)\s+$/.test(normalized)) return false;
+  if (/^[0-9\s:.-]+$/.test(text)) return false;
+
+  return true;
+}
+
+export function canonicalizeEntity(rawValue, options = {}) {
+  const normalized = normalizeTitle(rawValue);
+  if (!normalized || !isValidEntityCandidate(rawValue)) {
+    return { title: "", confidence: 0, method: "rejected" };
+  }
+
+  const normalizedAliasKey = aliasLookupKey(normalized);
+  const directAlias = KNOWN_ENTITY_ALIASES.get(normalized) || KNOWN_ENTITY_ALIASES.get(normalizedAliasKey);
+  if (directAlias) {
+    return { title: directAlias, confidence: 1, method: "alias" };
+  }
+
+  const knownEntities = Array.isArray(options.knownEntities) && options.knownEntities.length ? options.knownEntities : KNOWN_ENTITIES;
+  let best = { title: titleCaseWords(rawValue), confidence: 0, method: "raw" };
+
+  knownEntities.forEach((entity) => {
+    const similarity = jaccardSimilarity(normalized, entity);
+    if (similarity > best.confidence) {
+      best = { title: entity, confidence: similarity, method: "fuzzy" };
+    }
+  });
+
+  if (best.confidence >= 0.8) return best;
+  return { title: titleCaseWords(rawValue), confidence: 0.4, method: "raw" };
 }
 
 export function extractLetterboxd(html) {
@@ -48,7 +177,7 @@ export function extractLetterboxd(html) {
   const total = Math.max(unique.length, 1);
 
   return unique.map((item, index) => ({
-    title: item.title,
+    title: canonicalizeEntity(item.title).title || item.title,
     rank: index + 1,
     score: Number(((total - index) / total).toFixed(4))
   }));
@@ -66,7 +195,7 @@ export function extractTitleLikePhrases(text) {
     const phrase = match[1].trim();
     if (phrase.length < 4) continue;
     if (/\b(Best|Oscar|Oscars|Academy|Awards|Prediction|Predictions|Category)\b/.test(phrase)) continue;
-    matches.push(phrase);
+    if (isValidEntityCandidate(phrase)) matches.push(phrase);
   }
 
   return dedupeByNormalized(matches.map((value) => ({ value })), (item) => item.value)
@@ -88,9 +217,11 @@ export function extractTheGamer(html) {
   lines.forEach((line, index) => {
     const weight = Math.max(1, 6 - Math.floor(index / 10));
     extractTitleLikePhrases(line).forEach((title) => {
-      const key = normalizeTitle(title);
+      const canonical = canonicalizeEntity(title);
+      if (!canonical.title) return;
+      const key = normalizeTitle(canonical.title);
       if (!key) return;
-      const entry = titleCounts.get(key) || { title: titleCaseWords(title), score: 0 };
+      const entry = titleCounts.get(key) || { title: canonical.title, score: 0 };
       entry.score += weight;
       titleCounts.set(key, entry);
     });
@@ -119,9 +250,11 @@ export function extractReddit(data) {
   const mentionMap = new Map();
   posts.forEach((post) => {
     extractTitleLikePhrases(post.title).forEach((title) => {
-      const key = normalizeTitle(title);
+      const canonical = canonicalizeEntity(title);
+      if (!canonical.title) return;
+      const key = normalizeTitle(canonical.title);
       if (!key) return;
-      const entry = mentionMap.get(key) || { title: titleCaseWords(title), count: 0, weightedScore: 0 };
+      const entry = mentionMap.get(key) || { title: canonical.title, count: 0, weightedScore: 0 };
       entry.count += 1;
       entry.weightedScore += post.score + post.comments;
       mentionMap.set(key, entry);
@@ -139,10 +272,12 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
   const aggregate = new Map();
 
   letterboxdItems.forEach((item) => {
-    const key = normalizeTitle(item.title);
+    const canonical = canonicalizeEntity(item.title);
+    if (!canonical.title) return;
+    const key = normalizeTitle(canonical.title);
     if (!key) return;
     aggregate.set(key, {
-      title: item.title,
+      title: canonical.title,
       letterboxdScore: item.score,
       thegamerScore: 0,
       redditCount: 0,
@@ -151,11 +286,13 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
   });
 
   thegamerItems.forEach((item, index) => {
-    const key = normalizeTitle(item.title);
+    const canonical = canonicalizeEntity(item.title);
+    if (!canonical.title) return;
+    const key = normalizeTitle(canonical.title);
     if (!key) return;
     const current =
       aggregate.get(key) || {
-        title: item.title,
+        title: canonical.title,
         letterboxdScore: 0,
         thegamerScore: 0,
         redditCount: 0,
@@ -167,11 +304,13 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
 
   const maxReddit = Math.max(...redditMentions.map((item) => item.count), 1);
   redditMentions.forEach((item) => {
-    const key = normalizeTitle(item.title);
+    const canonical = canonicalizeEntity(item.title);
+    if (!canonical.title) return;
+    const key = normalizeTitle(canonical.title);
     if (!key) return;
     const current =
       aggregate.get(key) || {
-        title: item.title,
+        title: canonical.title,
         letterboxdScore: 0,
         thegamerScore: 0,
         redditCount: 0,
