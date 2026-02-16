@@ -31,6 +31,11 @@ API endpoints:
 - `GET /api/profiles`
 - `GET /api/forecast/:profileId`
 - `PUT /api/forecast/:profileId`
+- `GET /api/tmdb-poster?title=...`
+
+Optional for more reliable poster lookup:
+- `TMDB_API_KEY`
+- `TMDB_API_READ_ACCESS_TOKEN`
 
 ## Scraping and polling external sources
 This project includes a polling scraper for:

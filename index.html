@@ -38,17 +38,28 @@
       <section class="workspace">
         <article class="panel results spotlight" aria-live="polite">
           <h2>Projected Odds</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th id="resultsPrimaryHeader">Film</th>
-                  <th>Nomination %</th>
-                  <th>Winner %</th>
-                </tr>
-              </thead>
-              <tbody id="resultsBody"></tbody>
-            </table>
+          <div class="spotlight-layout">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th id="resultsPrimaryHeader">Film</th>
+                    <th>Nomination %</th>
+                    <th>Winner %</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+              </table>
+            </div>
+            <aside class="movie-panel" aria-live="polite">
+              <img id="movieDetailPoster" class="movie-poster" alt="Selected movie poster" />
+              <a id="movieDetailPosterLink" class="movie-poster-link" href="#" target="_blank" rel="noreferrer noopener">Source: TMDB</a>
+              <h3 id="movieDetailTitle">Selected Film</h3>
+              <p class="movie-detail-row"><strong>Director:</strong> <span id="movieDetailDirector">-</span></p>
+              <p class="movie-detail-row"><strong>Stars:</strong> <span id="movieDetailStars">-</span></p>
+              <p class="movie-detail-row"><strong>Genre:</strong> <span id="movieDetailGenre">-</span></p>
+              <p class="movie-detail-description" id="movieDetailDescription"></p>
+            </aside>
           </div>
           <section class="explain-panel" id="explainPanel" aria-live="polite">
             <h3 id="explainTitle">Why this %</h3>

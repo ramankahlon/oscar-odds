@@ -102,15 +102,15 @@ const schedule2026Films = [
   "Masters of the Universe",
   "Power Ballad",
   "Scary Movie 6",
-  "The Dish [Spielberg Movie]",
+  "The Dish",
   "Pixar's Toy Story 5",
   "Supergirl",
   "Mega Minions",
   "Shiver",
   "Young Washington",
-  "Moana [Live-Action]",
+  "Moana Live-Action",
   "Cut Off",
-  "Christopher Nolan's The Odyssey",
+  "The Odyssey",
   "Evil Dead Burn",
   "Spider-Man: Brand New Day",
   "Once Upon A Time in A Cinema",
@@ -128,7 +128,7 @@ const schedule2026Films = [
   "Resident Evil",
   "Charlie Harper",
   "Forgotten Island",
-  "Judy [Inarritu Movie]",
+  "Judy",
   "Verity",
   "The Legend of Aang: The Last Airbender",
   "Other Mommy",
@@ -183,7 +183,7 @@ function contender(title, studio, precursor, history, buzz, strength) {
 
 const categorySeeds = {
   picture: [
-    contender("Christopher Nolan's The Odyssey", "Universal", 88, 84, 92, "High"),
+    contender("The Odyssey", "Universal", 88, 84, 92, "High"),
     contender("Dune: Part Three", "Warner Bros.", 86, 81, 90, "High"),
     contender("Project Hail Mary", "Amazon MGM", 82, 74, 87, "High"),
     contender("The Social Reckoning", "A24", 80, 76, 83, "High"),
@@ -192,7 +192,7 @@ const categorySeeds = {
     contender("Michael", "Lionsgate", 75, 66, 88, "Medium"),
     contender("Sense and Sensibility", "Focus Features", 71, 73, 70, "Medium"),
     contender("Narnia", "Netflix", 68, 64, 79, "Medium"),
-    contender("The Dish [Spielberg Movie]", "Universal", 69, 70, 72, "Medium")
+    contender("The Dish", "Universal", 69, 70, 72, "Medium")
   ],
   director: [
     contender("Christopher Nolan", "The Odyssey", 90, 88, 94, "High"),
@@ -233,7 +233,7 @@ const categorySeeds = {
     contender("The Social Reckoning", "A24", 82, 78, 80, "High"),
     contender("The Bride!", "Warner Bros.", 78, 71, 76, "High"),
     contender("The Drama", "A24", 75, 73, 72, "Medium"),
-    contender("The Dish [Spielberg Movie]", "Universal", 73, 77, 69, "Medium"),
+    contender("The Dish", "Universal", 73, 77, 69, "Medium"),
     contender("Michael", "Lionsgate", 70, 64, 78, "Medium")
   ],
   "adapted-screenplay": [
@@ -296,7 +296,7 @@ const categorySeeds = {
     contender("Michael", "Lionsgate", 84, 72, 91, "High"),
     contender("Narnia", "Netflix", 79, 68, 83, "Medium"),
     contender("Toy Story 5", "Disney/Pixar", 76, 71, 80, "Medium"),
-    contender("Moana [Live-Action]", "Disney", 74, 70, 85, "Medium"),
+    contender("Moana Live-Action", "Disney", 74, 70, 85, "Medium"),
     contender("The Bride!", "Warner Bros.", 73, 74, 88, "Medium")
   ],
   sound: [
@@ -311,14 +311,14 @@ const categorySeeds = {
     contender("Dune: Part Three", "Warner Bros.", 85, 83, 75, "High"),
     contender("The Bride!", "Warner Bros.", 82, 77, 73, "Medium"),
     contender("Narnia", "Netflix", 78, 69, 79, "Medium"),
-    contender("The Dish [Spielberg Movie]", "Universal", 74, 72, 67, "Low")
+    contender("The Dish", "Universal", 74, 72, 67, "Low")
   ],
   cinematography: [
     contender("The Odyssey", "Universal", 89, 88, 79, "High"),
     contender("Dune: Part Three", "Warner Bros.", 87, 86, 77, "High"),
     contender("The Dog Stars", "20th Century Studios", 83, 84, 71, "High"),
     contender("The Bride!", "Warner Bros.", 79, 74, 70, "Medium"),
-    contender("Judy [Inarritu Movie]", "Warner Bros.", 76, 82, 68, "Medium")
+    contender("Judy", "Warner Bros.", 76, 82, 68, "Medium")
   ],
   "makeup-hairstyling": [
     contender("The Bride!", "Warner Bros.", 86, 80, 75, "High"),
@@ -423,6 +423,13 @@ const explainMeta = document.querySelector("#explainMeta");
 const explainDelta = document.querySelector("#explainDelta");
 const explainBreakdown = document.querySelector("#explainBreakdown");
 const explainNotes = document.querySelector("#explainNotes");
+const movieDetailTitle = document.querySelector("#movieDetailTitle");
+const movieDetailDirector = document.querySelector("#movieDetailDirector");
+const movieDetailStars = document.querySelector("#movieDetailStars");
+const movieDetailGenre = document.querySelector("#movieDetailGenre");
+const movieDetailDescription = document.querySelector("#movieDetailDescription");
+const movieDetailPoster = document.querySelector("#movieDetailPoster");
+const movieDetailPosterLink = document.querySelector("#movieDetailPosterLink");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const importCsvButton = document.querySelector("#importCsvButton");
 const csvFileInput = document.querySelector("#csvFileInput");
@@ -431,6 +438,121 @@ const profileSelect = document.querySelector("#profileSelect");
 const newProfileButton = document.querySelector("#newProfileButton");
 let profileOptions = ["default"];
 const explainSelectionByCategory = {};
+let activePosterRequestId = 0;
+
+function normalizeMovieDetailKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[^a-z0-9']+/g, " ")
+    .trim();
+}
+
+function getTmdbSearchUrl(title) {
+  return `https://www.themoviedb.org/search?query=${encodeURIComponent(String(title || "").trim())}`;
+}
+
+function buildPosterFallbackDataUrl(title) {
+  const safeTitle = String(title || "Selected Movie")
+    .slice(0, 60)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8edd9"/><stop offset="1" stop-color="#eadac2"/></linearGradient></defs><rect width="600" height="900" fill="url(#g)"/><text x="300" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#1e1a17">Poster Unavailable</text><text x="300" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#5f554a">${safeTitle}</text><text x="300" y="525" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#5f554a">TMDB Search Link Below</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+const movieDetails = {
+  "The Odyssey": {
+    director: "Christopher Nolan",
+    stars: ["Matt Damon", "Charlize Theron", "Tom Holland"],
+    genre: "Epic, Action, Historical Drama",
+    description: "A large-scale adaptation of Homer's Odyssey following a long, dangerous return home after war."
+  },
+  "Dune: Part Three": {
+    director: "Denis Villeneuve",
+    stars: ["Timothee Chalamet", "Zendaya", "Florence Pugh"],
+    genre: "Sci-Fi, Epic, Drama",
+    description: "The next chapter of the Dune saga, escalating political power struggles and interstellar conflict."
+  },
+  "Project Hail Mary": {
+    director: "Phil Lord & Christopher Miller",
+    stars: ["Ryan Gosling", "Sandra Huller"],
+    genre: "Sci-Fi, Adventure, Drama",
+    description: "A lone astronaut wakes in deep space and must solve an extinction-level crisis for Earth."
+  },
+  "The Social Reckoning": {
+    director: "Trey Edward Shults",
+    stars: ["Mikey Madison", "Jeremy Strong"],
+    genre: "Drama, Thriller",
+    description: "A prestige drama about public accountability, image, and power in a high-stakes social collapse."
+  },
+  "The Dog Stars": {
+    director: "Ridley Scott",
+    stars: ["Jacob Elordi", "Margaret Qualley"],
+    genre: "Post-Apocalyptic, Drama",
+    description: "A pilot and his companion navigate a devastated world while searching for hope and connection."
+  },
+  "The Bride!": {
+    director: "Maggie Gyllenhaal",
+    stars: ["Jessie Buckley", "Christian Bale"],
+    genre: "Gothic, Romance, Horror-Drama",
+    description: "A stylized reimagining of Frankenstein's Bride that blends classic horror iconography with romance."
+  },
+  Michael: {
+    director: "Antoine Fuqua",
+    stars: ["Jaafar Jackson", "Colman Domingo", "Nia Long"],
+    genre: "Biographical Drama",
+    description: "A biopic charting Michael Jackson's life, career rise, and lasting global pop-cultural influence."
+  },
+  "Sense and Sensibility": {
+    director: "Georgia Oakley",
+    stars: ["Daisy Edgar-Jones", "Paul Mescal"],
+    genre: "Period Drama, Romance",
+    description: "A new adaptation of Austen's novel centered on class, love, and family pressure in Regency England."
+  },
+  Narnia: {
+    director: "Greta Gerwig",
+    stars: ["Ensemble Cast"],
+    genre: "Fantasy, Adventure",
+    description: "A new screen take on C.S. Lewis world-building with large-scale fantasy production design."
+  },
+  "The Dish": {
+    director: "Steven Spielberg",
+    stars: ["Emily Blunt", "Colin Firth"],
+    genre: "Historical Drama",
+    description: "A prestige period drama from Spielberg expected to focus on media, politics, and institutional power."
+  },
+  Judy: {
+    director: "Alejandro G. Inarritu",
+    stars: ["Tom Cruise", "Sandra Huller", "John Goodman"],
+    genre: "Drama",
+    description: "A character-driven drama built around a demanding central performance and major supporting turns."
+  },
+  "Wuthering Heights": {
+    director: "Emerald Fennell",
+    stars: ["Jacob Elordi", "Margot Robbie"],
+    genre: "Period Drama, Romance",
+    description: "A modernized gothic adaptation of the classic novel focused on obsession, class, and revenge."
+  },
+  "The Drama": {
+    director: "Kristoffer Borgli",
+    stars: ["Zendaya", "Robert Pattinson"],
+    genre: "Romantic Drama",
+    description: "A relationship-centered prestige drama that blends sharp humor and emotional instability."
+  },
+  "The Odyssey": {
+    director: "Christopher Nolan",
+    stars: ["Matt Damon", "Charlize Theron", "Tom Holland"],
+    genre: "Epic, Action, Historical Drama",
+    description: "A large-scale adaptation of Homer's Odyssey following a long, dangerous return home after war."
+  }
+};
+
+const movieDetailsIndex = new Map(
+  Object.entries(movieDetails).map(([title, details]) => [normalizeMovieDetailKey(title), { title, ...details }])
+);
 
 function normalizeSignalKey(value) {
   return String(value || "")
@@ -723,6 +845,73 @@ function getDisplayTitle(categoryId, title, studio) {
   return `${title} (${studio})`;
 }
 
+function getSelectedFilmTitle(categoryId, entry) {
+  const isPersonCategory =
+    categoryId === "director" ||
+    categoryId === "actor" ||
+    categoryId === "actress" ||
+    categoryId === "supporting-actor" ||
+    categoryId === "supporting-actress";
+  return isPersonCategory ? entry.rawStudio : entry.rawTitle;
+}
+
+function setPosterState(posterUrl, movieUrl) {
+  const src = posterUrl || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
+  const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
+  movieDetailPoster.src = src;
+  movieDetailPoster.classList.remove("hidden");
+  movieDetailPosterLink.href = href;
+  movieDetailPosterLink.classList.remove("hidden");
+}
+
+async function loadPosterForTitle(title) {
+  const requestId = ++activePosterRequestId;
+  setPosterState(buildPosterFallbackDataUrl(title), getTmdbSearchUrl(title));
+  if (!title) return;
+
+  try {
+    const response = await fetch(`/api/tmdb-poster?title=${encodeURIComponent(title)}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (requestId !== activePosterRequestId) return;
+    const posterUrl = payload?.result?.posterUrl || "";
+    const movieUrl = payload?.result?.movieUrl || "";
+    if (posterUrl || movieUrl) setPosterState(posterUrl, movieUrl);
+  } catch {
+    // Keep fallback poster/link if API is unavailable.
+  }
+}
+
+function renderMovieDetails(category, entry) {
+  if (!entry) {
+    movieDetailTitle.textContent = "Selected Film";
+    movieDetailDirector.textContent = "-";
+    movieDetailStars.textContent = "-";
+    movieDetailGenre.textContent = "-";
+    movieDetailDescription.textContent = "Select a contender in Projected Odds to view details.";
+    setPosterState(buildPosterFallbackDataUrl("Selected Film"), getTmdbSearchUrl(""));
+    return;
+  }
+
+  const selectedFilmTitle = getSelectedFilmTitle(category.id, entry);
+  loadPosterForTitle(selectedFilmTitle);
+  const details = movieDetailsIndex.get(normalizeMovieDetailKey(selectedFilmTitle));
+  if (!details) {
+    movieDetailTitle.textContent = selectedFilmTitle;
+    movieDetailDirector.textContent = "TBD";
+    movieDetailStars.textContent = "TBD";
+    movieDetailGenre.textContent = "TBD";
+    movieDetailDescription.textContent = "No metadata available yet for this selection.";
+    return;
+  }
+
+  movieDetailTitle.textContent = details.title;
+  movieDetailDirector.textContent = details.director;
+  movieDetailStars.textContent = details.stars.join(", ");
+  movieDetailGenre.textContent = details.genre;
+  movieDetailDescription.textContent = details.description;
+}
+
 function buildProjections(category) {
   const normalized = normalizeWeights();
 
@@ -813,6 +1002,7 @@ function renderResults(category, projections) {
   });
 
   renderExplanation(category, displayProjections[boundedIndex], displayProjections);
+  renderMovieDetails(category, displayProjections[boundedIndex]);
 }
 
 function renderExplanation(category, entry, fieldEntries) {
