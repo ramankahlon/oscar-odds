@@ -2,7 +2,7 @@ services:
   - type: web
     name: oscar-odds
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /api/health
