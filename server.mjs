@@ -182,7 +182,13 @@ function canonicalMovieUrlFromId(id) {
 function posterUrlFromPath(pathValue) {
   const pathString = String(pathValue || "").trim();
   if (!pathString) return "";
-  if (pathString.startsWith("http://") || pathString.startsWith("https://")) return pathString;
+  if (pathString.startsWith("http://") || pathString.startsWith("https://")) {
+    if (/^https?:\/\/www\.themoviedb\.org\/t\/p\//i.test(pathString)) {
+      return pathString.replace(/^https?:\/\/www\.themoviedb\.org\/t\/p\//i, "https://image.tmdb.org/t/p/");
+    }
+    return pathString;
+  }
+  if (pathString.startsWith("/t/p/")) return `https://image.tmdb.org${pathString}`;
   return `${TMDB_IMAGE_BASE}${pathString.startsWith("/") ? "" : "/"}${pathString}`;
 }
 
@@ -202,7 +208,10 @@ async function isHttpResourceAvailable(url) {
       headers: { "user-agent": "oscar-odds/1.0 (+local-dev)" },
       signal: AbortSignal.timeout(8000)
     });
-    if (head.ok) return true;
+    if (head.ok) {
+      const contentType = String(head.headers.get("content-type") || "").toLowerCase();
+      if (contentType.startsWith("image/")) return true;
+    }
   } catch {
     // Fallback to GET probe below.
   }
@@ -213,7 +222,9 @@ async function isHttpResourceAvailable(url) {
       headers: { Range: "bytes=0-0", "user-agent": "oscar-odds/1.0 (+local-dev)" },
       signal: AbortSignal.timeout(8000)
     });
-    return get.ok;
+    if (!get.ok) return false;
+    const contentType = String(get.headers.get("content-type") || "").toLowerCase();
+    return contentType.startsWith("image/");
   } catch {
     return false;
   }

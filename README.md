@@ -166,15 +166,6 @@ Trend analytics snapshots are captured in the forecast payload and persisted per
 - UX polish compounds:
   - Keyboard navigation, mobile table ergonomics, and explicit state messaging changed the app from demo-like to product-like.
 
-## Resume-focused 2-week plan
-Week 1:
-1. Backend/API persistence (implemented): server-side forecast storage endpoint and frontend API integration with local fallback.
-2. Test harness (implemented): unit tests for forecast utility logic.
-
-Week 2:
-1. Auth + multi-profile forecast workspaces.
-2. Explainability panel for each contender (`why this %` feature attribution).
-
 ## Files
 - `index.html`: app structure and content
 - `styles.css`: visual design and responsive layout

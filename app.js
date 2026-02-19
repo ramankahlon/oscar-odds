@@ -484,6 +484,15 @@ function getTmdbSearchUrl(title) {
   return `https://www.themoviedb.org/search?query=${encodeURIComponent(String(title || "").trim())}`;
 }
 
+function normalizePosterRenderUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith("/t/p/")) return `https://image.tmdb.org${value}`;
+  if (value.startsWith("http://www.themoviedb.org/t/p/")) return value.replace("http://www.themoviedb.org/t/p/", "https://image.tmdb.org/t/p/");
+  if (value.startsWith("https://www.themoviedb.org/t/p/")) return value.replace("https://www.themoviedb.org/t/p/", "https://image.tmdb.org/t/p/");
+  return value;
+}
+
 function buildPosterFallbackDataUrl(title) {
   const safeTitle = String(title || "Selected Movie")
     .slice(0, 60)
@@ -1094,7 +1103,7 @@ function renderTrendAnalytics(category, entry) {
 }
 
 function setPosterState(posterUrl, movieUrl) {
-  const src = posterUrl || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
+  const src = normalizePosterRenderUrl(posterUrl) || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
   const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
   posterFallbackActive = !posterUrl;
   movieDetailPoster.src = src;
