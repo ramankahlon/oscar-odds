@@ -1,17 +1,97 @@
 # Oscar Odds 2027
 
-A lightweight static site that estimates nomination and winner probabilities for major 2027 Oscar categories.
+A full-stack Oscar forecasting app that combines curated contender data, external source scraping, probabilistic scoring, and explainable UI analytics for the 2027 race.
 
-## What it does
-- Seeds major upcoming films and contenders.
-- Uses a weighted blend of:
-  - precursor signals
-  - historical fit
-  - industry buzz
-- Outputs category-level nomination and winner percentages.
-- Lets you edit each contender's inputs and campaign strength in the UI.
-- Tracks contender trend lines over time for nomination/winner movement with source-update markers.
-- Includes mobile-first odds table behavior and explicit loading/empty/error UX states with keyboard-accessible contender rows.
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+  subgraph Sources[External Sources]
+    LB[Letterboxd list]
+    TG[TheGamer article]
+    RD[Reddit r/oscarrace]
+    TMDB[TMDB API / pages]
+  end
+
+  subgraph Ingestion[Ingestion + Data Quality]
+    POLL[scripts/poll-sources.mjs]
+    CLEAN[scraper-utils.js\nentity matching + validation]
+    SIG[(data/source-signals.json)]
+    OBS[(data/scrape-observability.json)]
+  end
+
+  subgraph App[Node/Express Service]
+    API[server.mjs\nforecast APIs + poster lookup]
+    STORE[(data/forecast-store.json)]
+    METRICS[/api/health + /api/metrics]
+  end
+
+  subgraph Frontend[Browser App]
+    UI[index.html + styles.css + app.js]
+    MODEL[Scoring + Rebalancing\nforecast-utils.js + scoring-utils.js]
+    STATE[localStorage + profile state]
+  end
+
+  LB --> POLL
+  TG --> POLL
+  RD --> POLL
+  POLL --> CLEAN
+  CLEAN --> SIG
+  POLL --> OBS
+  SIG --> UI
+  UI --> MODEL
+  MODEL --> UI
+  UI <--> API
+  API <--> STORE
+  API --> METRICS
+  UI --> STATE
+  UI --> TMDB
+  API --> TMDB
+```
+
+## Feature List
+
+- Category-level nomination and winner forecasting for major Academy Awards categories.
+- Contender input controls (precursor/history/buzz/strength) with instant recalculation.
+- Explainability panel (`Why this %`) showing feature contribution deltas versus category averages.
+- Trend analytics with nomination/winner movement lines and source-refresh impact markers.
+- CSV export/import for contender data workflows.
+- Multi-profile forecast workspaces with localStorage + backend persistence.
+- Poster and movie-detail side panel for selected contenders.
+- External source polling + normalized aggregation from Letterboxd, Reddit, and TheGamer.
+- Scraper observability: source freshness, retries, failures, and run-level telemetry.
+- Mobile-first odds table behavior and keyboard-accessible row navigation.
+- Deploy-ready backend with health/metrics endpoints, security headers, HTTPS enforcement toggle, and optional in-process poller.
+
+## Technical Decisions
+
+- Single-service architecture (frontend + backend together):
+  - Chosen to reduce operational overhead and simplify deployment for a portfolio project.
+  - Tradeoff: tighter coupling between UI and API release cycles.
+
+- Deterministic scoring + constrained rebalancing:
+  - Uses transparent weighted features and post-processing constraints rather than opaque ML.
+  - Enables explainability and direct tuning of business rules (`winner <= nomination cap`, bounded totals).
+
+- Hybrid persistence model:
+  - localStorage for resilient UX and offline-ish continuity.
+  - Backend profile storage for cross-session/server-backed workflows.
+
+- Scraper resilience before sophistication:
+  - Retry/backoff, freshness tracking, and source-level observability were prioritized.
+  - This made failures diagnosable and safe instead of silently degrading outputs.
+
+- Data-quality guardrails in ingestion:
+  - Added title/entity canonicalization and noisy phrase rejection to reduce false matches.
+  - Prevents polluted signals from headline text and forum chatter artifacts.
+
+- Strict TMDB poster matching:
+  - Enforced release-year filtering (2026) and poster URL validation.
+  - Avoids common ambiguous-title mismatches and broken poster links.
+
+- Accessibility and UX hardening:
+  - Added loading/empty/error states and keyboard navigation for forecast rows.
+  - Improves usability and demonstrates production-minded frontend behavior.
 
 ## Run locally
 Install dependencies:
@@ -68,6 +148,23 @@ Observability metrics are written to `data/scrape-observability.json` with:
 
 The app polls this file every 5 minutes and applies the latest aggregate signal deltas to contender inputs.
 Trend analytics snapshots are captured in the forecast payload and persisted per profile.
+
+## What I Learned
+
+- Data products fail at the seams, not in core logic:
+  - Most reliability work was around ingestion quality, retries, stale data handling, and bad external links.
+
+- Explainability is a product feature:
+  - Users trust probabilistic outputs more when they can inspect driver contributions and trend movement.
+
+- Constraint tuning matters as much as base scoring:
+  - Practical caps and rebalancing rules were necessary to keep percentages realistic and stable.
+
+- Production readiness is more than “it runs”:
+  - Security headers, health/metrics endpoints, deploy config, and monitoring loops significantly improved project maturity.
+
+- UX polish compounds:
+  - Keyboard navigation, mobile table ergonomics, and explicit state messaging changed the app from demo-like to product-like.
 
 ## Resume-focused 2-week plan
 Week 1:
