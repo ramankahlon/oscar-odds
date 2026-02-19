@@ -458,6 +458,7 @@ let profileOptions = ["default"];
 const explainSelectionByCategory = {};
 let activePosterRequestId = 0;
 let isBootstrapping = true;
+let posterFallbackActive = false;
 
 function setAppNotice(message = "", type = "") {
   if (!appStateNotice) return;
@@ -1095,6 +1096,7 @@ function renderTrendAnalytics(category, entry) {
 function setPosterState(posterUrl, movieUrl) {
   const src = posterUrl || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
   const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
+  posterFallbackActive = !posterUrl;
   movieDetailPoster.src = src;
   movieDetailPoster.classList.remove("hidden");
   movieDetailPosterLink.href = href;
@@ -1118,6 +1120,13 @@ async function loadPosterForTitle(title) {
     // Keep fallback poster/link if API is unavailable.
   }
 }
+
+movieDetailPoster?.addEventListener("error", () => {
+  if (posterFallbackActive) return;
+  posterFallbackActive = true;
+  movieDetailPoster.src = buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
+  movieDetailPosterLink.href = getTmdbSearchUrl(movieDetailTitle.textContent || "");
+});
 
 function renderMovieDetails(category, entry) {
   if (!entry) {

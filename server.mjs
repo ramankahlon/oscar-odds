@@ -17,6 +17,7 @@ const TMDB_BASE_URL = "https://www.themoviedb.org";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BEARER = process.env.TMDB_API_READ_ACCESS_TOKEN || "";
+const TMDB_RELEASE_YEAR = 2026;
 const FORCE_HTTPS = process.env.FORCE_HTTPS === "true";
 const ENABLE_SOURCE_POLLER = process.env.ENABLE_SOURCE_POLLER === "true";
 const SOURCE_POLL_INTERVAL_MINUTES = Math.max(5, Number(process.env.SOURCE_POLL_INTERVAL_MINUTES || 30));
@@ -155,7 +156,11 @@ function normalizePosterKey(value) {
 function toAbsoluteTmdbUrl(value) {
   if (!value) return "";
   if (value.startsWith("http://") || value.startsWith("https://")) return value;
-  if (value.startsWith("//")) return `https:${value}`;
+  if (value.startsWith("//")) {
+    if (value.includes("image.tmdb.org")) return `https:${value.slice(2)}`;
+    return `https:${value.slice(2)}`;
+  }
+  if (value.startsWith("/t/p/")) return `https://image.tmdb.org${value}`;
   if (value.startsWith("/")) return `${TMDB_BASE_URL}${value}`;
   return `${TMDB_BASE_URL}/${value}`;
 }
@@ -181,8 +186,63 @@ function posterUrlFromPath(pathValue) {
   return `${TMDB_IMAGE_BASE}${pathString.startsWith("/") ? "" : "/"}${pathString}`;
 }
 
-function extractMoviePathFromSearchHtml(html) {
+function posterUrlToOriginal(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (/\/t\/p\/w\d+\//i.test(value)) return value.replace(/\/t\/p\/w\d+\//i, "/t/p/original/");
+  return value;
+}
+
+async function isHttpResourceAvailable(url) {
+  const target = String(url || "").trim();
+  if (!target) return false;
+  try {
+    const head = await fetch(target, {
+      method: "HEAD",
+      headers: { "user-agent": "oscar-odds/1.0 (+local-dev)" },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (head.ok) return true;
+  } catch {
+    // Fallback to GET probe below.
+  }
+
+  try {
+    const get = await fetch(target, {
+      method: "GET",
+      headers: { Range: "bytes=0-0", "user-agent": "oscar-odds/1.0 (+local-dev)" },
+      signal: AbortSignal.timeout(8000)
+    });
+    return get.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveValidPosterUrl(candidateUrl) {
+  const primary = String(candidateUrl || "").trim();
+  if (!primary) return "";
+  if (await isHttpResourceAvailable(primary)) return primary;
+  const original = posterUrlToOriginal(primary);
+  if (original && original !== primary && (await isHttpResourceAvailable(original))) return original;
+  return "";
+}
+
+function releaseYearFromDate(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/^(\d{4})-/);
+  if (!match) return null;
+  return Number(match[1]);
+}
+
+function isTargetReleaseYear(value) {
+  return releaseYearFromDate(value) === TMDB_RELEASE_YEAR;
+}
+
+function extractMoviePathsFromSearchHtml(html) {
   const $ = cheerio.load(html);
+  const paths = [];
+  const seen = new Set();
   const selectors = [
     "section.search_results.movie .card .content h2 a[href^='/movie/']",
     ".search_results.movie .card .image_content a[href^='/movie/']",
@@ -191,15 +251,29 @@ function extractMoviePathFromSearchHtml(html) {
     "a[href^='/movie/']"
   ];
 
+  const pushPath = (href) => {
+    if (!href || !/\/movie\/[0-9]/i.test(href)) return;
+    const normalized = String(href).split("?")[0].trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    paths.push(normalized);
+  };
+
   for (const selector of selectors) {
-    const href = $(selector).first().attr("href");
-    if (href && /\/movie\/[0-9]/i.test(href)) {
-      return href;
+    $(selector).each((_, el) => {
+      pushPath($(el).attr("href"));
+    });
+    if (paths.length >= 10) break;
+  }
+
+  if (paths.length === 0) {
+    for (const match of html.matchAll(/href=\"(\/movie\/[0-9][^\"?#]*)/gi)) {
+      pushPath(match[1]);
+      if (paths.length >= 10) break;
     }
   }
 
-  const match = html.match(/href=\"(\/movie\/[0-9][^\"?#]*)/i);
-  return match ? match[1] : "";
+  return paths;
 }
 
 function extractPosterUrlFromMovieHtml(html) {
@@ -227,6 +301,32 @@ function extractPosterUrlFromMovieHtml(html) {
   return "";
 }
 
+function extractReleaseYearFromMovieHtml(html) {
+  const $ = cheerio.load(html);
+  const ldJson = $("script[type='application/ld+json']").first().text().trim();
+  if (ldJson) {
+    try {
+      const parsed = JSON.parse(ldJson);
+      const releaseDate = parsed?.datePublished || parsed?.releasedEvent?.startDate || "";
+      const fromLd = releaseYearFromDate(releaseDate);
+      if (fromLd) return fromLd;
+    } catch {
+      // Fall through to regex/meta parsing.
+    }
+  }
+
+  const dateMeta =
+    $("meta[property='movie:release_date']").attr("content") ||
+    $("meta[property='og:release_date']").attr("content") ||
+    "";
+  const fromMeta = releaseYearFromDate(dateMeta);
+  if (fromMeta) return fromMeta;
+
+  const dateRegex = html.match(/\"release_date\"\s*:\s*\"(\d{4}-\d{2}-\d{2})\"/i);
+  if (dateRegex?.[1]) return releaseYearFromDate(dateRegex[1]);
+  return null;
+}
+
 function tmdbApiHeaders() {
   if (TMDB_BEARER) return { Authorization: `Bearer ${TMDB_BEARER}` };
   return {};
@@ -240,6 +340,7 @@ async function fetchFromTmdbApi(query) {
   searchUrl.searchParams.set("include_adult", "false");
   searchUrl.searchParams.set("language", "en-US");
   searchUrl.searchParams.set("page", "1");
+  searchUrl.searchParams.set("primary_release_year", String(TMDB_RELEASE_YEAR));
   if (TMDB_API_KEY) searchUrl.searchParams.set("api_key", TMDB_API_KEY);
 
   const searchResponse = await fetch(searchUrl, {
@@ -251,11 +352,13 @@ async function fetchFromTmdbApi(query) {
   });
   if (!searchResponse.ok) return null;
   const searchJson = await searchResponse.json();
-  const firstMovie = Array.isArray(searchJson?.results) ? searchJson.results.find((item) => item?.id) : null;
-  if (!firstMovie) return null;
+  const results = Array.isArray(searchJson?.results) ? searchJson.results : [];
+  const firstMovie = results.find((item) => item?.id && isTargetReleaseYear(item?.release_date));
+  if (!firstMovie?.id) return null;
+  const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path));
 
   return {
-    posterUrl: posterUrlFromPath(firstMovie.poster_path),
+    posterUrl,
     movieUrl: canonicalMovieUrlFromId(firstMovie.id)
   };
 }
@@ -276,11 +379,15 @@ async function fetchFromTmdbRemoteMulti(query) {
   if (!response.ok) return null;
   const json = await response.json();
   const results = Array.isArray(json?.results) ? json.results : [];
-  const firstMovie = results.find((item) => item?.media_type === "movie" && item?.id) || results.find((item) => item?.id);
-  if (!firstMovie) return null;
+  const firstMovie = results.find((item) => {
+    const isMovieLike = !item?.media_type || item.media_type === "movie";
+    return isMovieLike && item?.id && isTargetReleaseYear(item?.release_date);
+  });
+  if (!firstMovie?.id) return null;
+  const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path || firstMovie.profile_path || ""));
 
   return {
-    posterUrl: posterUrlFromPath(firstMovie.poster_path || firstMovie.profile_path || ""),
+    posterUrl,
     movieUrl: canonicalMovieUrlFromId(firstMovie.id)
   };
 }
@@ -324,33 +431,35 @@ async function fetchTmdbPoster(title) {
   if (!searchResponse.ok) throw new Error(`TMDB search failed: ${searchResponse.status}`);
 
   const searchHtml = await searchResponse.text();
-  const moviePath = extractMoviePathFromSearchHtml(searchHtml);
-  if (!moviePath) {
+  const moviePaths = extractMoviePathsFromSearchHtml(searchHtml);
+  if (moviePaths.length === 0) {
     posterCache.set(cacheKey, null);
     return null;
   }
 
-  const movieUrl = canonicalMovieUrlFromPath(moviePath);
-  const movieResponse = await fetch(movieUrl, {
-    headers: {
-      "user-agent": "oscar-odds/1.0 (+local-dev)",
-      "accept-language": "en-US,en;q=0.9"
-    },
-    signal: AbortSignal.timeout(12000)
-  });
-  if (!movieResponse.ok) throw new Error(`TMDB movie fetch failed: ${movieResponse.status}`);
+  for (const moviePath of moviePaths) {
+    const movieUrl = canonicalMovieUrlFromPath(moviePath);
+    const movieResponse = await fetch(movieUrl, {
+      headers: {
+        "user-agent": "oscar-odds/1.0 (+local-dev)",
+        "accept-language": "en-US,en;q=0.9"
+      },
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!movieResponse.ok) continue;
 
-  const movieHtml = await movieResponse.text();
-  const posterUrl = extractPosterUrlFromMovieHtml(movieHtml);
-  if (!posterUrl) {
-    const payload = { posterUrl: "", movieUrl };
+    const movieHtml = await movieResponse.text();
+    const releaseYear = extractReleaseYearFromMovieHtml(movieHtml);
+    if (releaseYear !== TMDB_RELEASE_YEAR) continue;
+
+    const posterUrl = await resolveValidPosterUrl(extractPosterUrlFromMovieHtml(movieHtml));
+    const payload = { posterUrl: posterUrl || "", movieUrl };
     posterCache.set(cacheKey, payload);
     return payload;
   }
 
-  const payload = { posterUrl, movieUrl };
-  posterCache.set(cacheKey, payload);
-  return payload;
+  posterCache.set(cacheKey, null);
+  return null;
 }
 
 app.get("/api/health", (_, res) => {
