@@ -504,9 +504,26 @@ const explainSelectionByCategory = {};
 let activePosterRequestId = 0;
 let isBootstrapping = true;
 let posterFallbackActive = false;
+let backendOfflineMode = false;
+
+function setBackendOfflineMode(isOffline) {
+  backendOfflineMode = Boolean(isOffline);
+  if (backendOfflineMode) {
+    setAppNotice("Offline mode — data loaded from local storage.", "error");
+    return;
+  }
+  if (appStateNotice?.textContent === "Offline mode — data loaded from local storage.") {
+    setAppNotice("");
+  }
+}
 
 function setAppNotice(message = "", type = "") {
   if (!appStateNotice) return;
+  if (!message && backendOfflineMode) {
+    appStateNotice.textContent = "Offline mode — data loaded from local storage.";
+    appStateNotice.className = "app-notice error";
+    return;
+  }
   appStateNotice.textContent = message;
   appStateNotice.className = `app-notice${type ? ` ${type}` : ""}`;
 }
@@ -1858,9 +1875,11 @@ async function loadProfiles() {
   try {
     const response = await fetch(API_PROFILE_LIST_URL, { cache: "no-store" });
     if (!response.ok) {
+      setBackendOfflineMode(true);
       renderProfileOptions();
       return;
     }
+    setBackendOfflineMode(false);
     const doc = await response.json();
     const ids = Array.isArray(doc.profiles) ? doc.profiles.map((entry) => entry.id).filter(Boolean) : [];
     if (!ids.length) ids.push("default");
@@ -1872,31 +1891,41 @@ async function loadProfiles() {
     }
     renderProfileOptions();
   } catch {
+    setBackendOfflineMode(true);
     renderProfileOptions();
   }
 }
 
 async function saveStateToApi() {
   try {
-    await fetch(getForecastApiUrl(), {
+    const response = await fetch(getForecastApiUrl(), {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(serializeStatePayload())
     });
+    if (!response.ok) {
+      setBackendOfflineMode(true);
+      return;
+    }
+    setBackendOfflineMode(false);
   } catch {
-    setAppNotice("Autosave API unavailable. Working in local save mode.", "error");
+    setBackendOfflineMode(true);
   }
 }
 
 async function loadStateFromApi() {
   try {
     const response = await fetch(getForecastApiUrl(), { cache: "no-store" });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setBackendOfflineMode(true);
+      return;
+    }
     const doc = await response.json();
     if (!doc || typeof doc !== "object" || !doc.payload) return;
+    setBackendOfflineMode(false);
     applyStatePayload(doc.payload);
   } catch {
-    setAppNotice("Could not load profile from API. Using locally saved state.", "error");
+    setBackendOfflineMode(true);
   }
 }
 
@@ -2034,12 +2063,17 @@ async function fetchComparePayload(profileId) {
   if (comparePayloadCache.has(profileId)) return comparePayloadCache.get(profileId);
   try {
     const res = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      setBackendOfflineMode(true);
+      return null;
+    }
     const doc = await res.json();
     if (!doc?.payload) return null;
+    setBackendOfflineMode(false);
     comparePayloadCache.set(profileId, doc.payload);
     return doc.payload;
   } catch {
+    setBackendOfflineMode(true);
     return null;
   }
 }
@@ -2298,7 +2332,11 @@ async function bootstrap() {
   bindCompareControls();
   isBootstrapping = false;
   setPanelsBusy(false);
-  setAppNotice("");
+  if (backendOfflineMode) {
+    setAppNotice("Offline mode — data loaded from local storage.", "error");
+  } else {
+    setAppNotice("");
+  }
   render();
   startExternalSignalPolling();
   startScraperHealthPolling();
