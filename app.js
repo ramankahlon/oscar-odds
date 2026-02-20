@@ -396,6 +396,33 @@ const overdueNarrativeBoost = {
   }
 };
 
+const CATEGORY_SHORT_NAMES = {
+  "picture": "Picture",
+  "director": "Director",
+  "actor": "Actor",
+  "actress": "Actress",
+  "supporting-actor": "Supp. Actor",
+  "supporting-actress": "Supp. Actress",
+  "original-screenplay": "Orig. Screenplay",
+  "adapted-screenplay": "Adpt. Screenplay",
+  "animated-feature": "Animated",
+  "international-feature": "Intl. Feature",
+  "documentary-feature": "Doc. Feature",
+  "documentary-short": "Doc. Short",
+  "live-action-short": "Live Action Short",
+  "animated-short": "Animated Short",
+  "original-score": "Score",
+  "original-song": "Song",
+  "sound": "Sound",
+  "production-design": "Prod. Design",
+  "cinematography": "Cinematography",
+  "makeup-hairstyling": "Makeup",
+  "costume-design": "Costume",
+  "film-editing": "Film Editing",
+  "visual-effects": "VFX",
+  "casting": "Casting"
+};
+
 const STORAGE_KEY = "oscarOddsForecastState.v11";
 const API_PROFILE_LIST_URL = "/api/profiles";
 const API_FORECAST_BASE_URL = "/api/forecast";
@@ -425,6 +452,7 @@ const trendHistory = {
 };
 
 const categoryTabs = document.querySelector("#categoryTabs");
+const categorySummaryBar = document.querySelector("#categorySummaryBar");
 const categoryTitle = document.querySelector("#categoryTitle");
 const candidateCards = document.querySelector("#candidateCards");
 const resultsBody = document.querySelector("#resultsBody");
@@ -1963,6 +1991,67 @@ function bindTrendControls() {
   });
 }
 
+function renderSummaryBar() {
+  if (!categorySummaryBar) return;
+  categorySummaryBar.innerHTML = "";
+
+  categories.forEach((category) => {
+    const projections = buildProjections(category);
+    const top = projections[0];
+    const second = projections[1];
+    if (!top) return;
+
+    const gap = second ? top.winner - second.winner : null;
+    const shortName = CATEGORY_SHORT_NAMES[category.id] || category.name;
+    const isActive = category.id === state.categoryId;
+    const displayName = top.rawTitle;
+
+    let gapClass = "gap-moderate";
+    if (gap !== null) {
+      if (gap < 5) gapClass = "gap-tight";
+      else if (gap >= 15) gapClass = "gap-clear";
+    }
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `summary-card${isActive ? " active" : ""}`;
+    card.setAttribute(
+      "aria-label",
+      `${category.name}: ${displayName}, ${top.winner.toFixed(1)}% winner odds${gap !== null ? `, +${gap.toFixed(1)}pp lead` : ""}`
+    );
+    card.setAttribute("aria-pressed", isActive ? "true" : "false");
+
+    card.innerHTML = `
+      <span class="summary-card-category">${shortName}</span>
+      <span class="summary-card-title">${displayName}</span>
+      <span class="summary-card-footer">
+        <span class="summary-card-odds">${top.winner.toFixed(1)}%</span>
+        ${gap !== null ? `<span class="summary-card-gap ${gapClass}">+${gap.toFixed(1)}pp</span>` : ""}
+      </span>
+    `;
+
+    card.addEventListener("click", () => {
+      if (searchQuery) {
+        searchQuery = "";
+        if (contenderSearch) contenderSearch.value = "";
+        if (contenderSearchClear) contenderSearchClear.hidden = true;
+      }
+      state.categoryId = category.id;
+      saveState();
+      render();
+    });
+
+    categorySummaryBar.appendChild(card);
+  });
+
+  // Scroll the active card into view within the bar
+  const activeCard = categorySummaryBar.querySelector(".summary-card.active");
+  if (activeCard) {
+    const bar = categorySummaryBar;
+    bar.scrollLeft = activeCard.offsetLeft - bar.clientWidth / 2 + activeCard.offsetWidth / 2;
+  }
+}
+
 function render() {
   setPanelsBusy(isBootstrapping);
   const activeCategory = getActiveCategory();
@@ -1970,6 +2059,7 @@ function render() {
   const capturedTrend = captureTrendSnapshot(activeCategory, projections);
   if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
   renderTabs();
+  renderSummaryBar();
   renderCandidates(activeCategory, projections);
   renderResults(activeCategory, projections);
   if (capturedTrend) saveState();

@@ -145,6 +145,118 @@ label {
   background: #fff;
 }
 
+.summary-bar-section {
+  overflow: hidden;
+}
+
+.summary-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.summary-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.summary-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.summary-bar::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 2px;
+}
+
+.summary-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  width: 148px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  box-shadow: var(--shadow);
+  transition: border-color 0.12s;
+}
+
+.summary-card:hover {
+  border-color: var(--accent);
+}
+
+.summary-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.summary-card-category {
+  display: block;
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-card-title {
+  display: block;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.summary-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.summary-card-odds {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.summary-card-gap {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.summary-card-gap.gap-tight {
+  background: #fdf0dc;
+  color: var(--warn);
+}
+
+.summary-card-gap.gap-moderate {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.summary-card-gap.gap-clear {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .workspace {
   display: grid;
   gap: 18px;
