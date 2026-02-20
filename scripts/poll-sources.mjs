@@ -16,7 +16,9 @@ const SOURCE_URLS = {
   thegamer: "https://www.thegamer.com/oscars-predictions-2026-2027/"
 };
 
-const USER_AGENT = "oscar-odds-bot/1.0 (+local-dev)";
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const REDDIT_USER_AGENT = "web:oscar-odds-bot:1.0.0 (scraper for open Oscar forecast project)";
 const RETRY_COUNT = 2;
 const RETRY_BACKOFF_MS = 750;
 
@@ -36,6 +38,7 @@ async function fetchText(url) {
   const response = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
+      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "accept-language": "en-US,en;q=0.8"
     },
     signal: AbortSignal.timeout(15000)
@@ -48,10 +51,10 @@ async function fetchText(url) {
   return response.text();
 }
 
-async function fetchJson(url) {
+async function fetchRedditJson(url) {
   const response = await fetch(url, {
     headers: {
-      "user-agent": USER_AGENT,
+      "user-agent": REDDIT_USER_AGENT,
       "accept": "application/json",
       "accept-language": "en-US,en;q=0.8"
     },
@@ -199,7 +202,7 @@ async function runOnce() {
 
   const sourceTasks = {
     letterboxd: async () => extractLetterboxd(await fetchText(SOURCE_URLS.letterboxd)),
-    reddit: async () => extractReddit(await fetchJson(SOURCE_URLS.reddit)),
+    reddit: async () => extractReddit(await fetchRedditJson(SOURCE_URLS.reddit)),
     thegamer: async () => extractTheGamer(await fetchText(SOURCE_URLS.thegamer))
   };
 

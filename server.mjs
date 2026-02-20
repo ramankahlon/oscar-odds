@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +30,14 @@ const requestMetrics = {
 };
 let pollerProcess = null;
 let pollerState = { running: false, startedAt: null, lastExitCode: null, restarts: 0 };
+
+const forecastWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down." }
+});
 
 app.use(express.json({ limit: "1mb" }));
 app.set("trust proxy", 1);
@@ -518,7 +527,7 @@ app.get("/api/forecast/:profileId", async (req, res) => {
   res.json({ profileId, ...profile });
 });
 
-app.put("/api/forecast/:profileId", async (req, res) => {
+app.put("/api/forecast/:profileId", forecastWriteLimiter, async (req, res) => {
   const payload = req.body;
   if (!payload || typeof payload !== "object") {
     res.status(400).json({ error: "Invalid forecast payload." });

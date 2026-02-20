@@ -71,6 +71,25 @@ body {
   color: var(--muted);
 }
 
+.scraper-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #fdf0dc;
+  border: 1px solid #e8c07c;
+  color: var(--warn);
+}
+
+.scraper-health-badge::before {
+  content: "⚠";
+  font-size: 0.75rem;
+}
+
 .app-notice.error {
   color: #8b2b1f;
 }

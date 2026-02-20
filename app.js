@@ -440,6 +440,7 @@ const trendChart = document.querySelector("#trendChart");
 const trendSourceMoves = document.querySelector("#trendSourceMoves");
 const trendWindowSelect = document.querySelector("#trendWindowSelect");
 const appStateNotice = document.querySelector("#appStateNotice");
+const scraperHealthBadge = document.querySelector("#scraperHealthBadge");
 const resultsPanel = document.querySelector("#resultsPanel");
 const movieDetailTitle = document.querySelector("#movieDetailTitle");
 const movieDetailDirector = document.querySelector("#movieDetailDirector");
@@ -730,6 +731,47 @@ function startExternalSignalPolling() {
   setInterval(() => {
     fetchAndApplyExternalSignals();
   }, EXTERNAL_SIGNALS_POLL_MS);
+}
+
+const SCRAPE_OBSERVABILITY_URL = "/api/scrape-observability";
+const SCRAPE_HEALTH_POLL_MS = 10 * 60 * 1000;
+const SCRAPE_STALE_THRESHOLD_MINUTES = 120;
+
+async function checkScraperHealth() {
+  if (!scraperHealthBadge) return;
+  try {
+    const res = await fetch(SCRAPE_OBSERVABILITY_URL, { cache: "no-store" });
+    if (!res.ok) return;
+    const obs = await res.json();
+    const sources = obs?.sources || {};
+    const now = Date.now();
+    const staleSourceNames = Object.entries(sources)
+      .filter(([, metrics]) => {
+        if (metrics.consecutiveFailures > 0) return true;
+        if (metrics.lastSuccessAt) {
+          const ageMinutes = (now - Date.parse(metrics.lastSuccessAt)) / 60000;
+          if (ageMinutes > SCRAPE_STALE_THRESHOLD_MINUTES) return true;
+        } else if (metrics.attempts > 0) {
+          return true;
+        }
+        return false;
+      })
+      .map(([id]) => id);
+
+    if (staleSourceNames.length > 0) {
+      scraperHealthBadge.textContent = `Sources stale: ${staleSourceNames.join(", ")}`;
+      scraperHealthBadge.hidden = false;
+    } else {
+      scraperHealthBadge.hidden = true;
+    }
+  } catch {
+    // Fail silently — badge is informational only
+  }
+}
+
+function startScraperHealthPolling() {
+  checkScraperHealth();
+  setInterval(checkScraperHealth, SCRAPE_HEALTH_POLL_MS);
 }
 
 function parseFilmRecord(record) {
@@ -1756,6 +1798,7 @@ async function bootstrap() {
   setAppNotice("");
   render();
   startExternalSignalPolling();
+  startScraperHealthPolling();
 }
 
 bootstrap();
