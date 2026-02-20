@@ -33,6 +33,11 @@
             <button id="newProfileButton" class="action-button" type="button">New</button>
             <button id="renameProfileButton" class="action-button" type="button">Rename</button>
             <button id="deleteProfileButton" class="action-button action-button--danger" type="button">Delete</button>
+            <button id="compareToggleButton" class="action-button action-button--compare" type="button" aria-pressed="false">Compare</button>
+          </div>
+          <div id="compareControls" class="compare-controls" hidden aria-label="Comparison profile">
+            <span class="compare-controls-label">vs.</span>
+            <select id="compareProfileSelect"></select>
           </div>
           <h2>Categories</h2>
           <div class="category-list" id="categoryTabs" aria-label="Oscar categories"></div>
@@ -57,8 +62,10 @@
                 <thead>
                   <tr>
                     <th id="resultsPrimaryHeader">Film</th>
-                    <th>Nomination %</th>
-                    <th>Winner %</th>
+                    <th id="thNomination">Nomination %</th>
+                    <th id="thWinner">Winner %</th>
+                    <th id="thCompareB" hidden>Win%</th>
+                    <th id="thDelta" hidden>Δ</th>
                   </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>

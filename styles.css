@@ -307,6 +307,62 @@ label {
   pointer-events: none;
 }
 
+.action-button--compare {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.action-button--compare:hover,
+.action-button--compare[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+
+.compare-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.compare-controls-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.compare-controls select {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font: inherit;
+  background: var(--accent-soft);
+  color: var(--ink);
+  min-width: 140px;
+}
+
+.delta-pos {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.delta-neg {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.delta-neutral {
+  color: var(--muted);
+}
+
+.delta-na {
+  color: var(--muted);
+}
+
+th#thCompareB,
+th#thDelta {
+  white-space: nowrap;
+}
+
 .tool-status {
   margin: 0;
   font-size: 0.86rem;

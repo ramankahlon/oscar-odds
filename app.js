@@ -471,7 +471,17 @@ const appStateNotice = document.querySelector("#appStateNotice");
 const scraperHealthBadge = document.querySelector("#scraperHealthBadge");
 const contenderSearch = document.querySelector("#contenderSearch");
 const contenderSearchClear = document.querySelector("#contenderSearchClear");
+const compareToggleButton = document.querySelector("#compareToggleButton");
+const compareControls = document.querySelector("#compareControls");
+const compareProfileSelect = document.querySelector("#compareProfileSelect");
+const thNomination = document.querySelector("#thNomination");
+const thWinner = document.querySelector("#thWinner");
+const thCompareB = document.querySelector("#thCompareB");
+const thDelta = document.querySelector("#thDelta");
 let searchQuery = "";
+let compareMode = false;
+let compareProfileId = null;
+const comparePayloadCache = new Map();
 const resultsPanel = document.querySelector("#resultsPanel");
 const movieDetailTitle = document.querySelector("#movieDetailTitle");
 const movieDetailDirector = document.querySelector("#movieDetailDirector");
@@ -1269,10 +1279,18 @@ function renderMovieDetails(category, entry) {
   movieDetailDescription.textContent = details.description;
 }
 
-function buildProjections(category) {
-  const normalized = normalizeWeights();
+function buildProjections(category, overrides = null) {
+  const films = overrides?.films ?? category.films;
+  let normalized;
+  if (overrides?.weights) {
+    const w = overrides.weights;
+    const total = (w.precursor || 0) + (w.history || 0) + (w.buzz || 0) || 1;
+    normalized = { precursor: w.precursor / total, history: w.history / total, buzz: w.buzz / total };
+  } else {
+    normalized = normalizeWeights();
+  }
 
-  const scored = category.films.map((film, index) => {
+  const scored = films.map((film, index) => {
     const scores = scoreFilm(category.id, film, normalized);
     return { ...film, ...scores, index };
   });
@@ -1354,7 +1372,11 @@ function renderCandidates(category, projections) {
 }
 
 function renderSearchResults(query) {
-  resultsPrimaryHeader.textContent = "Film";
+  if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = "Film";
+  if (thNomination) thNomination.hidden = false;
+  if (thWinner) thWinner.textContent = "Winner %";
+  if (thCompareB) thCompareB.hidden = true;
+  if (thDelta) thDelta.hidden = true;
   resultsBody.innerHTML = "";
 
   const normalizedQuery = query.toLowerCase();
@@ -1435,7 +1457,7 @@ function renderResults(category, projections) {
     renderSearchResults(searchQuery);
     return;
   }
-  resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
+  setNormalTableHeaders(category);
   resultsBody.innerHTML = "";
   const displayProjections = projections.slice(0, getDisplayLimit(category));
   if (displayProjections.length === 0) {
@@ -1829,6 +1851,7 @@ function renderProfileOptions() {
     profileSelect.appendChild(option);
   });
   if (deleteProfileButton) deleteProfileButton.disabled = profileOptions.length <= 1;
+  if (compareMode) updateCompareProfileSelect();
 }
 
 async function loadProfiles() {
@@ -1904,6 +1927,22 @@ function bindProfileControls() {
     state.profileId = event.target.value;
     loadState();
     await loadStateFromApi();
+    if (compareMode) {
+      updateCompareProfileSelect();
+      if (compareProfileId === state.profileId || !compareProfileId) {
+        const others = profileOptions.filter((id) => id !== state.profileId);
+        compareProfileId = others[0] ?? null;
+        if (!compareProfileId) {
+          compareMode = false;
+          if (compareControls) compareControls.hidden = true;
+          if (compareToggleButton) { compareToggleButton.textContent = "Compare"; compareToggleButton.setAttribute("aria-pressed", "false"); }
+        } else {
+          updateCompareProfileSelect();
+          await fetchAndRenderCompare();
+          return;
+        }
+      }
+    }
     render();
   });
 
@@ -1991,6 +2030,175 @@ function bindTrendControls() {
   });
 }
 
+async function fetchComparePayload(profileId) {
+  if (comparePayloadCache.has(profileId)) return comparePayloadCache.get(profileId);
+  try {
+    const res = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
+    if (!res.ok) return null;
+    const doc = await res.json();
+    if (!doc?.payload) return null;
+    comparePayloadCache.set(profileId, doc.payload);
+    return doc.payload;
+  } catch {
+    return null;
+  }
+}
+
+function buildCompareProjectionsFrom(category, payload) {
+  if (!payload) return null;
+  const payloadCategory = Array.isArray(payload.categories)
+    ? payload.categories.find((c) => c.id === category.id)
+    : null;
+  const films = payloadCategory?.films
+    ? payloadCategory.films.map(parseFilmRecord).filter(Boolean)
+    : null;
+  if (!films || films.length === 0) return null;
+  return buildProjections(category, { films, weights: payload.weights ?? state.weights });
+}
+
+function setNormalTableHeaders(category) {
+  if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
+  if (thNomination) thNomination.hidden = false;
+  if (thWinner) thWinner.textContent = "Winner %";
+  if (thCompareB) thCompareB.hidden = true;
+  if (thDelta) thDelta.hidden = true;
+}
+
+function setCompareTableHeaders(category) {
+  if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
+  if (thNomination) thNomination.hidden = true;
+  if (thWinner) { thWinner.textContent = state.profileId; thWinner.title = `Winner % for profile "${state.profileId}"`; }
+  if (thCompareB) { thCompareB.textContent = compareProfileId; thCompareB.title = `Winner % for profile "${compareProfileId}"`; thCompareB.hidden = false; }
+  if (thDelta) thDelta.hidden = false;
+}
+
+function updateCompareProfileSelect() {
+  if (!compareProfileSelect) return;
+  compareProfileSelect.innerHTML = "";
+  const others = profileOptions.filter((id) => id !== state.profileId);
+  others.forEach((id) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = id;
+    option.selected = id === compareProfileId;
+    compareProfileSelect.appendChild(option);
+  });
+  if (!others.includes(compareProfileId)) compareProfileId = others[0] ?? null;
+}
+
+async function fetchAndRenderCompare() {
+  if (!compareProfileId) return;
+  setAppNotice("Loading comparison profile…", "loading");
+  await fetchComparePayload(compareProfileId);
+  setAppNotice("");
+  render();
+}
+
+function renderCompareResults(category, primaryProjections) {
+  setCompareTableHeaders(category);
+  resultsBody.innerHTML = "";
+
+  const displayLimit = getDisplayLimit(category);
+  const primaryTop = primaryProjections.slice(0, displayLimit);
+
+  if (primaryTop.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="results-empty" colspan="4">No projected contenders for this category.</td>`;
+    resultsBody.appendChild(row);
+    renderExplanation(category, null, []);
+    renderMovieDetails(category, null);
+    renderTrendAnalytics(category, null);
+    return;
+  }
+
+  const comparePayload = comparePayloadCache.get(compareProfileId) ?? null;
+  const compareProjections = buildCompareProjectionsFrom(category, comparePayload);
+  const compareMap = new Map();
+  if (compareProjections) {
+    compareProjections.forEach((entry) => compareMap.set(entry.rawTitle.toLowerCase(), entry));
+  }
+
+  const selectedIndex = explainSelectionByCategory[category.id] ?? 0;
+  const boundedIndex = clamp(selectedIndex, 0, Math.max(0, primaryTop.length - 1));
+  explainSelectionByCategory[category.id] = boundedIndex;
+
+  primaryTop.forEach((entry, index) => {
+    const cEntry = compareMap.get(entry.rawTitle.toLowerCase());
+    const bWinner = cEntry?.winner ?? null;
+    const delta = bWinner !== null ? bWinner - entry.winner : null;
+
+    let deltaCell;
+    if (delta === null) {
+      deltaCell = `<td data-label="Δ" class="delta-na">—</td>`;
+    } else {
+      const sign = delta >= 0 ? "+" : "";
+      const cls = delta > 0.5 ? "delta-pos" : delta < -0.5 ? "delta-neg" : "delta-neutral";
+      deltaCell = `<td data-label="Δ" class="${cls}">${sign}${delta.toFixed(1)}pp</td>`;
+    }
+
+    const row = document.createElement("tr");
+    row.className = `results-row${index === boundedIndex ? " active" : ""}`;
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-selected", index === boundedIndex ? "true" : "false");
+    row.setAttribute(
+      "aria-label",
+      `${entry.title}. ${state.profileId}: ${entry.winner.toFixed(1)}%. ${bWinner !== null ? `${compareProfileId}: ${bWinner.toFixed(1)}%.` : "No comparison data."}`
+    );
+
+    row.addEventListener("click", () => { explainSelectionByCategory[category.id] = index; render(); });
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); explainSelectionByCategory[category.id] = index; render(); return; }
+      if (event.key === "ArrowDown") { event.preventDefault(); explainSelectionByCategory[category.id] = clamp(index + 1, 0, primaryTop.length - 1); render(); return; }
+      if (event.key === "ArrowUp") { event.preventDefault(); explainSelectionByCategory[category.id] = clamp(index - 1, 0, primaryTop.length - 1); render(); }
+    });
+
+    row.innerHTML = `
+      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>
+      <td data-label="${state.profileId}">${entry.winner.toFixed(1)}%</td>
+      <td data-label="${compareProfileId}">${bWinner !== null ? bWinner.toFixed(1) + "%" : "—"}</td>
+      ${deltaCell}
+    `;
+    resultsBody.appendChild(row);
+  });
+
+  renderExplanation(category, primaryTop[boundedIndex], primaryTop);
+  renderMovieDetails(category, primaryTop[boundedIndex]);
+  renderTrendAnalytics(category, primaryTop[boundedIndex]);
+}
+
+function bindCompareControls() {
+  compareToggleButton?.addEventListener("click", async () => {
+    if (compareMode) {
+      compareMode = false;
+      compareProfileId = null;
+      if (compareControls) compareControls.hidden = true;
+      compareToggleButton.textContent = "Compare";
+      compareToggleButton.setAttribute("aria-pressed", "false");
+      render();
+      return;
+    }
+    const others = profileOptions.filter((id) => id !== state.profileId);
+    if (others.length === 0) {
+      setAppNotice("Create a second profile to use comparison mode.", "error");
+      return;
+    }
+    compareMode = true;
+    compareProfileId = others[0];
+    updateCompareProfileSelect();
+    if (compareControls) compareControls.hidden = false;
+    compareToggleButton.textContent = "✕ Compare";
+    compareToggleButton.setAttribute("aria-pressed", "true");
+    await fetchAndRenderCompare();
+  });
+
+  compareProfileSelect?.addEventListener("change", async (event) => {
+    comparePayloadCache.delete(event.target.value);
+    compareProfileId = event.target.value;
+    await fetchAndRenderCompare();
+  });
+}
+
 function renderSummaryBar() {
   if (!categorySummaryBar) return;
   categorySummaryBar.innerHTML = "";
@@ -2061,7 +2269,19 @@ function render() {
   renderTabs();
   renderSummaryBar();
   renderCandidates(activeCategory, projections);
-  renderResults(activeCategory, projections);
+  if (compareMode && compareProfileId && !searchQuery) {
+    if (comparePayloadCache.has(compareProfileId)) {
+      renderCompareResults(activeCategory, projections);
+    } else {
+      setNormalTableHeaders(activeCategory);
+      resultsBody.innerHTML = "";
+      const loadingRow = document.createElement("tr");
+      loadingRow.innerHTML = `<td class="results-empty" colspan="4">Loading comparison profile…</td>`;
+      resultsBody.appendChild(loadingRow);
+    }
+  } else {
+    renderResults(activeCategory, projections);
+  }
   if (capturedTrend) saveState();
 }
 
@@ -2075,6 +2295,7 @@ async function bootstrap() {
   bindTrendControls();
   bindCsvControls();
   bindSearchControls();
+  bindCompareControls();
   isBootstrapping = false;
   setPanelsBusy(false);
   setAppNotice("");
