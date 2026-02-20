@@ -464,6 +464,12 @@ table {
   margin-bottom: 14px;
 }
 
+.odds-last-updated {
+  margin: -6px 0 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .spotlight .table-wrap {
   overflow-x: auto;
 }
@@ -976,6 +982,11 @@ a:focus-visible {
   .spotlight h2 {
     font-size: 14pt;
     margin-bottom: 8px;
+  }
+
+  .odds-last-updated {
+    font-size: 9pt;
+    margin: -2px 0 8px;
   }
 
   .spotlight-layout {

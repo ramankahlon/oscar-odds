@@ -464,6 +464,7 @@ const categoryTitle = document.querySelector("#categoryTitle");
 const candidateCards = document.querySelector("#candidateCards");
 const resultsBody = document.querySelector("#resultsBody");
 const resultsPrimaryHeader = document.querySelector("#resultsPrimaryHeader");
+const oddsLastUpdated = document.querySelector("#oddsLastUpdated");
 const explainTitle = document.querySelector("#explainTitle");
 const explainMeta = document.querySelector("#explainMeta");
 const explainDelta = document.querySelector("#explainDelta");
@@ -514,6 +515,8 @@ let activePosterRequestId = 0;
 let isBootstrapping = true;
 let posterFallbackActive = false;
 let backendOfflineMode = false;
+let lastOddsRecalculatedAt = null;
+let lastSourceSyncAt = null;
 
 function setBackendOfflineMode(isOffline) {
   backendOfflineMode = Boolean(isOffline);
@@ -541,6 +544,32 @@ function setPanelsBusy(isBusy) {
   const busyValue = isBusy ? "true" : "false";
   if (resultsPanel) resultsPanel.setAttribute("aria-busy", busyValue);
   if (candidateCards) candidateCards.setAttribute("aria-busy", busyValue);
+}
+
+function formatTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Unknown";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function updateOddsFreshnessLabel() {
+  if (!oddsLastUpdated) return;
+  if (!lastOddsRecalculatedAt) {
+    oddsLastUpdated.textContent = "";
+    return;
+  }
+  const recalculated = formatTimestamp(lastOddsRecalculatedAt);
+  if (!lastSourceSyncAt) {
+    oddsLastUpdated.textContent = `Last recalculated: ${recalculated}`;
+    return;
+  }
+  oddsLastUpdated.textContent = `Last recalculated: ${recalculated} • Last source sync: ${formatTimestamp(lastSourceSyncAt)}`;
 }
 
 function normalizeMovieDetailKey(value) {
@@ -727,6 +756,7 @@ function applyExternalSignalSnapshot(snapshot) {
   });
   if (!result.changed) return false;
   appliedExternalSnapshotId = result.appliedSnapshotId;
+  lastSourceSyncAt = snapshot?.generatedAt || new Date().toISOString();
   return true;
 }
 
@@ -2285,6 +2315,8 @@ function render() {
   const activeCategory = getActiveCategory();
   updatePrintMeta();
   const projections = buildProjections(activeCategory);
+  lastOddsRecalculatedAt = new Date().toISOString();
+  updateOddsFreshnessLabel();
   const capturedTrend = captureTrendSnapshot(activeCategory, projections);
   if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
   renderTabs();
