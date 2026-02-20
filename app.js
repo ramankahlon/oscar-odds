@@ -441,6 +441,9 @@ const trendSourceMoves = document.querySelector("#trendSourceMoves");
 const trendWindowSelect = document.querySelector("#trendWindowSelect");
 const appStateNotice = document.querySelector("#appStateNotice");
 const scraperHealthBadge = document.querySelector("#scraperHealthBadge");
+const contenderSearch = document.querySelector("#contenderSearch");
+const contenderSearchClear = document.querySelector("#contenderSearchClear");
+let searchQuery = "";
 const resultsPanel = document.querySelector("#resultsPanel");
 const movieDetailTitle = document.querySelector("#movieDetailTitle");
 const movieDetailDirector = document.querySelector("#movieDetailDirector");
@@ -835,6 +838,11 @@ function renderTabs() {
 
   select.addEventListener("change", (event) => {
     state.categoryId = event.target.value;
+    if (searchQuery) {
+      searchQuery = "";
+      if (contenderSearch) contenderSearch.value = "";
+      if (contenderSearchClear) contenderSearchClear.hidden = true;
+    }
     saveState();
     render();
   });
@@ -1293,7 +1301,88 @@ function renderCandidates(category, projections) {
   });
 }
 
+function renderSearchResults(query) {
+  resultsPrimaryHeader.textContent = "Film";
+  resultsBody.innerHTML = "";
+
+  const normalizedQuery = query.toLowerCase();
+  const matches = [];
+
+  categories.forEach((category) => {
+    const projections = buildProjections(category);
+    const displayLimit = getDisplayLimit(category);
+    projections.slice(0, displayLimit).forEach((entry) => {
+      if (
+        entry.title.toLowerCase().includes(normalizedQuery) ||
+        entry.rawTitle.toLowerCase().includes(normalizedQuery)
+      ) {
+        matches.push({ ...entry, categoryName: category.name });
+      }
+    });
+  });
+
+  matches.sort((a, b) => b.winner - a.winner);
+
+  if (matches.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="results-empty" colspan="3">No contenders match "${query}".</td>`;
+    resultsBody.appendChild(row);
+  } else {
+    matches.forEach((entry) => {
+      const row = document.createElement("tr");
+      row.className = "results-row";
+      row.setAttribute("tabindex", "0");
+      row.setAttribute("role", "button");
+      row.setAttribute(
+        "aria-label",
+        `${entry.title}, ${entry.categoryName}. Nomination ${entry.nomination.toFixed(1)}%. Winner ${entry.winner.toFixed(1)}%.`
+      );
+
+      const navigateToEntry = () => {
+        searchQuery = "";
+        if (contenderSearch) contenderSearch.value = "";
+        if (contenderSearchClear) contenderSearchClear.hidden = true;
+        state.categoryId = entry.categoryId;
+        const cat = categories.find((c) => c.id === entry.categoryId);
+        if (cat) {
+          const catProjections = buildProjections(cat);
+          const foundIdx = catProjections.findIndex((p) => p.rawTitle === entry.rawTitle);
+          if (foundIdx >= 0) explainSelectionByCategory[entry.categoryId] = foundIdx;
+        }
+        saveState();
+        render();
+      };
+
+      row.addEventListener("click", navigateToEntry);
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          navigateToEntry();
+        }
+      });
+
+      row.innerHTML = `
+        <td data-label="Film">
+          <strong>${entry.title}</strong>
+          <span class="results-category-label">${entry.categoryName}</span>
+        </td>
+        <td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>
+        <td data-label="Winner %">${entry.winner.toFixed(1)}%</td>
+      `;
+      resultsBody.appendChild(row);
+    });
+  }
+
+  renderExplanation(getActiveCategory(), null, []);
+  renderMovieDetails(getActiveCategory(), null);
+  renderTrendAnalytics(getActiveCategory(), null);
+}
+
 function renderResults(category, projections) {
+  if (searchQuery) {
+    renderSearchResults(searchQuery);
+    return;
+  }
   resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   resultsBody.innerHTML = "";
   const displayProjections = projections.slice(0, getDisplayLimit(category));
@@ -1531,6 +1620,23 @@ function importContendersCsv(text) {
       category.films = importedFilms;
     }
   });
+}
+
+function bindSearchControls() {
+  if (!contenderSearch) return;
+  contenderSearch.addEventListener("input", () => {
+    searchQuery = contenderSearch.value.trim();
+    if (contenderSearchClear) contenderSearchClear.hidden = !searchQuery;
+    render();
+  });
+  if (contenderSearchClear) {
+    contenderSearchClear.addEventListener("click", () => {
+      searchQuery = "";
+      contenderSearch.value = "";
+      contenderSearchClear.hidden = true;
+      render();
+    });
+  }
 }
 
 function bindCsvControls() {
@@ -1793,6 +1899,7 @@ async function bootstrap() {
   bindProfileControls();
   bindTrendControls();
   bindCsvControls();
+  bindSearchControls();
   isBootstrapping = false;
   setPanelsBusy(false);
   setAppNotice("");
