@@ -1,1 +1,6 @@
-.github/workflows/ci.yml
+node_modules/
+coverage/
+data/forecast.db
+data/forecast-store.json
+data/source-signals.json
+data/scrape-observability.json

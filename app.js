@@ -682,12 +682,6 @@ const movieDetails = {
     stars: ["Zendaya", "Robert Pattinson"],
     genre: "Romantic Drama",
     description: "A relationship-centered prestige drama that blends sharp humor and emotional instability."
-  },
-  "The Odyssey": {
-    director: "Christopher Nolan",
-    stars: ["Matt Damon", "Charlize Theron", "Tom Holland"],
-    genre: "Epic, Action, Historical Drama",
-    description: "A large-scale adaptation of Homer's Odyssey following a long, dangerous return home after war."
   }
 };
 

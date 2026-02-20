@@ -302,7 +302,7 @@ function extractMoviePathsFromSearchHtml(html) {
   }
 
   if (paths.length === 0) {
-    for (const match of html.matchAll(/href=\"(\/movie\/[0-9][^\"?#]*)/gi)) {
+    for (const match of html.matchAll(/href="(\/movie\/[0-9][^"?#]*)/gi)) {
       pushPath(match[1]);
       if (paths.length >= 10) break;
     }
@@ -357,7 +357,7 @@ function extractReleaseYearFromMovieHtml(html) {
   const fromMeta = releaseYearFromDate(dateMeta);
   if (fromMeta) return fromMeta;
 
-  const dateRegex = html.match(/\"release_date\"\s*:\s*\"(\d{4}-\d{2}-\d{2})\"/i);
+  const dateRegex = html.match(/"release_date"\s*:\s*"(\d{4}-\d{2}-\d{2})"/i);
   if (dateRegex?.[1]) return releaseYearFromDate(dateRegex[1]);
   return null;
 }
