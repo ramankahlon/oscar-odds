@@ -6,11 +6,13 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
+    "smoke": "sh -c 'node server.mjs & PID=$!; trap \"kill $PID 2>/dev/null || true\" EXIT; sleep 1; curl -fsS -i http://localhost:3000/api/profiles'",
     "scrape:sources": "node scripts/poll-sources.mjs --once",
     "poll:sources": "node scripts/poll-sources.mjs --interval-minutes 30",
     "test": "vitest run"
   },
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "cheerio": "^1.0.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.1"

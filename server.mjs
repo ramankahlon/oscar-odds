@@ -1,16 +1,19 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import fs from "node:fs/promises";
+import { readFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import * as cheerio from "cheerio";
+import Database from "better-sqlite3";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const STORE_PATH = path.join(__dirname, "data", "forecast-store.json");
+const STORE_PATH = path.join(__dirname, "data", "forecast-store.json"); // kept for one-time migration
+const DB_PATH = path.join(__dirname, "data", "forecast.db");
 const SCRAPE_OBSERVABILITY_PATH = path.join(__dirname, "data", "scrape-observability.json");
 const DEFAULT_PROFILE_ID = "default";
 const posterCache = new Map();
@@ -30,6 +33,7 @@ const requestMetrics = {
 };
 let pollerProcess = null;
 let pollerState = { running: false, startedAt: null, lastExitCode: null, restarts: 0 };
+let db;
 
 const forecastWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -110,37 +114,48 @@ function startSourcePoller() {
   });
 }
 
-async function readStore() {
-  try {
-    const raw = await fs.readFile(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.profiles && typeof parsed.profiles === "object") return parsed;
+function initDb() {
+  mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
 
-    const migratedPayload = parsed?.payload || null;
-    return {
-      updatedAt: parsed?.updatedAt || null,
-      activeProfileId: DEFAULT_PROFILE_ID,
-      profiles: {
-        [DEFAULT_PROFILE_ID]: {
-          updatedAt: parsed?.updatedAt || null,
-          payload: migratedPayload
-        }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS profiles (
+      id         TEXT PRIMARY KEY,
+      updated_at TEXT,
+      payload    TEXT
+    );
+    CREATE TABLE IF NOT EXISTS meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+
+  // One-time migration from forecast-store.json when the DB is empty.
+  const isEmpty = db.prepare("SELECT COUNT(*) AS n FROM profiles").get().n === 0;
+  if (isEmpty) {
+    try {
+      const raw = readFileSync(STORE_PATH, "utf8");
+      const doc = JSON.parse(raw);
+      const profiles = doc?.profiles || (doc?.payload != null ? { [DEFAULT_PROFILE_ID]: { updatedAt: doc.updatedAt || null, payload: doc.payload } } : null);
+      if (profiles && typeof profiles === "object" && Object.keys(profiles).length > 0) {
+        const insert = db.prepare("INSERT OR IGNORE INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)");
+        db.transaction(() => {
+          for (const [id, entry] of Object.entries(profiles)) {
+            insert.run(id, entry.updatedAt || null, entry.payload != null ? JSON.stringify(entry.payload) : null);
+          }
+        })();
+        const activeProfileId = doc.activeProfileId || Object.keys(profiles)[0];
+        db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", activeProfileId);
+        console.log("[db] migrated forecast-store.json → forecast.db");
+      } else {
+        throw new Error("no profiles in JSON store");
       }
-    };
-  } catch {
-    return {
-      updatedAt: null,
-      activeProfileId: DEFAULT_PROFILE_ID,
-      profiles: {
-        [DEFAULT_PROFILE_ID]: { updatedAt: null, payload: null }
-      }
-    };
+    } catch {
+      db.prepare("INSERT OR IGNORE INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(DEFAULT_PROFILE_ID, null, null);
+      db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", DEFAULT_PROFILE_ID);
+    }
   }
-}
-
-async function writeStore(document) {
-  await fs.writeFile(STORE_PATH, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-  return document;
 }
 
 async function readScrapeObservability() {
@@ -511,23 +526,26 @@ app.get("/api/scrape-observability", async (_, res) => {
   res.json(doc);
 });
 
-app.get("/api/profiles", async (_, res) => {
-  const doc = await readStore();
-  const profiles = Object.entries(doc.profiles || {}).map(([id, entry]) => ({
-    id,
-    updatedAt: entry?.updatedAt || null
-  }));
-  res.json({ activeProfileId: doc.activeProfileId || DEFAULT_PROFILE_ID, profiles });
+app.get("/api/profiles", (_, res) => {
+  const profiles = db
+    .prepare("SELECT id, updated_at FROM profiles ORDER BY id")
+    .all()
+    .map((row) => ({ id: row.id, updatedAt: row.updated_at || null }));
+  const activeProfileId =
+    db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id")?.value || DEFAULT_PROFILE_ID;
+  res.json({ activeProfileId, profiles });
 });
 
-app.get("/api/forecast/:profileId", async (req, res) => {
-  const doc = await readStore();
+app.get("/api/forecast/:profileId", (req, res) => {
   const profileId = req.params.profileId || DEFAULT_PROFILE_ID;
-  const profile = doc.profiles?.[profileId] || { updatedAt: null, payload: null };
+  const row = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(profileId);
+  const profile = row
+    ? { updatedAt: row.updated_at || null, payload: row.payload != null ? JSON.parse(row.payload) : null }
+    : { updatedAt: null, payload: null };
   res.json({ profileId, ...profile });
 });
 
-app.put("/api/forecast/:profileId", forecastWriteLimiter, async (req, res) => {
+app.put("/api/forecast/:profileId", forecastWriteLimiter, (req, res) => {
   const payload = req.body;
   if (!payload || typeof payload !== "object") {
     res.status(400).json({ error: "Invalid forecast payload." });
@@ -535,42 +553,43 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, async (req, res) => {
   }
 
   const profileId = req.params.profileId || DEFAULT_PROFILE_ID;
-  const doc = await readStore();
   const updatedAt = new Date().toISOString();
-  doc.updatedAt = updatedAt;
-  doc.activeProfileId = profileId;
-  doc.profiles = doc.profiles || {};
-  doc.profiles[profileId] = { updatedAt, payload };
-
-  const saved = await writeStore(doc);
-  res.json({ profileId, ...saved.profiles[profileId] });
+  db.prepare("INSERT OR REPLACE INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(
+    profileId,
+    updatedAt,
+    JSON.stringify(payload)
+  );
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", profileId);
+  res.json({ profileId, updatedAt, payload });
 });
 
-app.delete("/api/forecast/:profileId", async (req, res) => {
+app.delete("/api/forecast/:profileId", (req, res) => {
   const profileId = req.params.profileId;
-  const doc = await readStore();
-
-  if (!doc.profiles?.[profileId]) {
+  if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
     res.status(404).json({ error: "Profile not found." });
     return;
   }
 
-  const remaining = Object.keys(doc.profiles).filter((id) => id !== profileId);
+  const remaining = db.prepare("SELECT id FROM profiles WHERE id != ?").all(profileId);
   if (remaining.length === 0) {
     res.status(400).json({ error: "Cannot delete the last profile." });
     return;
   }
 
-  delete doc.profiles[profileId];
-  if (doc.activeProfileId === profileId) {
-    doc.activeProfileId = remaining[0];
-  }
+  db.transaction(() => {
+    db.prepare("DELETE FROM profiles WHERE id = ?").run(profileId);
+    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id");
+    if (!activeRow?.value || activeRow.value === profileId) {
+      db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", remaining[0].id);
+    }
+  })();
 
-  await writeStore(doc);
-  res.json({ deleted: profileId, activeProfileId: doc.activeProfileId });
+  const activeProfileId =
+    db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id")?.value || remaining[0].id;
+  res.json({ deleted: profileId, activeProfileId });
 });
 
-app.patch("/api/forecast/:profileId/rename", async (req, res) => {
+app.patch("/api/forecast/:profileId/rename", (req, res) => {
   const oldId = req.params.profileId;
   const newId = String(req.body?.newId || "").trim();
 
@@ -579,9 +598,8 @@ app.patch("/api/forecast/:profileId/rename", async (req, res) => {
     return;
   }
 
-  const doc = await readStore();
-
-  if (!doc.profiles?.[oldId]) {
+  const existing = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(oldId);
+  if (!existing) {
     res.status(404).json({ error: "Profile not found." });
     return;
   }
@@ -591,16 +609,24 @@ app.patch("/api/forecast/:profileId/rename", async (req, res) => {
     return;
   }
 
-  if (doc.profiles[newId]) {
+  if (db.prepare("SELECT id FROM profiles WHERE id = ?").get(newId)) {
     res.status(409).json({ error: "A profile with that name already exists." });
     return;
   }
 
-  doc.profiles[newId] = doc.profiles[oldId];
-  delete doc.profiles[oldId];
-  if (doc.activeProfileId === oldId) doc.activeProfileId = newId;
+  db.transaction(() => {
+    db.prepare("INSERT INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(
+      newId,
+      existing.updated_at,
+      existing.payload
+    );
+    db.prepare("DELETE FROM profiles WHERE id = ?").run(oldId);
+    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id");
+    if (activeRow?.value === oldId) {
+      db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", newId);
+    }
+  })();
 
-  await writeStore(doc);
   res.json({ profileId: newId });
 });
 
@@ -623,6 +649,8 @@ app.get("*", (_, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+initDb();
+
 const server = app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
   startSourcePoller();
@@ -632,6 +660,7 @@ function shutdown(signal) {
   console.log(`[server] received ${signal}, shutting down...`);
   if (pollerProcess && !pollerProcess.killed) pollerProcess.kill("SIGTERM");
   server.close(() => {
+    if (db?.open) db.close();
     process.exit(0);
   });
 }
