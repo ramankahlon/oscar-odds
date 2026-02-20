@@ -179,6 +179,22 @@ label {
   border-color: var(--accent);
 }
 
+.action-button--danger {
+  color: #8b2b1f;
+  border-color: #d9a09a;
+}
+
+.action-button--danger:hover {
+  background: #fbeae8;
+  border-color: #c0392b;
+}
+
+.action-button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .tool-status {
   margin: 0;
   font-size: 0.86rem;

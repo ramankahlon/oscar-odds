@@ -546,6 +546,64 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, async (req, res) => {
   res.json({ profileId, ...saved.profiles[profileId] });
 });
 
+app.delete("/api/forecast/:profileId", async (req, res) => {
+  const profileId = req.params.profileId;
+  const doc = await readStore();
+
+  if (!doc.profiles?.[profileId]) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  const remaining = Object.keys(doc.profiles).filter((id) => id !== profileId);
+  if (remaining.length === 0) {
+    res.status(400).json({ error: "Cannot delete the last profile." });
+    return;
+  }
+
+  delete doc.profiles[profileId];
+  if (doc.activeProfileId === profileId) {
+    doc.activeProfileId = remaining[0];
+  }
+
+  await writeStore(doc);
+  res.json({ deleted: profileId, activeProfileId: doc.activeProfileId });
+});
+
+app.patch("/api/forecast/:profileId/rename", async (req, res) => {
+  const oldId = req.params.profileId;
+  const newId = String(req.body?.newId || "").trim();
+
+  if (!newId) {
+    res.status(400).json({ error: "Missing newId." });
+    return;
+  }
+
+  const doc = await readStore();
+
+  if (!doc.profiles?.[oldId]) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  if (newId === oldId) {
+    res.json({ profileId: newId });
+    return;
+  }
+
+  if (doc.profiles[newId]) {
+    res.status(409).json({ error: "A profile with that name already exists." });
+    return;
+  }
+
+  doc.profiles[newId] = doc.profiles[oldId];
+  delete doc.profiles[oldId];
+  if (doc.activeProfileId === oldId) doc.activeProfileId = newId;
+
+  await writeStore(doc);
+  res.json({ profileId: newId });
+});
+
 app.get("/api/tmdb-poster", async (req, res) => {
   const title = String(req.query.title || "").trim();
   if (!title) {

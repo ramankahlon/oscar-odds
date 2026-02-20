@@ -458,6 +458,8 @@ const csvFileInput = document.querySelector("#csvFileInput");
 const csvStatus = document.querySelector("#csvStatus");
 const profileSelect = document.querySelector("#profileSelect");
 const newProfileButton = document.querySelector("#newProfileButton");
+const renameProfileButton = document.querySelector("#renameProfileButton");
+const deleteProfileButton = document.querySelector("#deleteProfileButton");
 let profileOptions = ["default"];
 const explainSelectionByCategory = {};
 let activePosterRequestId = 0;
@@ -1776,6 +1778,7 @@ function renderProfileOptions() {
     option.selected = id === state.profileId;
     profileSelect.appendChild(option);
   });
+  if (deleteProfileButton) deleteProfileButton.disabled = profileOptions.length <= 1;
 }
 
 async function loadProfiles() {
@@ -1864,6 +1867,66 @@ function bindProfileControls() {
     renderProfileOptions();
     saveState();
     await loadProfiles();
+  });
+
+  renameProfileButton?.addEventListener("click", async () => {
+    const current = state.profileId;
+    const input = window.prompt("Rename profile to:", current);
+    if (!input || input.trim() === current) return;
+    const newId = input.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+    if (!newId || newId === current) return;
+
+    try {
+      const res = await fetch(`${API_FORECAST_BASE_URL}/${encodeURIComponent(current)}/rename`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ newId })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setAppNotice(err.error || "Rename failed.", "error");
+        return;
+      }
+      const oldKey = getLocalStorageKeyForProfile(current);
+      const saved = localStorage.getItem(oldKey);
+      if (saved) {
+        localStorage.setItem(getLocalStorageKeyForProfile(newId), saved);
+        localStorage.removeItem(oldKey);
+      }
+      const idx = profileOptions.indexOf(current);
+      if (idx >= 0) profileOptions[idx] = newId;
+      state.profileId = newId;
+      renderProfileOptions();
+      setAppNotice(`Profile renamed to "${newId}".`);
+    } catch {
+      setAppNotice("Rename failed. Check your connection.", "error");
+    }
+  });
+
+  deleteProfileButton?.addEventListener("click", async () => {
+    if (profileOptions.length <= 1) return;
+    const current = state.profileId;
+    if (!window.confirm(`Delete profile "${current}"? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch(getForecastApiUrl(current), { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setAppNotice(err.error || "Delete failed.", "error");
+        return;
+      }
+      const doc = await res.json();
+      localStorage.removeItem(getLocalStorageKeyForProfile(current));
+      profileOptions = profileOptions.filter((id) => id !== current);
+      state.profileId = doc.activeProfileId || profileOptions[0];
+      renderProfileOptions();
+      loadState();
+      await loadStateFromApi();
+      render();
+      setAppNotice("Profile deleted.");
+    } catch {
+      setAppNotice("Delete failed. Check your connection.", "error");
+    }
   });
 }
 
