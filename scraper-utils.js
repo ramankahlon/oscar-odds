@@ -233,7 +233,16 @@ export function extractTheGamer(html) {
     .map((item, index) => ({ title: item.title, rank: index + 1, score: item.score }));
 }
 
-export function extractReddit(data) {
+export function recencyMultiplier(createdUtc, nowMs = Date.now()) {
+  if (!createdUtc || !Number.isFinite(createdUtc)) return 1;
+  const ageDays = (nowMs - createdUtc * 1000) / (1000 * 60 * 60 * 24);
+  if (ageDays <= 3) return 2.0;
+  if (ageDays <= 7) return 1.0;
+  if (ageDays <= 30) return 0.5;
+  return 0.25;
+}
+
+export function extractReddit(data, nowMs = Date.now()) {
   const children = data?.data?.children || [];
   const posts = children
     .map((child) => child?.data)
@@ -255,8 +264,9 @@ export function extractReddit(data) {
       const key = normalizeTitle(canonical.title);
       if (!key) return;
       const entry = mentionMap.get(key) || { title: canonical.title, count: 0, weightedScore: 0 };
-      entry.count += 1;
-      entry.weightedScore += post.score + post.comments;
+      const decay = recencyMultiplier(post.createdUtc, nowMs);
+      entry.count += decay;
+      entry.weightedScore += (post.score + post.comments) * decay;
       mentionMap.set(key, entry);
     });
   });

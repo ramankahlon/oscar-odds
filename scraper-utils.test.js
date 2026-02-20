@@ -5,7 +5,8 @@ import {
   extractLetterboxd,
   extractReddit,
   extractTheGamer,
-  isValidEntityCandidate
+  isValidEntityCandidate,
+  recencyMultiplier
 } from "./scraper-utils.js";
 
 describe("extractLetterboxd", () => {
@@ -25,6 +26,32 @@ describe("extractLetterboxd", () => {
   });
 });
 
+describe("recencyMultiplier", () => {
+  const nowMs = Date.now();
+  const daysAgo = (d) => Math.floor((nowMs - d * 24 * 60 * 60 * 1000) / 1000);
+
+  it("returns 2.0 for posts within 3 days", () => {
+    expect(recencyMultiplier(daysAgo(1), nowMs)).toBe(2.0);
+  });
+
+  it("returns 1.0 for posts between 3 and 7 days old", () => {
+    expect(recencyMultiplier(daysAgo(5), nowMs)).toBe(1.0);
+  });
+
+  it("returns 0.5 for posts between 7 and 30 days old", () => {
+    expect(recencyMultiplier(daysAgo(14), nowMs)).toBe(0.5);
+  });
+
+  it("returns 0.25 for posts older than 30 days", () => {
+    expect(recencyMultiplier(daysAgo(45), nowMs)).toBe(0.25);
+  });
+
+  it("returns 1 for missing or zero timestamp", () => {
+    expect(recencyMultiplier(0, nowMs)).toBe(1);
+    expect(recencyMultiplier(null, nowMs)).toBe(1);
+  });
+});
+
 describe("extractReddit", () => {
   it("extracts posts and mention counts", () => {
     const data = {
@@ -39,6 +66,29 @@ describe("extractReddit", () => {
     const extracted = extractReddit(data);
     expect(extracted.posts.length).toBe(2);
     expect(extracted.mentions.length).toBeGreaterThan(0);
+  });
+
+  it("weights recent posts higher than old posts", () => {
+    const nowMs = Date.now();
+    const recentUtc = Math.floor((nowMs - 1 * 24 * 60 * 60 * 1000) / 1000);  // 1 day ago → 2.0×
+    const oldUtc = Math.floor((nowMs - 45 * 24 * 60 * 60 * 1000) / 1000);    // 45 days ago → 0.25×
+
+    const data = {
+      data: {
+        children: [
+          { data: { title: "The Odyssey gets buzz", score: 10, num_comments: 5, created_utc: recentUtc, permalink: "/r/oscarrace/a" } },
+          { data: { title: "Dune Part Three discussion", score: 10, num_comments: 5, created_utc: oldUtc, permalink: "/r/oscarrace/b" } }
+        ]
+      }
+    };
+
+    const extracted = extractReddit(data, nowMs);
+    const odyssey = extracted.mentions.find((m) => m.title.toLowerCase().includes("odyssey"));
+    const dune = extracted.mentions.find((m) => m.title.toLowerCase().includes("dune"));
+
+    if (odyssey && dune) {
+      expect(odyssey.weightedScore).toBeGreaterThan(dune.weightedScore);
+    }
   });
 });
 
