@@ -506,6 +506,8 @@ const profileSelect = document.querySelector("#profileSelect");
 const newProfileButton = document.querySelector("#newProfileButton");
 const renameProfileButton = document.querySelector("#renameProfileButton");
 const deleteProfileButton = document.querySelector("#deleteProfileButton");
+const printPdfButton = document.querySelector("#printPdfButton");
+const printMeta = document.querySelector("#printMeta");
 let profileOptions = ["default"];
 const explainSelectionByCategory = {};
 let activePosterRequestId = 0;
@@ -1828,6 +1830,13 @@ function getForecastApiUrl(profileId = state.profileId) {
   return `${API_FORECAST_BASE_URL}/${encodeURIComponent(profileId)}`;
 }
 
+function updatePrintMeta() {
+  if (!printMeta) return;
+  const activeCategory = getActiveCategory();
+  const stamp = new Date().toLocaleString();
+  printMeta.textContent = `Profile: ${state.profileId} | Category: ${activeCategory?.name || "Unknown"} | Generated: ${stamp}`;
+}
+
 function renderProfileOptions() {
   profileSelect.innerHTML = "";
   profileOptions.forEach((id) => {
@@ -2026,6 +2035,13 @@ function bindTrendControls() {
     state.trendWindow = TREND_WINDOW_OPTIONS.includes(value) ? value : 30;
     saveState();
     render();
+  });
+}
+
+function bindPrintControls() {
+  printPdfButton?.addEventListener("click", () => {
+    updatePrintMeta();
+    window.print();
   });
 }
 
@@ -2267,6 +2283,7 @@ function renderSummaryBar() {
 function render() {
   setPanelsBusy(isBootstrapping);
   const activeCategory = getActiveCategory();
+  updatePrintMeta();
   const projections = buildProjections(activeCategory);
   const capturedTrend = captureTrendSnapshot(activeCategory, projections);
   if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
@@ -2298,6 +2315,7 @@ async function bootstrap() {
   bindProfileControls();
   bindTrendControls();
   bindCsvControls();
+  bindPrintControls();
   bindSearchControls();
   bindCompareControls();
   isBootstrapping = false;

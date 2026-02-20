@@ -317,6 +317,22 @@ label {
   background: var(--accent-soft);
 }
 
+.action-button--print {
+  color: #1f4e8c;
+  border-color: #9fbce0;
+}
+
+.action-button--print:hover {
+  background: #eef5ff;
+  border-color: #1f4e8c;
+}
+
+.print-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .compare-controls {
   display: flex;
   align-items: center;
@@ -880,5 +896,166 @@ a:focus-visible {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     margin-bottom: 2px;
+  }
+}
+
+@page {
+  size: Letter portrait;
+  margin: 0.45in;
+}
+
+@media print {
+  :root {
+    --line: #cfcfcf;
+    --ink: #111;
+    --muted: #444;
+    --accent: #111;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111;
+    font-size: 10.5pt;
+  }
+
+  .app-shell {
+    max-width: none;
+    padding: 0;
+    gap: 10px;
+  }
+
+  .panel {
+    box-shadow: none !important;
+    border: 1px solid #d0d0d0;
+    background: #fff !important;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .controls,
+  .summary-bar-section,
+  .candidates,
+  .methodology,
+  .movie-panel,
+  .trend-panel,
+  .search-bar,
+  .app-notice,
+  .scraper-health-badge,
+  .compare-controls,
+  .data-tools {
+    display: none !important;
+  }
+
+  .print-meta {
+    display: block !important;
+  }
+
+  .hero {
+    break-after: avoid-page;
+  }
+
+  .hero h1 {
+    font-size: 22pt;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    max-width: none;
+    font-size: 10.5pt;
+  }
+
+  .workspace {
+    display: block;
+  }
+
+  .spotlight {
+    border-width: 1px;
+    background: #fff !important;
+  }
+
+  .spotlight h2 {
+    font-size: 14pt;
+    margin-bottom: 8px;
+  }
+
+  .spotlight-layout {
+    display: block;
+  }
+
+  .table-wrap {
+    overflow: visible !important;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.2pt;
+    display: table;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tbody {
+    display: table-row-group;
+  }
+
+  tr {
+    display: table-row;
+    break-inside: avoid;
+  }
+
+  th,
+  td {
+    display: table-cell;
+    padding: 6px 7px;
+    border-bottom: 1px solid #ddd;
+  }
+
+  th {
+    color: #111;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    background: #f7f7f7;
+  }
+
+  td::before {
+    content: none !important;
+  }
+
+  .results-row.active {
+    background: #f4f4f4 !important;
+  }
+
+  .results-row {
+    cursor: default;
+  }
+
+  .explain-panel {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .explain-panel h3 {
+    font-size: 11pt;
+    margin-bottom: 4px;
+  }
+
+  .explain-row {
+    grid-template-columns: 110px 1fr 90px;
+    gap: 6px;
+    font-size: 9pt;
+    margin-bottom: 4px;
+  }
+
+  .explain-bar {
+    background: #ddd;
+    height: 6px;
+  }
+
+  .explain-bar > span {
+    background: #444;
   }
 }
