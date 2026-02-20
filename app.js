@@ -1,4 +1,11 @@
-import { clamp, rebalanceFieldTotal } from "./forecast-utils.js";
+import { clamp } from "./forecast-utils.js";
+import {
+  applySourceSignals,
+  calculateNominationOdds,
+  calculateWinnerOdds,
+  normalizeSignalKey as normalizeSignalKeyCore,
+  rebalanceCategory
+} from "./app-logic.js";
 
 const schedule2026Films = [
   "The Mother and the Bear",
@@ -658,13 +665,7 @@ const movieDetailsIndex = new Map(
 );
 
 function normalizeSignalKey(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/\[[^\]]*]/g, " ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/[^a-z0-9']+/g, " ")
-    .trim();
+  return normalizeSignalKeyCore(value);
 }
 
 function normalizeWeights() {
@@ -717,51 +718,13 @@ function sanitizeStrength(value) {
 }
 
 function applyExternalSignalSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.aggregate)) return false;
-  if (!snapshot.generatedAt || snapshot.generatedAt === appliedExternalSnapshotId) return false;
-
-  const aggregateMap = new Map();
-  snapshot.aggregate.forEach((entry) => {
-    if (!entry || typeof entry !== "object") return;
-    const key = normalizeSignalKey(entry.title);
-    if (!key) return;
-    aggregateMap.set(key, entry);
+  const result = applySourceSignals({
+    categories,
+    snapshot,
+    lastAppliedSnapshotId: appliedExternalSnapshotId
   });
-
-  if (aggregateMap.size === 0) return false;
-
-  let updated = 0;
-  categories.forEach((category) => {
-    category.films.forEach((film) => {
-      const match =
-        aggregateMap.get(normalizeSignalKey(film.title)) ||
-        aggregateMap.get(normalizeSignalKey(film.studio));
-
-      if (!match) return;
-
-      const combined = clamp(Number(match.combinedScore || 0), 0, 1);
-      const letterboxdScore = clamp(Number(match.letterboxdScore || 0), 0, 1);
-      const redditScore = clamp(Number(match.redditScore || 0), 0, 1);
-      const thegamerScore = clamp(Number(match.thegamerScore || 0), 0, 1);
-
-      film.precursor = clamp(film.precursor + Math.round((combined - 0.35) * 10), 0, 100);
-      film.history = clamp(film.history + Math.round((letterboxdScore + thegamerScore - 0.55) * 8), 0, 100);
-      film.buzz = clamp(film.buzz + Math.round((redditScore + thegamerScore - 0.5) * 10), 0, 100);
-
-      if (combined >= 0.7 || redditScore >= 0.75) {
-        film.strength = "High";
-      } else if (combined >= 0.45) {
-        film.strength = "Medium";
-      } else {
-        film.strength = "Low";
-      }
-
-      updated += 1;
-    });
-  });
-
-  if (updated === 0) return false;
-  appliedExternalSnapshotId = snapshot.generatedAt;
+  if (!result.changed) return false;
+  appliedExternalSnapshotId = result.appliedSnapshotId;
   return true;
 }
 
@@ -1318,14 +1281,23 @@ function buildProjections(category, overrides = null) {
 
   const projections = scored
     .map((film) => {
-      const nomination = clamp((film.nominationRaw / nominationTotal) * 100 * nomineeScale * NOMINATION_PERCENT_UPLIFT, 0.6, 99);
-      const winner = clamp(
-        (((film.winnerRaw / winnerTotal) * 100 + nomination * category.winnerBase) /
-          (1 + category.winnerBase)) *
-          WINNER_PERCENT_UPLIFT,
-        0.4,
-        92
-      );
+      const nomination = calculateNominationOdds({
+        nominationRaw: film.nominationRaw,
+        nominationTotal,
+        nomineeScale,
+        uplift: NOMINATION_PERCENT_UPLIFT,
+        min: 0.6,
+        max: 99
+      });
+      const winner = calculateWinnerOdds({
+        winnerRaw: film.winnerRaw,
+        winnerTotal,
+        nomination,
+        winnerBase: category.winnerBase,
+        uplift: WINNER_PERCENT_UPLIFT,
+        min: 0.4,
+        max: 92
+      });
 
       return {
         index: film.index,
@@ -1347,24 +1319,22 @@ function buildProjections(category, overrides = null) {
   const displayLimit = getDisplayLimit(category);
   const topContenders = projections.slice(0, displayLimit);
 
-  rebalanceFieldTotal(topContenders, "nomination", {
-    minTotal: 90,
-    maxTotal: 95,
-    targetTotal: 93,
-    minValue: 0.6,
-    maxValue: 50
-  });
-
-  rebalanceFieldTotal(topContenders, "winner", {
-    minTotal: 30,
-    maxTotal: 45,
-    targetTotal: 38,
-    minValue: 0.4,
-    maxValue: 24
-  });
-
-  topContenders.forEach((entry) => {
-    entry.winner = Math.min(entry.winner, entry.nomination * WINNER_TO_NOMINATION_CAP);
+  rebalanceCategory(topContenders, {
+    winnerToNominationCap: WINNER_TO_NOMINATION_CAP,
+    nominationBand: {
+      minTotal: 90,
+      maxTotal: 95,
+      targetTotal: 93,
+      minValue: 0.6,
+      maxValue: 50
+    },
+    winnerBand: {
+      minTotal: 30,
+      maxTotal: 45,
+      targetTotal: 38,
+      minValue: 0.4,
+      maxValue: 24
+    }
   });
 
   return [...topContenders, ...projections.slice(displayLimit)];
