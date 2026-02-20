@@ -450,6 +450,7 @@ const movieDetailDirector = document.querySelector("#movieDetailDirector");
 const movieDetailStars = document.querySelector("#movieDetailStars");
 const movieDetailGenre = document.querySelector("#movieDetailGenre");
 const movieDetailDescription = document.querySelector("#movieDetailDescription");
+const posterSkeleton = document.querySelector("#posterSkeleton");
 const movieDetailPoster = document.querySelector("#movieDetailPoster");
 const movieDetailPosterLink = document.querySelector("#movieDetailPosterLink");
 const exportCsvButton = document.querySelector("#exportCsvButton");
@@ -1154,10 +1155,21 @@ function renderTrendAnalytics(category, entry) {
   renderSourceMovement(points);
 }
 
+function showPosterSkeleton() {
+  if (posterSkeleton) posterSkeleton.hidden = false;
+  if (movieDetailPoster) movieDetailPoster.classList.add("hidden");
+  if (movieDetailPosterLink) movieDetailPosterLink.classList.add("hidden");
+}
+
+function hidePosterSkeleton() {
+  if (posterSkeleton) posterSkeleton.hidden = true;
+}
+
 function setPosterState(posterUrl, movieUrl) {
   const src = normalizePosterRenderUrl(posterUrl) || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
   const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
   posterFallbackActive = !posterUrl;
+  hidePosterSkeleton();
   movieDetailPoster.src = src;
   movieDetailPoster.classList.remove("hidden");
   movieDetailPosterLink.href = href;
@@ -1166,19 +1178,28 @@ function setPosterState(posterUrl, movieUrl) {
 
 async function loadPosterForTitle(title) {
   const requestId = ++activePosterRequestId;
-  setPosterState(buildPosterFallbackDataUrl(title), getTmdbSearchUrl(title));
-  if (!title) return;
+  showPosterSkeleton();
+
+  if (!title) {
+    setPosterState("", getTmdbSearchUrl(""));
+    return;
+  }
 
   try {
     const response = await fetch(`/api/tmdb-poster?title=${encodeURIComponent(title)}`, { cache: "no-store" });
-    if (!response.ok) return;
+    if (requestId !== activePosterRequestId) return;
+    if (!response.ok) {
+      setPosterState("", getTmdbSearchUrl(title));
+      return;
+    }
     const payload = await response.json();
     if (requestId !== activePosterRequestId) return;
     const posterUrl = payload?.result?.posterUrl || "";
     const movieUrl = payload?.result?.movieUrl || "";
-    if (posterUrl || movieUrl) setPosterState(posterUrl, movieUrl);
+    setPosterState(posterUrl, movieUrl || getTmdbSearchUrl(title));
   } catch {
-    // Keep fallback poster/link if API is unavailable.
+    if (requestId !== activePosterRequestId) return;
+    setPosterState("", getTmdbSearchUrl(title));
   }
 }
 
@@ -1191,6 +1212,7 @@ movieDetailPoster?.addEventListener("error", () => {
 
 function renderMovieDetails(category, entry) {
   if (!entry) {
+    activePosterRequestId++;
     movieDetailTitle.textContent = "Selected Film";
     movieDetailDirector.textContent = "-";
     movieDetailStars.textContent = "-";
