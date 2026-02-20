@@ -905,6 +905,109 @@ a:focus-visible {
   }
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181510;
+    --surface: #201d17;
+    --surface-2: #272219;
+    --ink: #ede7dc;
+    --muted: #9a8c7b;
+    --line: #38322a;
+    --accent: #4ecdb8;
+    --accent-soft: #193530;
+    --warn: #e09848;
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 15% 20%, rgba(91, 58, 10, 0.2) 0%, transparent 30%),
+      radial-gradient(circle at 85% 30%, rgba(15, 75, 60, 0.18) 0%, transparent 35%),
+      linear-gradient(180deg, #181510 0%, #141210 100%);
+  }
+
+  .scraper-health-badge {
+    background: rgba(80, 45, 5, 0.55);
+    border-color: rgba(200, 140, 50, 0.4);
+  }
+
+  .app-notice.error,
+  .tool-status.error {
+    color: #e07878;
+  }
+
+  .profile-tools select,
+  .category-select,
+  .mini-grid input,
+  .mini-grid select,
+  .trend-window-control select {
+    background: var(--surface-2);
+    color: var(--ink);
+    color-scheme: dark;
+  }
+
+  .summary-card-gap.gap-tight {
+    background: rgba(80, 45, 5, 0.5);
+  }
+
+  .action-button--danger {
+    color: #e07878;
+    border-color: #6a3030;
+  }
+
+  .action-button--danger:hover {
+    background: rgba(110, 30, 28, 0.35);
+    border-color: #e07878;
+  }
+
+  .action-button--print {
+    color: #6ea8dc;
+    border-color: #2a4060;
+  }
+
+  .action-button--print:hover {
+    background: rgba(25, 55, 95, 0.35);
+    border-color: #6ea8dc;
+  }
+
+  .badge {
+    background: rgba(90, 50, 5, 0.55);
+  }
+
+  .spotlight {
+    background: linear-gradient(180deg, #22201a 0%, #1e1c14 100%);
+  }
+
+  .movie-poster {
+    background: #2a231a;
+  }
+
+  .explain-bar {
+    background: var(--line);
+  }
+
+  .trend-chart {
+    background: var(--surface-2);
+  }
+
+  /* Mobile stacked table rows lose their hardcoded #fff in dark mode */
+  .spotlight tr {
+    background: var(--surface-2);
+  }
+
+  .legend-dot.nomination {
+    background: var(--accent);
+  }
+
+  .legend-dot.winner {
+    background: var(--warn);
+  }
+
+  .legend-dot.source {
+    background: var(--muted);
+  }
+}
+
 @page {
   size: Letter portrait;
   margin: 0.45in;
