@@ -1,0 +1,649 @@
+openapi: "3.0.3"
+
+info:
+  title: Oscar Odds API
+  version: "1.0.0"
+  description: |
+    REST API for the Oscar Odds forecast lab — a browser tool that models
+    nomination and winner probabilities for the 99th Academy Awards (2027).
+
+    Manages named **forecast profiles** stored in SQLite and exposes a
+    TMDB poster-resolution proxy. All write endpoints are rate-limited.
+
+    ## Profile IDs
+    Profile identifiers must match `^[a-z0-9_-]+$` (1–100 chars).
+    The reserved profile `default` is created on first boot.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: status
+    description: Health, runtime metrics, and scraper observability
+  - name: profiles
+    description: List forecast profiles
+  - name: forecast
+    description: Read and write per-profile forecast data
+  - name: media
+    description: TMDB movie poster resolution (server-side proxy + cache)
+
+# ── Reusable components ────────────────────────────────────────────────────────
+components:
+
+  parameters:
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      description: >
+        Profile identifier — lowercase letters, digits, hyphens, or underscores
+        (1–100 characters).
+      schema:
+        type: string
+        pattern: "^[a-z0-9_-]+$"
+        minLength: 1
+        maxLength: 100
+        example: default
+
+  schemas:
+
+    # Shared error envelope ────────────────────────────────────────────────────
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable description of what went wrong.
+          example: Profile not found.
+
+    # Background source-poller state (shared by /health and /metrics) ──────────
+    PollerState:
+      type: object
+      required:
+        - enabled
+        - running
+        - restarts
+      properties:
+        enabled:
+          type: boolean
+          description: Whether ENABLE_SOURCE_POLLER=true was set at startup.
+          example: false
+        running:
+          type: boolean
+          description: Whether the child process is currently alive.
+          example: false
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp when the poller last started; null if never started.
+          example: null
+        lastExitCode:
+          type: integer
+          nullable: true
+          description: Exit code of the most recent poller run; null if never exited.
+          example: null
+        restarts:
+          type: integer
+          minimum: 0
+          description: Cumulative auto-restarts since server boot.
+          example: 0
+
+    # Profile row returned in the profile list ─────────────────────────────────
+    ProfileSummary:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Profile identifier.
+          example: default
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            ISO 8601 timestamp of the last PUT /api/forecast/{profileId} call;
+            null if the profile was created but never written.
+          example: "2025-03-15T10:22:00.000Z"
+
+    # Opaque forecast data blob ────────────────────────────────────────────────
+    ForecastPayload:
+      type: object
+      description: >
+        Opaque JSON object written and read back verbatim. The client stores
+        category state, contender weights, model parameters, and UI state here.
+        All keys are strings; values may be any JSON type.
+      additionalProperties: true
+      example:
+        categoryId: best-picture
+        weights:
+          gg_drama: 0.18
+          sag_ensemble: 0.22
+        trendWindow: 30
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
+paths:
+
+  # GET /api/health ─────────────────────────────────────────────────────────────
+  /api/health:
+    get:
+      operationId: getHealth
+      tags:
+        - status
+      summary: Liveness check
+      description: >
+        Returns ok: true, the current timestamp, server uptime in seconds,
+        and the state of the optional background source-polling process.
+        Suitable for use as a health-check probe.
+      responses:
+        "200":
+          description: Server is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - now
+                  - uptimeSeconds
+                  - poller
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  now:
+                    type: string
+                    format: date-time
+                    description: Current server time (ISO 8601).
+                    example: "2025-03-15T10:22:00.000Z"
+                  uptimeSeconds:
+                    type: integer
+                    minimum: 0
+                    description: Seconds elapsed since the server process started.
+                    example: 3600
+                  poller:
+                    $ref: "#/components/schemas/PollerState"
+              example:
+                ok: true
+                now: "2025-03-15T10:22:00.000Z"
+                uptimeSeconds: 3600
+                poller:
+                  enabled: false
+                  running: false
+                  startedAt: null
+                  lastExitCode: null
+                  restarts: 0
+
+  # GET /api/metrics ────────────────────────────────────────────────────────────
+  /api/metrics:
+    get:
+      operationId: getMetrics
+      tags:
+        - status
+      summary: Runtime request metrics
+      description: >
+        Aggregate request counts broken down by HTTP method and response status
+        class (2xx / 3xx / 4xx / 5xx), plus server uptime and poller state.
+        Counts reset on server restart.
+      responses:
+        "200":
+          description: Current runtime metrics.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - uptimeSeconds
+                  - requests
+                  - poller
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    description: Timestamp when this response was generated.
+                  uptimeSeconds:
+                    type: integer
+                    minimum: 0
+                    example: 3600
+                  requests:
+                    type: object
+                    required:
+                      - total
+                      - byMethod
+                      - byStatusClass
+                    properties:
+                      total:
+                        type: integer
+                        minimum: 0
+                        description: Total requests handled since boot.
+                        example: 284
+                      byMethod:
+                        type: object
+                        description: Request count keyed by HTTP method.
+                        additionalProperties:
+                          type: integer
+                        example:
+                          GET: 252
+                          PUT: 24
+                          DELETE: 4
+                          PATCH: 4
+                      byStatusClass:
+                        type: object
+                        description: Request count keyed by HTTP status class.
+                        properties:
+                          "2xx":
+                            type: integer
+                          "3xx":
+                            type: integer
+                          "4xx":
+                            type: integer
+                          "5xx":
+                            type: integer
+                        example:
+                          "2xx": 278
+                          "3xx": 0
+                          "4xx": 6
+                          "5xx": 0
+                  poller:
+                    $ref: "#/components/schemas/PollerState"
+
+  # GET /api/scrape-observability ───────────────────────────────────────────────
+  /api/scrape-observability:
+    get:
+      operationId: getScrapeObservability
+      tags:
+        - status
+      summary: Latest scraper run metadata
+      description: >
+        Returns the contents of data/scrape-observability.json, which the
+        background source-polling script overwrites after each scrape cycle.
+        Contains timestamps, per-source result counts, and error summaries.
+        Returns { updatedAt: null } when no scrape has ever run.
+      responses:
+        "200":
+          description: Scraper observability snapshot (schema is open — fields vary by run).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: ISO 8601 timestamp of the last completed scrape.
+              example:
+                updatedAt: "2025-03-14T06:00:00.000Z"
+                sourcesScraped: 4
+                errors: 0
+
+  # GET /api/profiles ───────────────────────────────────────────────────────────
+  /api/profiles:
+    get:
+      operationId: listProfiles
+      tags:
+        - profiles
+      summary: List all forecast profiles
+      description: >
+        Returns every profile sorted by ID, plus the ID of the currently active
+        profile. The active profile is the one most recently written via
+        PUT /api/forecast/{profileId}.
+      responses:
+        "200":
+          description: Profile list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - activeProfileId
+                  - profiles
+                properties:
+                  activeProfileId:
+                    type: string
+                    description: ID of the currently active profile.
+                    example: default
+                  profiles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProfileSummary"
+              example:
+                activeProfileId: default
+                profiles:
+                  - id: default
+                    updatedAt: "2025-03-15T10:00:00.000Z"
+                  - id: optimistic
+                    updatedAt: "2025-03-14T18:30:00.000Z"
+
+  # /api/forecast/{profileId} ───────────────────────────────────────────────────
+  /api/forecast/{profileId}:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    get:
+      operationId: getForecast
+      tags:
+        - forecast
+      summary: Read a profile's forecast data
+      description: >
+        Returns the full saved payload for the given profile.
+        If the profile exists but has never been written, payload is null.
+        If the profile does not exist, payload is also null (the row is
+        lazily created on first PUT).
+      responses:
+        "200":
+          description: Profile data — payload may be null if never saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profileId
+                  - updatedAt
+                  - payload
+                properties:
+                  profileId:
+                    type: string
+                    example: default
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: "2025-03-15T10:00:00.000Z"
+                  payload:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+                    description: >
+                      Opaque forecast data; null if the profile has never been
+                      saved via PUT.
+        "400":
+          description: profileId fails pattern validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: >-
+                  Profile ID must contain only lowercase letters, numbers,
+                  hyphens, or underscores
+
+    put:
+      operationId: saveForecast
+      tags:
+        - forecast
+      summary: Create or replace a profile's forecast data
+      description: >
+        Upserts the forecast payload for profileId and sets it as the active
+        profile. The entire object is replaced on every save — partial updates
+        are not supported. The client reads the current state, modifies it in
+        memory, then writes it back in full.
+
+        Rate limit: 60 requests per minute per IP address.
+      requestBody:
+        required: true
+        description: >
+          Full forecast state to persist. Any valid JSON object is accepted;
+          the server stores and returns it verbatim.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForecastPayload"
+      responses:
+        "200":
+          description: Profile saved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profileId
+                  - updatedAt
+                  - payload
+                properties:
+                  profileId:
+                    type: string
+                    example: default
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    description: Server-assigned write timestamp.
+                    example: "2025-03-15T10:22:00.000Z"
+                  payload:
+                    $ref: "#/components/schemas/ForecastPayload"
+        "400":
+          description: Invalid profileId format or non-object request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded — 60 writes per minute per IP.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Too many requests, please slow down.
+
+    delete:
+      operationId: deleteForecast
+      tags:
+        - forecast
+      summary: Delete a forecast profile
+      description: >
+        Permanently removes the profile from the database.
+
+        If the deleted profile was active, the active pointer is atomically
+        reassigned to another remaining profile.
+
+        Constraint: the last remaining profile cannot be deleted.
+      responses:
+        "200":
+          description: Profile deleted; the new active profile ID is returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - deleted
+                  - activeProfileId
+                properties:
+                  deleted:
+                    type: string
+                    description: ID of the profile that was deleted.
+                    example: optimistic
+                  activeProfileId:
+                    type: string
+                    description: ID of the profile that is now active.
+                    example: default
+        "400":
+          description: Cannot delete the last remaining profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Cannot delete the last profile.
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Profile not found.
+
+  # PATCH /api/forecast/{profileId}/rename ──────────────────────────────────────
+  /api/forecast/{profileId}/rename:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    patch:
+      operationId: renameProfile
+      tags:
+        - forecast
+      summary: Rename a forecast profile
+      description: >
+        Atomically copies the profile row to a new ID and deletes the old one.
+        If the renamed profile was active, the active pointer is updated.
+
+        When newId equals profileId the operation is a no-op and returns
+        immediately without touching the database.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newId
+              properties:
+                newId:
+                  type: string
+                  pattern: "^[a-z0-9_-]+$"
+                  minLength: 1
+                  maxLength: 100
+                  description: Target profile ID — same character rules as profileId.
+                  example: my-renamed-profile
+      responses:
+        "200":
+          description: Profile renamed (or unchanged when old and new IDs match).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profileId
+                properties:
+                  profileId:
+                    type: string
+                    description: The ID the profile now has.
+                    example: my-renamed-profile
+        "400":
+          description: Invalid profileId path parameter or invalid newId in body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Source profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Profile not found.
+        "409":
+          description: A profile with the requested newId already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: A profile with that name already exists.
+
+  # GET /api/tmdb-poster ────────────────────────────────────────────────────────
+  /api/tmdb-poster:
+    get:
+      operationId: getTmdbPoster
+      tags:
+        - media
+      summary: Resolve a TMDB poster and movie URL for a film title
+      description: >
+        Searches TMDB for a 2026-release film matching title and returns the
+        poster image URL and canonical TMDB movie page URL.
+
+        Results are cached in memory for the lifetime of the server process,
+        so the first call for a given title is the only one that hits TMDB.
+
+        Resolution order (first match wins):
+
+        1. TMDB v3 JSON API — used when TMDB_API_KEY or
+           TMDB_API_READ_ACCESS_TOKEN env vars are set.
+
+        2. TMDB /search/remote/multi JSON endpoint.
+
+        3. HTML scrape of TMDB search results.
+
+        Returns result: null when no matching 2026-release film is found.
+      parameters:
+        - name: title
+          in: query
+          required: true
+          description: Film title to search for (1–200 characters).
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+            example: "The Brutalist"
+      responses:
+        "200":
+          description: >
+            Lookup completed. result is null when no matching film was found;
+            it is an object when a poster was successfully resolved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - title
+                  - result
+                properties:
+                  title:
+                    type: string
+                    description: The title query parameter echoed back.
+                    example: "The Brutalist"
+                  result:
+                    type: object
+                    nullable: true
+                    description: Null when no matching film was found on TMDB.
+                    properties:
+                      posterUrl:
+                        type: string
+                        format: uri
+                        description: >
+                          Direct image.tmdb.org URL for the poster image (w780).
+                          Empty string if the film was found but has no poster.
+                        example: "https://image.tmdb.org/t/p/w780/abc123.jpg"
+                      movieUrl:
+                        type: string
+                        format: uri
+                        description: Canonical TMDB movie page URL.
+                        example: "https://www.themoviedb.org/movie/12345"
+              examples:
+                found:
+                  summary: Film and poster resolved
+                  value:
+                    title: "The Brutalist"
+                    result:
+                      posterUrl: "https://image.tmdb.org/t/p/w780/abc123.jpg"
+                      movieUrl: "https://www.themoviedb.org/movie/12345"
+                not_found:
+                  summary: No matching film on TMDB
+                  value:
+                    title: "Unknown Film"
+                    result: null
+        "400":
+          description: Missing or invalid title query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "title: title is required"
+        "502":
+          description: Upstream TMDB request failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "TMDB search failed: 503"

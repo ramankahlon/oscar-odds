@@ -11,6 +11,8 @@ import Database from "better-sqlite3";
 import { z } from "zod";
 import type { Logger } from "pino";
 import { logger } from "./logger.js";
+import swaggerUi from "swagger-ui-express";
+import yaml from "js-yaml";
 
 declare global {
   namespace Express {
@@ -38,6 +40,7 @@ const FORCE_HTTPS = process.env.FORCE_HTTPS === "true";
 const ENABLE_SOURCE_POLLER = process.env.ENABLE_SOURCE_POLLER === "true";
 const SOURCE_POLL_INTERVAL_MINUTES = Math.max(5, Number(process.env.SOURCE_POLL_INTERVAL_MINUTES || 30));
 const bootAt = Date.now();
+const openApiSpec = yaml.load(readFileSync(path.join(__dirname, "openapi.yaml"), "utf8")) as Record<string, unknown>;
 const requestMetrics = {
   total: 0,
   byMethod: {} as Record<string, number>,
@@ -722,6 +725,8 @@ app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
     res.status(502).json({ error: String((error as Error)?.message || error) });
   }
 });
+
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.get("*", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "index.html"));
