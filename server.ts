@@ -64,6 +64,15 @@ interface CountRow {
   n: number;
 }
 
+interface SnapshotRow {
+  category_id: string;
+  contender_key: string;
+  contender_title: string;
+  nom_pct: number;
+  win_pct: number;
+  snapped_at: string;
+}
+
 // ── Zod schemas ──────────────────────────────────────────────────────────────
 
 const profileIdSchema = z
@@ -211,6 +220,20 @@ function initDb(): void {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+    CREATE TABLE IF NOT EXISTS snapshots (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id      TEXT    NOT NULL,
+      category_id     TEXT    NOT NULL,
+      contender_key   TEXT    NOT NULL,
+      contender_title TEXT    NOT NULL,
+      nom_pct         REAL    NOT NULL,
+      win_pct         REAL    NOT NULL,
+      snapped_at      TEXT    NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshots_unique
+      ON snapshots(profile_id, category_id, contender_key, snapped_at);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
+      ON snapshots(profile_id, category_id, snapped_at);
   `);
 
   // One-time migration from forecast-store.json when the DB is empty.
@@ -644,6 +667,45 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Re
     JSON.stringify(payload)
   );
   db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", profileId);
+
+  // Extract trendHistory.snapshots from the payload and upsert one row per contender
+  // per calendar day. Overwrites same-day rows so the latest values are preserved.
+  const rawSnapshots: unknown[] = Array.isArray((payload as any).trendHistory?.snapshots)
+    ? (payload as any).trendHistory.snapshots
+    : [];
+  if (rawSnapshots.length > 0) {
+    const upsertSnap = db.prepare(`
+      INSERT INTO snapshots
+        (profile_id, category_id, contender_key, contender_title, nom_pct, win_pct, snapped_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(profile_id, category_id, contender_key, snapped_at) DO UPDATE SET
+        contender_title = excluded.contender_title,
+        nom_pct         = excluded.nom_pct,
+        win_pct         = excluded.win_pct
+    `);
+    db.transaction(() => {
+      for (const rawSnap of rawSnapshots) {
+        if (!rawSnap || typeof rawSnap !== "object") continue;
+        const snap = rawSnap as Record<string, unknown>;
+        const categoryId = typeof snap.categoryId === "string" ? snap.categoryId : null;
+        const capturedAt = typeof snap.capturedAt === "string" ? snap.capturedAt : null;
+        const entries = Array.isArray(snap.entries) ? snap.entries : [];
+        if (!categoryId || !capturedAt) continue;
+        const snappedAt = capturedAt.slice(0, 10);
+        for (const rawEntry of entries) {
+          if (!rawEntry || typeof rawEntry !== "object") continue;
+          const entry = rawEntry as Record<string, unknown>;
+          const key = typeof entry.key === "string" ? entry.key : null;
+          const title = typeof entry.title === "string" ? entry.title : "";
+          const nomination = typeof entry.nomination === "number" ? entry.nomination : 0;
+          const winner = typeof entry.winner === "number" ? entry.winner : 0;
+          if (!key) continue;
+          upsertSnap.run(profileId, categoryId, key, title, nomination, winner, snappedAt);
+        }
+      }
+    })();
+  }
+
   res.json({ profileId, updatedAt, payload });
 });
 
@@ -662,6 +724,7 @@ app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
   }
 
   db.transaction(() => {
+    db.prepare("DELETE FROM snapshots WHERE profile_id = ?").run(profileId);
     db.prepare("DELETE FROM profiles WHERE id = ?").run(profileId);
     const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined;
     if (!activeRow?.value || activeRow.value === profileId) {
@@ -698,6 +761,7 @@ app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
   }
 
   db.transaction(() => {
+    db.prepare("UPDATE snapshots SET profile_id = ? WHERE profile_id = ?").run(newId, oldId);
     db.prepare("INSERT INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(
       newId,
       existing.updated_at,
@@ -711,6 +775,40 @@ app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
   })();
 
   res.json({ profileId: newId });
+});
+
+app.get("/api/forecast/:profileId/history", (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const rows = db.prepare(
+    `SELECT category_id, contender_key, contender_title, nom_pct, win_pct, snapped_at
+     FROM snapshots
+     WHERE profile_id = ?
+     ORDER BY snapped_at ASC, category_id ASC`
+  ).all(profileId) as SnapshotRow[];
+
+  // Group flat rows into one snapshot object per (snapped_at × category_id).
+  const snapshotMap = new Map<string, {
+    categoryId: string;
+    snappedAt: string;
+    entries: Array<{ key: string; title: string; nomPct: number; winPct: number }>;
+  }>();
+
+  for (const row of rows) {
+    const mapKey = `${row.snapped_at}::${row.category_id}`;
+    if (!snapshotMap.has(mapKey)) {
+      snapshotMap.set(mapKey, { categoryId: row.category_id, snappedAt: row.snapped_at, entries: [] });
+    }
+    snapshotMap.get(mapKey)!.entries.push({
+      key: row.contender_key,
+      title: row.contender_title,
+      nomPct: row.nom_pct,
+      winPct: row.win_pct,
+    });
+  }
+
+  res.json({ profileId, snapshots: Array.from(snapshotMap.values()) });
 });
 
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {

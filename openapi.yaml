@@ -550,6 +550,111 @@ paths:
               example:
                 error: A profile with that name already exists.
 
+  # GET /api/forecast/{profileId}/history ────────────────────────────────────────
+  /api/forecast/{profileId}/history:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    get:
+      operationId: getForecastHistory
+      tags:
+        - forecast
+      summary: Daily snapshot history for a profile
+      description: >
+        Returns all daily contender-odds snapshots accumulated in the server-side
+        `snapshots` table for the given profile.
+
+        One snapshot object is returned per (category × calendar day). Each
+        snapshot lists every tracked contender with its nomination and winner
+        percentages as of the last save that day.
+
+        The client uses this data to extend the in-memory trend chart with history
+        that predates the current session or exceeds the 240-entry in-memory limit.
+      responses:
+        "200":
+          description: Snapshot history (empty snapshots array if no saves yet).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profileId
+                  - snapshots
+                properties:
+                  profileId:
+                    type: string
+                    example: default
+                  snapshots:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - categoryId
+                        - snappedAt
+                        - entries
+                      properties:
+                        categoryId:
+                          type: string
+                          description: Oscar category identifier.
+                          example: best-picture
+                        snappedAt:
+                          type: string
+                          format: date
+                          description: Calendar date of the snapshot (YYYY-MM-DD).
+                          example: "2026-01-15"
+                        entries:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                              - key
+                              - title
+                              - nomPct
+                              - winPct
+                            properties:
+                              key:
+                                type: string
+                                description: Stable contender key used by the trend chart.
+                                example: "best-picture::the-brutalist"
+                              title:
+                                type: string
+                                description: Display name of the contender.
+                                example: "The Brutalist"
+                              nomPct:
+                                type: number
+                                format: float
+                                description: Nomination probability percentage.
+                                example: 85.5
+                              winPct:
+                                type: number
+                                format: float
+                                description: Winner probability percentage.
+                                example: 42.3
+              example:
+                profileId: default
+                snapshots:
+                  - categoryId: best-picture
+                    snappedAt: "2026-01-15"
+                    entries:
+                      - key: "best-picture::the-brutalist"
+                        title: "The Brutalist"
+                        nomPct: 85.5
+                        winPct: 42.3
+                      - key: "best-picture::conclave"
+                        title: "Conclave"
+                        nomPct: 78.2
+                        winPct: 31.1
+        "400":
+          description: profileId fails pattern validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: >-
+                  Profile ID must contain only lowercase letters, numbers,
+                  hyphens, or underscores
+
   # GET /api/tmdb-poster ────────────────────────────────────────────────────────
   /api/tmdb-poster:
     get:

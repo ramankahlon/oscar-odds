@@ -1985,9 +1985,67 @@ async function saveStateToApi() {
   }
 }
 
-async function loadStateFromApi() {
+// Fetches the server-side daily snapshot history and prepends any entries that are
+// not already present in the in-memory trendHistory.  Extends the trend chart with
+// data that predates the current session or exceeds the in-memory 240-entry cap.
+async function mergeServerHistory(profileId: string): Promise<void> {
   try {
-    const response = await fetch(getForecastApiUrl(), { cache: "no-store" });
+    const res = await fetch(
+      `${API_FORECAST_BASE_URL}/${encodeURIComponent(profileId)}/history`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return;
+    const doc = await res.json();
+    if (!doc || !Array.isArray(doc.snapshots) || doc.snapshots.length === 0) return;
+
+    // Calendar dates already covered by the in-memory history per category.
+    const existingDates = new Set<string>();
+    for (const snap of trendHistory.snapshots) {
+      existingDates.add(`${snap.categoryId}::${snap.capturedAt.slice(0, 10)}`);
+    }
+
+    const serverSnaps: TrendSnapshot[] = [];
+    for (const raw of doc.snapshots as unknown[]) {
+      if (!raw || typeof raw !== "object") continue;
+      const snap = raw as Record<string, unknown>;
+      const categoryId = typeof snap.categoryId === "string" ? snap.categoryId : null;
+      const snappedAt = typeof snap.snappedAt === "string" ? snap.snappedAt : null;
+      const entries = Array.isArray(snap.entries) ? snap.entries : [];
+      if (!categoryId || !snappedAt) continue;
+      if (existingDates.has(`${categoryId}::${snappedAt}`)) continue;
+      serverSnaps.push({
+        categoryId,
+        capturedAt: `${snappedAt}T12:00:00.000Z`,
+        sourceSnapshotId: null,
+        entries: (entries as unknown[]).flatMap((e) => {
+          if (!e || typeof e !== "object") return [];
+          const entry = e as Record<string, unknown>;
+          const key = typeof entry.key === "string" ? entry.key : null;
+          if (!key) return [];
+          return [{
+            key,
+            title: typeof entry.title === "string" ? entry.title : "",
+            nomination: typeof entry.nomPct === "number" ? entry.nomPct : 0,
+            winner: typeof entry.winPct === "number" ? entry.winPct : 0,
+          }];
+        }),
+      });
+    }
+
+    if (serverSnaps.length === 0) return;
+
+    trendHistory.snapshots = [...serverSnaps, ...trendHistory.snapshots]
+      .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
+      .slice(-TREND_HISTORY_LIMIT);
+  } catch {
+    // Non-blocking — server history is best-effort.
+  }
+}
+
+async function loadStateFromApi() {
+  const profileId = state.profileId;
+  try {
+    const response = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
     if (!response.ok) {
       setBackendOfflineMode(true);
       return;
@@ -1996,6 +2054,7 @@ async function loadStateFromApi() {
     if (!doc || typeof doc !== "object" || !doc.payload) return;
     setBackendOfflineMode(false);
     applyStatePayload(doc.payload);
+    await mergeServerHistory(profileId);
   } catch {
     setBackendOfflineMode(true);
   }
