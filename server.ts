@@ -2,12 +2,23 @@ import express, { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import fs from "node:fs/promises";
 import { readFileSync, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, ChildProcess } from "node:child_process";
 import * as cheerio from "cheerio";
 import Database from "better-sqlite3";
 import { z } from "zod";
+import type { Logger } from "pino";
+import { logger } from "./logger.js";
+
+declare global {
+  namespace Express {
+    interface Request {
+      log: Logger;
+    }
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +112,18 @@ const forecastWriteLimiter = rateLimit({
 
 app.use(express.json({ limit: "1mb" }));
 app.set("trust proxy", 1);
+
+// ── Request logging ───────────────────────────────────────────────────────────
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requestId = (req.headers["x-request-id"] as string | undefined) || randomUUID();
+  const startMs = Date.now();
+  res.setHeader("x-request-id", requestId);
+  req.log = logger.child({ requestId, method: req.method, path: req.path });
+  res.on("finish", () => {
+    req.log.info({ status: res.statusCode, durationMs: Date.now() - startMs }, "request");
+  });
+  next();
+});
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   requestMetrics.total += 1;
@@ -204,7 +227,7 @@ function initDb(): void {
         })();
         const activeProfileId = (doc.activeProfileId as string | undefined) || Object.keys(profiles)[0];
         db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", activeProfileId);
-        console.log("[db] migrated forecast-store.json → forecast.db");
+        logger.info("db migrated forecast-store.json → forecast.db");
       } else {
         throw new Error("no profiles in JSON store");
       }
@@ -707,12 +730,12 @@ app.get("*", (_: Request, res: Response) => {
 initDb();
 
 const server = app.listen(PORT, () => {
-  console.log(`[server] listening on http://localhost:${PORT}`);
+  logger.info({ port: PORT }, "server listening");
   startSourcePoller();
 });
 
 function shutdown(signal: string): void {
-  console.log(`[server] received ${signal}, shutting down...`);
+  logger.info({ signal }, "shutting down");
   if (pollerProcess && !pollerProcess.killed) pollerProcess.kill("SIGTERM");
   server.close(() => {
     if (db?.open) db.close();
