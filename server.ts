@@ -1,10 +1,10 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import fs from "node:fs/promises";
 import { readFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, ChildProcess } from "node:child_process";
 import * as cheerio from "cheerio";
 import Database from "better-sqlite3";
 
@@ -16,7 +16,7 @@ const STORE_PATH = path.join(__dirname, "data", "forecast-store.json"); // kept 
 const DB_PATH = path.join(__dirname, "data", "forecast.db");
 const SCRAPE_OBSERVABILITY_PATH = path.join(__dirname, "data", "scrape-observability.json");
 const DEFAULT_PROFILE_ID = "default";
-const posterCache = new Map();
+const posterCache = new Map<string, { posterUrl: string; movieUrl: string } | null>();
 const TMDB_BASE_URL = "https://www.themoviedb.org";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
@@ -28,12 +28,26 @@ const SOURCE_POLL_INTERVAL_MINUTES = Math.max(5, Number(process.env.SOURCE_POLL_
 const bootAt = Date.now();
 const requestMetrics = {
   total: 0,
-  byMethod: {},
-  byStatusClass: { "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0 }
+  byMethod: {} as Record<string, number>,
+  byStatusClass: { "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0 } as Record<string, number>
 };
-let pollerProcess = null;
-let pollerState = { running: false, startedAt: null, lastExitCode: null, restarts: 0 };
-let db;
+let pollerProcess: ChildProcess | null = null;
+const pollerState = { running: false, startedAt: null as string | null, lastExitCode: null as number | null, restarts: 0 };
+let db: Database.Database;
+
+interface ProfileRow {
+  id: string;
+  updated_at: string | null;
+  payload: string | null;
+}
+
+interface MetaRow {
+  value: string;
+}
+
+interface CountRow {
+  n: number;
+}
 
 const forecastWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -46,7 +60,7 @@ const forecastWriteLimiter = rateLimit({
 app.use(express.json({ limit: "1mb" }));
 app.set("trust proxy", 1);
 
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   requestMetrics.total += 1;
   requestMetrics.byMethod[req.method] = (requestMetrics.byMethod[req.method] || 0) + 1;
 
@@ -88,11 +102,11 @@ app.use(
   })
 );
 
-function startSourcePoller() {
+function startSourcePoller(): void {
   if (!ENABLE_SOURCE_POLLER) return;
   if (pollerProcess && !pollerProcess.killed) return;
 
-  const args = ["scripts/poll-sources.mjs", "--interval-minutes", String(SOURCE_POLL_INTERVAL_MINUTES)];
+  const args = ["scripts/poll-sources.ts", "--interval-minutes", String(SOURCE_POLL_INTERVAL_MINUTES)];
   pollerProcess = spawn(process.execPath, args, {
     cwd: __dirname,
     env: process.env,
@@ -114,7 +128,7 @@ function startSourcePoller() {
   });
 }
 
-function initDb() {
+function initDb(): void {
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
@@ -132,12 +146,13 @@ function initDb() {
   `);
 
   // One-time migration from forecast-store.json when the DB is empty.
-  const isEmpty = db.prepare("SELECT COUNT(*) AS n FROM profiles").get().n === 0;
+  const isEmpty = (db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as CountRow).n === 0;
   if (isEmpty) {
     try {
       const raw = readFileSync(STORE_PATH, "utf8");
-      const doc = JSON.parse(raw);
-      const profiles = doc?.profiles || (doc?.payload != null ? { [DEFAULT_PROFILE_ID]: { updatedAt: doc.updatedAt || null, payload: doc.payload } } : null);
+      const doc = JSON.parse(raw) as Record<string, unknown>;
+      const profiles = (doc?.profiles as Record<string, { updatedAt?: string; payload: unknown }> | undefined) ||
+        (doc?.payload != null ? { [DEFAULT_PROFILE_ID]: { updatedAt: doc.updatedAt as string | undefined || null, payload: doc.payload } } : null);
       if (profiles && typeof profiles === "object" && Object.keys(profiles).length > 0) {
         const insert = db.prepare("INSERT OR IGNORE INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)");
         db.transaction(() => {
@@ -145,7 +160,7 @@ function initDb() {
             insert.run(id, entry.updatedAt || null, entry.payload != null ? JSON.stringify(entry.payload) : null);
           }
         })();
-        const activeProfileId = doc.activeProfileId || Object.keys(profiles)[0];
+        const activeProfileId = (doc.activeProfileId as string | undefined) || Object.keys(profiles)[0];
         db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", activeProfileId);
         console.log("[db] migrated forecast-store.json → forecast.db");
       } else {
@@ -158,10 +173,10 @@ function initDb() {
   }
 }
 
-async function readScrapeObservability() {
+async function readScrapeObservability(): Promise<Record<string, unknown>> {
   try {
     const raw = await fs.readFile(SCRAPE_OBSERVABILITY_PATH, "utf8");
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (!parsed || typeof parsed !== "object") return { updatedAt: null };
     return parsed;
   } catch {
@@ -169,7 +184,7 @@ async function readScrapeObservability() {
   }
 }
 
-function normalizePosterKey(value) {
+function normalizePosterKey(value: string): string {
   return String(value || "")
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
@@ -177,7 +192,7 @@ function normalizePosterKey(value) {
     .trim();
 }
 
-function toAbsoluteTmdbUrl(value) {
+function toAbsoluteTmdbUrl(value: string): string {
   if (!value) return "";
   if (value.startsWith("http://") || value.startsWith("https://")) return value;
   if (value.startsWith("//")) {
@@ -189,7 +204,7 @@ function toAbsoluteTmdbUrl(value) {
   return `${TMDB_BASE_URL}/${value}`;
 }
 
-function canonicalMovieUrlFromPath(pathname) {
+function canonicalMovieUrlFromPath(pathname: string): string {
   const clean = String(pathname || "").trim();
   if (!clean) return "";
   const absolute = toAbsoluteTmdbUrl(clean);
@@ -197,13 +212,13 @@ function canonicalMovieUrlFromPath(pathname) {
   return `${url.origin}${url.pathname}`;
 }
 
-function canonicalMovieUrlFromId(id) {
+function canonicalMovieUrlFromId(id: number): string {
   const numeric = Number(id);
   if (!Number.isFinite(numeric) || numeric <= 0) return "";
   return `${TMDB_BASE_URL}/movie/${numeric}`;
 }
 
-function posterUrlFromPath(pathValue) {
+function posterUrlFromPath(pathValue: string): string {
   const pathString = String(pathValue || "").trim();
   if (!pathString) return "";
   if (pathString.startsWith("http://") || pathString.startsWith("https://")) {
@@ -216,14 +231,14 @@ function posterUrlFromPath(pathValue) {
   return `${TMDB_IMAGE_BASE}${pathString.startsWith("/") ? "" : "/"}${pathString}`;
 }
 
-function posterUrlToOriginal(url) {
+function posterUrlToOriginal(url: string): string {
   const value = String(url || "").trim();
   if (!value) return "";
   if (/\/t\/p\/w\d+\//i.test(value)) return value.replace(/\/t\/p\/w\d+\//i, "/t/p/original/");
   return value;
 }
 
-async function isHttpResourceAvailable(url) {
+async function isHttpResourceAvailable(url: string): Promise<boolean> {
   const target = String(url || "").trim();
   if (!target) return false;
   try {
@@ -254,7 +269,7 @@ async function isHttpResourceAvailable(url) {
   }
 }
 
-async function resolveValidPosterUrl(candidateUrl) {
+async function resolveValidPosterUrl(candidateUrl: string): Promise<string> {
   const primary = String(candidateUrl || "").trim();
   if (!primary) return "";
   if (await isHttpResourceAvailable(primary)) return primary;
@@ -263,21 +278,21 @@ async function resolveValidPosterUrl(candidateUrl) {
   return "";
 }
 
-function releaseYearFromDate(value) {
+function releaseYearFromDate(value: string): number | null {
   const text = String(value || "").trim();
   const match = text.match(/^(\d{4})-/);
   if (!match) return null;
   return Number(match[1]);
 }
 
-function isTargetReleaseYear(value) {
+function isTargetReleaseYear(value: string): boolean {
   return releaseYearFromDate(value) === TMDB_RELEASE_YEAR;
 }
 
-function extractMoviePathsFromSearchHtml(html) {
+function extractMoviePathsFromSearchHtml(html: string): string[] {
   const $ = cheerio.load(html);
-  const paths = [];
-  const seen = new Set();
+  const paths: string[] = [];
+  const seen = new Set<string>();
   const selectors = [
     "section.search_results.movie .card .content h2 a[href^='/movie/']",
     ".search_results.movie .card .image_content a[href^='/movie/']",
@@ -286,7 +301,7 @@ function extractMoviePathsFromSearchHtml(html) {
     "a[href^='/movie/']"
   ];
 
-  const pushPath = (href) => {
+  const pushPath = (href: string | undefined): void => {
     if (!href || !/\/movie\/[0-9]/i.test(href)) return;
     const normalized = String(href).split("?")[0].trim();
     if (!normalized || seen.has(normalized)) return;
@@ -311,7 +326,7 @@ function extractMoviePathsFromSearchHtml(html) {
   return paths;
 }
 
-function extractPosterUrlFromMovieHtml(html) {
+function extractPosterUrlFromMovieHtml(html: string): string {
   const $ = cheerio.load(html);
   const selectorCandidates = [
     ".poster_wrapper img.poster",
@@ -336,13 +351,13 @@ function extractPosterUrlFromMovieHtml(html) {
   return "";
 }
 
-function extractReleaseYearFromMovieHtml(html) {
+function extractReleaseYearFromMovieHtml(html: string): number | null {
   const $ = cheerio.load(html);
   const ldJson = $("script[type='application/ld+json']").first().text().trim();
   if (ldJson) {
     try {
-      const parsed = JSON.parse(ldJson);
-      const releaseDate = parsed?.datePublished || parsed?.releasedEvent?.startDate || "";
+      const parsed = JSON.parse(ldJson) as Record<string, unknown>;
+      const releaseDate = (parsed?.datePublished as string) || ((parsed?.releasedEvent as Record<string, string>)?.startDate) || "";
       const fromLd = releaseYearFromDate(releaseDate);
       if (fromLd) return fromLd;
     } catch {
@@ -362,12 +377,12 @@ function extractReleaseYearFromMovieHtml(html) {
   return null;
 }
 
-function tmdbApiHeaders() {
+function tmdbApiHeaders(): Record<string, string> {
   if (TMDB_BEARER) return { Authorization: `Bearer ${TMDB_BEARER}` };
   return {};
 }
 
-async function fetchFromTmdbApi(query) {
+async function fetchFromTmdbApi(query: string): Promise<{ posterUrl: string; movieUrl: string } | null> {
   if (!TMDB_API_KEY && !TMDB_BEARER) return null;
 
   const searchUrl = new URL("https://api.themoviedb.org/3/search/movie");
@@ -386,11 +401,11 @@ async function fetchFromTmdbApi(query) {
     signal: AbortSignal.timeout(12000)
   });
   if (!searchResponse.ok) return null;
-  const searchJson = await searchResponse.json();
+  const searchJson = await searchResponse.json() as { results?: Array<{ id?: number; poster_path?: string; release_date?: string }> };
   const results = Array.isArray(searchJson?.results) ? searchJson.results : [];
-  const firstMovie = results.find((item) => item?.id && isTargetReleaseYear(item?.release_date));
+  const firstMovie = results.find((item) => item?.id && isTargetReleaseYear(item?.release_date || ""));
   if (!firstMovie?.id) return null;
-  const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path));
+  const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path || ""));
 
   return {
     posterUrl,
@@ -398,7 +413,7 @@ async function fetchFromTmdbApi(query) {
   };
 }
 
-async function fetchFromTmdbRemoteMulti(query) {
+async function fetchFromTmdbRemoteMulti(query: string): Promise<{ posterUrl: string; movieUrl: string } | null> {
   const remoteUrl = new URL("https://www.themoviedb.org/search/remote/multi");
   remoteUrl.searchParams.set("query", query);
   remoteUrl.searchParams.set("language", "en-US");
@@ -412,11 +427,11 @@ async function fetchFromTmdbRemoteMulti(query) {
     signal: AbortSignal.timeout(12000)
   });
   if (!response.ok) return null;
-  const json = await response.json();
+  const json = await response.json() as { results?: Array<{ id?: number; media_type?: string; poster_path?: string; profile_path?: string; release_date?: string }> };
   const results = Array.isArray(json?.results) ? json.results : [];
   const firstMovie = results.find((item) => {
     const isMovieLike = !item?.media_type || item.media_type === "movie";
-    return isMovieLike && item?.id && isTargetReleaseYear(item?.release_date);
+    return isMovieLike && item?.id && isTargetReleaseYear(item?.release_date || "");
   });
   if (!firstMovie?.id) return null;
   const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path || firstMovie.profile_path || ""));
@@ -427,12 +442,12 @@ async function fetchFromTmdbRemoteMulti(query) {
   };
 }
 
-async function fetchTmdbPoster(title) {
+async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movieUrl: string } | null> {
   const query = String(title || "").trim();
   if (!query) return null;
 
   const cacheKey = normalizePosterKey(query);
-  if (posterCache.has(cacheKey)) return posterCache.get(cacheKey);
+  if (posterCache.has(cacheKey)) return posterCache.get(cacheKey) ?? null;
 
   const queryVariants = [query];
   if (query === "The Odyssey") queryVariants.push("The Odyssey Christopher Nolan");
@@ -497,7 +512,7 @@ async function fetchTmdbPoster(title) {
   return null;
 }
 
-app.get("/api/health", (_, res) => {
+app.get("/api/health", (_: Request, res: Response) => {
   res.json({
     ok: true,
     now: new Date().toISOString(),
@@ -509,7 +524,7 @@ app.get("/api/health", (_, res) => {
   });
 });
 
-app.get("/api/metrics", (_, res) => {
+app.get("/api/metrics", (_: Request, res: Response) => {
   res.json({
     generatedAt: new Date().toISOString(),
     uptimeSeconds: Math.floor((Date.now() - bootAt) / 1000),
@@ -521,32 +536,35 @@ app.get("/api/metrics", (_, res) => {
   });
 });
 
-app.get("/api/scrape-observability", async (_, res) => {
+app.get("/api/scrape-observability", async (_: Request, res: Response) => {
   const doc = await readScrapeObservability();
   res.json(doc);
 });
 
-app.get("/api/profiles", (_, res) => {
+app.get("/api/profiles", (_: Request, res: Response) => {
   const profiles = db
     .prepare("SELECT id, updated_at FROM profiles ORDER BY id")
     .all()
-    .map((row) => ({ id: row.id, updatedAt: row.updated_at || null }));
+    .map((row) => {
+      const r = row as { id: string; updated_at: string | null };
+      return { id: r.id, updatedAt: r.updated_at || null };
+    });
   const activeProfileId =
-    db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id")?.value || DEFAULT_PROFILE_ID;
+    (db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined)?.value || DEFAULT_PROFILE_ID;
   res.json({ activeProfileId, profiles });
 });
 
-app.get("/api/forecast/:profileId", (req, res) => {
+app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
   const profileId = req.params.profileId || DEFAULT_PROFILE_ID;
-  const row = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(profileId);
+  const row = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(profileId) as ProfileRow | undefined;
   const profile = row
-    ? { updatedAt: row.updated_at || null, payload: row.payload != null ? JSON.parse(row.payload) : null }
+    ? { updatedAt: row.updated_at || null, payload: row.payload != null ? JSON.parse(row.payload) as unknown : null }
     : { updatedAt: null, payload: null };
   res.json({ profileId, ...profile });
 });
 
-app.put("/api/forecast/:profileId", forecastWriteLimiter, (req, res) => {
-  const payload = req.body;
+app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Response) => {
+  const payload = req.body as Record<string, unknown> | null;
   if (!payload || typeof payload !== "object") {
     res.status(400).json({ error: "Invalid forecast payload." });
     return;
@@ -563,14 +581,14 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, (req, res) => {
   res.json({ profileId, updatedAt, payload });
 });
 
-app.delete("/api/forecast/:profileId", (req, res) => {
+app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
   const profileId = req.params.profileId;
   if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
     res.status(404).json({ error: "Profile not found." });
     return;
   }
 
-  const remaining = db.prepare("SELECT id FROM profiles WHERE id != ?").all(profileId);
+  const remaining = db.prepare("SELECT id FROM profiles WHERE id != ?").all(profileId) as Array<{ id: string }>;
   if (remaining.length === 0) {
     res.status(400).json({ error: "Cannot delete the last profile." });
     return;
@@ -578,27 +596,27 @@ app.delete("/api/forecast/:profileId", (req, res) => {
 
   db.transaction(() => {
     db.prepare("DELETE FROM profiles WHERE id = ?").run(profileId);
-    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id");
+    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined;
     if (!activeRow?.value || activeRow.value === profileId) {
       db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", remaining[0].id);
     }
   })();
 
   const activeProfileId =
-    db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id")?.value || remaining[0].id;
+    (db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined)?.value || remaining[0].id;
   res.json({ deleted: profileId, activeProfileId });
 });
 
-app.patch("/api/forecast/:profileId/rename", (req, res) => {
+app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
   const oldId = req.params.profileId;
-  const newId = String(req.body?.newId || "").trim();
+  const newId = String((req.body as Record<string, unknown>)?.newId || "").trim();
 
   if (!newId) {
     res.status(400).json({ error: "Missing newId." });
     return;
   }
 
-  const existing = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(oldId);
+  const existing = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(oldId) as ProfileRow | undefined;
   if (!existing) {
     res.status(404).json({ error: "Profile not found." });
     return;
@@ -621,7 +639,7 @@ app.patch("/api/forecast/:profileId/rename", (req, res) => {
       existing.payload
     );
     db.prepare("DELETE FROM profiles WHERE id = ?").run(oldId);
-    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id");
+    const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined;
     if (activeRow?.value === oldId) {
       db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", newId);
     }
@@ -630,7 +648,7 @@ app.patch("/api/forecast/:profileId/rename", (req, res) => {
   res.json({ profileId: newId });
 });
 
-app.get("/api/tmdb-poster", async (req, res) => {
+app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const title = String(req.query.title || "").trim();
   if (!title) {
     res.status(400).json({ error: "Missing title query param." });
@@ -641,11 +659,11 @@ app.get("/api/tmdb-poster", async (req, res) => {
     const result = await fetchTmdbPoster(title);
     res.json({ title, result });
   } catch (error) {
-    res.status(502).json({ error: String(error?.message || error) });
+    res.status(502).json({ error: String((error as Error)?.message || error) });
   }
 });
 
-app.get("*", (_, res) => {
+app.get("*", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
@@ -656,7 +674,7 @@ const server = app.listen(PORT, () => {
   startSourcePoller();
 });
 
-function shutdown(signal) {
+function shutdown(signal: string): void {
   console.log(`[server] received ${signal}, shutting down...`);
   if (pollerProcess && !pollerProcess.killed) pollerProcess.kill("SIGTERM");
   server.close(() => {

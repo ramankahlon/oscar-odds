@@ -1,18 +1,22 @@
 import js from "@eslint/js";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   // Ignore generated and dependency directories
   {
-    ignores: ["coverage/", "node_modules/"]
+    ignores: ["coverage/", "node_modules/", "app.js"]
   },
 
-  // Base recommended rules for all JS files
+  // Base recommended rules for all files
   js.configs.recommended,
+
+  // TypeScript recommended rules for all TS files
+  ...tseslint.configs.recommended,
 
   // Node.js server and utility files
   {
-    files: ["server.mjs", "scraper-utils.js", "forecast-utils.js", "scoring-utils.js", "scripts/**/*.mjs"],
+    files: ["server.ts", "scraper-utils.ts", "forecast-utils.ts", "scoring-utils.ts", "app-logic.ts", "types.ts", "scripts/**/*.ts"],
     languageOptions: {
       globals: { ...globals.node }
     }
@@ -20,7 +24,7 @@ export default [
 
   // Browser app
   {
-    files: ["app.js"],
+    files: ["app.ts"],
     languageOptions: {
       globals: { ...globals.browser }
     }
@@ -28,17 +32,10 @@ export default [
 
   // Vitest test files — expose describe/it/expect globals
   {
-    files: ["**/*.test.js"],
+    files: ["**/*.test.ts"],
     languageOptions: {
       globals: {
-        ...globals.node,
-        describe: "readonly",
-        it: "readonly",
-        expect: "readonly",
-        beforeEach: "readonly",
-        afterEach: "readonly",
-        beforeAll: "readonly",
-        afterAll: "readonly"
+        ...globals.node
       }
     }
   },
@@ -46,10 +43,13 @@ export default [
   // Project-wide rule overrides
   {
     rules: {
-      // Allow unused catch bindings and underscore-prefixed params
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
+      // TypeScript handles unused vars; configure via @typescript-eslint rule
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
+      // Allow explicit any where intentional
+      "@typescript-eslint/no-explicit-any": "off",
       // console is intentional in a server/CLI project
       "no-console": "off"
     }
   }
-];
+);

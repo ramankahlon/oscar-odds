@@ -6,6 +6,57 @@ import {
   normalizeSignalKey as normalizeSignalKeyCore,
   rebalanceCategory
 } from "./app-logic.js";
+import type { Category, Film, NormalizedWeights, Projection, ScoreResult, Strength } from "./types.js";
+
+interface TrendEntry {
+  key: string;
+  title: string;
+  nomination: number;
+  winner: number;
+}
+
+interface TrendSnapshot {
+  categoryId: string;
+  capturedAt: string;
+  sourceSnapshotId: string | null;
+  entries: TrendEntry[];
+}
+
+interface TrendHistory {
+  version: number;
+  snapshots: TrendSnapshot[];
+  lastSignatureByCategory: Record<string, string>;
+}
+
+interface TrendPoint {
+  capturedAt: string;
+  sourceSnapshotId: string;
+  nomination: number;
+  winner: number;
+}
+
+interface AppState {
+  profileId: string;
+  categoryId: string;
+  weights: NormalizedWeights;
+  trendWindow: number;
+}
+
+interface StatePayload {
+  categoryId?: string;
+  weights?: Partial<NormalizedWeights>;
+  trendWindow?: number;
+  trendHistory?: {
+    version?: number;
+    snapshots?: unknown[];
+    lastSignatureByCategory?: Record<string, string>;
+  };
+  categories?: Array<{ id: string; films: unknown[] }>;
+}
+
+interface SearchProjection extends Projection {
+  categoryName: string;
+}
 
 const schedule2026Films = [
   "The Mother and the Bear",
@@ -184,11 +235,11 @@ const categoryDefinitions = [
   { id: "casting", name: "Best Casting", nominees: 5, winnerBase: 0.19 }
 ];
 
-function contender(title, studio, precursor, history, buzz, strength) {
+function contender(title: string, studio: string, precursor: number, history: number, buzz: number, strength: Strength): Film {
   return { title, studio, precursor, history, buzz, strength };
 }
 
-const categorySeeds = {
+const categorySeeds: Record<string, Film[]> = {
   picture: [
     contender("The Odyssey", "Universal", 88, 84, 92, "High"),
     contender("Dune: Part Three", "Warner Bros.", 86, 81, 90, "High"),
@@ -364,16 +415,16 @@ const categorySeeds = {
   ]
 };
 
-function createSeedFilms() {
+function createSeedFilms(): Film[] {
   return schedule2026Films.map((title) => contender(title, "TBD", 55, 50, 52, "Medium"));
 }
 
-const categories = categoryDefinitions.map((category) => ({
+const categories: Category[] = categoryDefinitions.map((category) => ({
   ...category,
   films: categorySeeds[category.id] ? [...categorySeeds[category.id]] : createSeedFilms()
 }));
 
-const priorCategoryWins = {
+const priorCategoryWins: Record<string, Record<string, number>> = {
   director: {
     "Christopher Nolan": 1,
     "Steven Spielberg": 2,
@@ -390,20 +441,20 @@ const priorCategoryWins = {
   }
 };
 
-const recentWinnerPenalty = {
+const recentWinnerPenalty: Record<string, Record<string, number>> = {
   actress: {
     "Mikey Madison": 2,
     "Jessie Buckley": 2
   }
 };
 
-const overdueNarrativeBoost = {
+const overdueNarrativeBoost: Record<string, Record<string, number>> = {
   actress: {
     "Amy Adams": 1
   }
 };
 
-const CATEGORY_SHORT_NAMES = {
+const CATEGORY_SHORT_NAMES: Record<string, string> = {
   "picture": "Picture",
   "director": "Director",
   "actor": "Actor",
@@ -441,7 +492,7 @@ const NOMINATION_PERCENT_UPLIFT = 1.14;
 const WINNER_PERCENT_UPLIFT = 1.2;
 const WINNER_TO_NOMINATION_CAP = 0.5;
 
-const state = {
+const state: AppState = {
   profileId: "default",
   categoryId: categories[0].id,
   weights: {
@@ -451,74 +502,74 @@ const state = {
   },
   trendWindow: 30
 };
-let appliedExternalSnapshotId = null;
-const trendHistory = {
+let appliedExternalSnapshotId: string | null = null;
+const trendHistory: TrendHistory = {
   version: 1,
   snapshots: [],
   lastSignatureByCategory: {}
 };
 
-const categoryTabs = document.querySelector("#categoryTabs");
-const categorySummaryBar = document.querySelector("#categorySummaryBar");
-const categoryTitle = document.querySelector("#categoryTitle");
-const candidateCards = document.querySelector("#candidateCards");
-const resultsBody = document.querySelector("#resultsBody");
-const resultsPrimaryHeader = document.querySelector("#resultsPrimaryHeader");
-const oddsLastUpdated = document.querySelector("#oddsLastUpdated");
-const explainTitle = document.querySelector("#explainTitle");
-const explainMeta = document.querySelector("#explainMeta");
-const explainDelta = document.querySelector("#explainDelta");
-const explainBreakdown = document.querySelector("#explainBreakdown");
-const explainNotes = document.querySelector("#explainNotes");
-const trendTitle = document.querySelector("#trendTitle");
-const trendMeta = document.querySelector("#trendMeta");
-const trendChart = document.querySelector("#trendChart");
-const trendSourceMoves = document.querySelector("#trendSourceMoves");
-const trendWindowSelect = document.querySelector("#trendWindowSelect");
-const appStateNotice = document.querySelector("#appStateNotice");
-const scraperHealthBadge = document.querySelector("#scraperHealthBadge");
-const contenderSearch = document.querySelector("#contenderSearch");
-const contenderSearchClear = document.querySelector("#contenderSearchClear");
-const compareToggleButton = document.querySelector("#compareToggleButton");
-const compareControls = document.querySelector("#compareControls");
-const compareProfileSelect = document.querySelector("#compareProfileSelect");
-const thNomination = document.querySelector("#thNomination");
-const thWinner = document.querySelector("#thWinner");
-const thCompareB = document.querySelector("#thCompareB");
-const thDelta = document.querySelector("#thDelta");
+const categoryTabs = document.querySelector<HTMLElement>("#categoryTabs")!;
+const categorySummaryBar = document.querySelector<HTMLElement>("#categorySummaryBar");
+const categoryTitle = document.querySelector<HTMLElement>("#categoryTitle")!;
+const candidateCards = document.querySelector<HTMLElement>("#candidateCards")!;
+const resultsBody = document.querySelector<HTMLTableSectionElement>("#resultsBody")!;
+const resultsPrimaryHeader = document.querySelector<HTMLElement>("#resultsPrimaryHeader");
+const oddsLastUpdated = document.querySelector<HTMLElement>("#oddsLastUpdated");
+const explainTitle = document.querySelector<HTMLElement>("#explainTitle")!;
+const explainMeta = document.querySelector<HTMLElement>("#explainMeta")!;
+const explainDelta = document.querySelector<HTMLElement>("#explainDelta")!;
+const explainBreakdown = document.querySelector<HTMLElement>("#explainBreakdown")!;
+const explainNotes = document.querySelector<HTMLElement>("#explainNotes")!;
+const trendTitle = document.querySelector<HTMLElement>("#trendTitle")!;
+const trendMeta = document.querySelector<HTMLElement>("#trendMeta")!;
+const trendChart = document.querySelector<SVGElement>("#trendChart");
+const trendSourceMoves = document.querySelector<HTMLElement>("#trendSourceMoves");
+const trendWindowSelect = document.querySelector<HTMLSelectElement>("#trendWindowSelect");
+const appStateNotice = document.querySelector<HTMLElement>("#appStateNotice");
+const scraperHealthBadge = document.querySelector<HTMLElement>("#scraperHealthBadge");
+const contenderSearch = document.querySelector<HTMLInputElement>("#contenderSearch");
+const contenderSearchClear = document.querySelector<HTMLElement>("#contenderSearchClear");
+const compareToggleButton = document.querySelector<HTMLButtonElement>("#compareToggleButton");
+const compareControls = document.querySelector<HTMLElement>("#compareControls");
+const compareProfileSelect = document.querySelector<HTMLSelectElement>("#compareProfileSelect");
+const thNomination = document.querySelector<HTMLElement>("#thNomination");
+const thWinner = document.querySelector<HTMLElement>("#thWinner");
+const thCompareB = document.querySelector<HTMLElement>("#thCompareB");
+const thDelta = document.querySelector<HTMLElement>("#thDelta");
 let searchQuery = "";
 let compareMode = false;
-let compareProfileId = null;
-const comparePayloadCache = new Map();
-const resultsPanel = document.querySelector("#resultsPanel");
-const movieDetailTitle = document.querySelector("#movieDetailTitle");
-const movieDetailDirector = document.querySelector("#movieDetailDirector");
-const movieDetailStars = document.querySelector("#movieDetailStars");
-const movieDetailGenre = document.querySelector("#movieDetailGenre");
-const movieDetailDescription = document.querySelector("#movieDetailDescription");
-const posterSkeleton = document.querySelector("#posterSkeleton");
-const movieDetailPoster = document.querySelector("#movieDetailPoster");
-const movieDetailPosterLink = document.querySelector("#movieDetailPosterLink");
-const exportCsvButton = document.querySelector("#exportCsvButton");
-const importCsvButton = document.querySelector("#importCsvButton");
-const csvFileInput = document.querySelector("#csvFileInput");
-const csvStatus = document.querySelector("#csvStatus");
-const profileSelect = document.querySelector("#profileSelect");
-const newProfileButton = document.querySelector("#newProfileButton");
-const renameProfileButton = document.querySelector("#renameProfileButton");
-const deleteProfileButton = document.querySelector("#deleteProfileButton");
-const printPdfButton = document.querySelector("#printPdfButton");
-const printMeta = document.querySelector("#printMeta");
-let profileOptions = ["default"];
-const explainSelectionByCategory = {};
+let compareProfileId: string | null = null;
+const comparePayloadCache = new Map<string, StatePayload>();
+const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
+const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
+const movieDetailDirector = document.querySelector<HTMLElement>("#movieDetailDirector")!;
+const movieDetailStars = document.querySelector<HTMLElement>("#movieDetailStars")!;
+const movieDetailGenre = document.querySelector<HTMLElement>("#movieDetailGenre")!;
+const movieDetailDescription = document.querySelector<HTMLElement>("#movieDetailDescription")!;
+const posterSkeleton = document.querySelector<HTMLElement>("#posterSkeleton");
+const movieDetailPoster = document.querySelector<HTMLImageElement>("#movieDetailPoster")!;
+const movieDetailPosterLink = document.querySelector<HTMLAnchorElement>("#movieDetailPosterLink")!;
+const exportCsvButton = document.querySelector<HTMLButtonElement>("#exportCsvButton")!;
+const importCsvButton = document.querySelector<HTMLButtonElement>("#importCsvButton")!;
+const csvFileInput = document.querySelector<HTMLInputElement>("#csvFileInput")!;
+const csvStatus = document.querySelector<HTMLElement>("#csvStatus")!;
+const profileSelect = document.querySelector<HTMLSelectElement>("#profileSelect")!;
+const newProfileButton = document.querySelector<HTMLButtonElement>("#newProfileButton")!;
+const renameProfileButton = document.querySelector<HTMLButtonElement>("#renameProfileButton");
+const deleteProfileButton = document.querySelector<HTMLButtonElement>("#deleteProfileButton");
+const printPdfButton = document.querySelector<HTMLButtonElement>("#printPdfButton");
+const printMeta = document.querySelector<HTMLElement>("#printMeta");
+let profileOptions: string[] = ["default"];
+const explainSelectionByCategory: Record<string, number> = {};
 let activePosterRequestId = 0;
 let isBootstrapping = true;
 let posterFallbackActive = false;
 let backendOfflineMode = false;
-let lastOddsRecalculatedAt = null;
-let lastSourceSyncAt = null;
+let lastOddsRecalculatedAt: string | null = null;
+let lastSourceSyncAt: string | null = null;
 
-function setBackendOfflineMode(isOffline) {
+function setBackendOfflineMode(isOffline: boolean): void {
   backendOfflineMode = Boolean(isOffline);
   if (backendOfflineMode) {
     setAppNotice("Offline mode — data loaded from local storage.", "error");
@@ -529,7 +580,7 @@ function setBackendOfflineMode(isOffline) {
   }
 }
 
-function setAppNotice(message = "", type = "") {
+function setAppNotice(message = "", type = ""): void {
   if (!appStateNotice) return;
   if (!message && backendOfflineMode) {
     appStateNotice.textContent = "Offline mode — data loaded from local storage.";
@@ -540,14 +591,14 @@ function setAppNotice(message = "", type = "") {
   appStateNotice.className = `app-notice${type ? ` ${type}` : ""}`;
 }
 
-function setPanelsBusy(isBusy) {
+function setPanelsBusy(isBusy: boolean): void {
   const busyValue = isBusy ? "true" : "false";
   if (resultsPanel) resultsPanel.setAttribute("aria-busy", busyValue);
   if (candidateCards) candidateCards.setAttribute("aria-busy", busyValue);
 }
 
-function formatTimestamp(value) {
-  const date = new Date(value);
+function formatTimestamp(value: string | number | null): string {
+  const date = new Date(value ?? "");
   if (Number.isNaN(date.valueOf())) return "Unknown";
   return date.toLocaleString([], {
     year: "numeric",
@@ -572,7 +623,7 @@ function updateOddsFreshnessLabel() {
   oddsLastUpdated.textContent = `Last recalculated: ${recalculated} • Last source sync: ${formatTimestamp(lastSourceSyncAt)}`;
 }
 
-function normalizeMovieDetailKey(value) {
+function normalizeMovieDetailKey(value: unknown): string {
   return String(value || "")
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
@@ -580,11 +631,11 @@ function normalizeMovieDetailKey(value) {
     .trim();
 }
 
-function getTmdbSearchUrl(title) {
+function getTmdbSearchUrl(title: string): string {
   return `https://www.themoviedb.org/search?query=${encodeURIComponent(String(title || "").trim())}`;
 }
 
-function normalizePosterRenderUrl(url) {
+function normalizePosterRenderUrl(url: string): string {
   const value = String(url || "").trim();
   if (!value) return "";
   if (value.startsWith("/t/p/")) return `https://image.tmdb.org${value}`;
@@ -593,7 +644,7 @@ function normalizePosterRenderUrl(url) {
   return value;
 }
 
-function buildPosterFallbackDataUrl(title) {
+function buildPosterFallbackDataUrl(title: string): string {
   const safeTitle = String(title || "Selected Movie")
     .slice(0, 60)
     .replace(/&/g, "&amp;")
@@ -685,15 +736,22 @@ const movieDetails = {
   }
 };
 
-const movieDetailsIndex = new Map(
+interface MovieDetailEntry {
+  title: string;
+  director: string;
+  stars: string[];
+  genre: string;
+  description: string;
+}
+const movieDetailsIndex = new Map<string, MovieDetailEntry>(
   Object.entries(movieDetails).map(([title, details]) => [normalizeMovieDetailKey(title), { title, ...details }])
 );
 
-function normalizeSignalKey(value) {
+function normalizeSignalKey(value: unknown): string {
   return normalizeSignalKeyCore(value);
 }
 
-function normalizeWeights() {
+function normalizeWeights(): NormalizedWeights {
   const total = state.weights.precursor + state.weights.history + state.weights.buzz;
   return {
     precursor: state.weights.precursor / total,
@@ -702,17 +760,17 @@ function normalizeWeights() {
   };
 }
 
-function logistic(z) {
+function logistic(z: number): number {
   return 1 / (1 + Math.exp(-z));
 }
 
-function strengthBoost(strength) {
+function strengthBoost(strength: Strength): number {
   if (strength === "High") return 1.06;
   if (strength === "Medium") return 1.0;
   return 0.94;
 }
 
-function winnerExperienceBoost(categoryId, contenderName) {
+function winnerExperienceBoost(categoryId: string, contenderName: string): number {
   const isPersonCategory =
     categoryId === "director" ||
     categoryId === "actor" ||
@@ -737,12 +795,12 @@ function winnerExperienceBoost(categoryId, contenderName) {
   return clamp(boost, 0.55, 1.15);
 }
 
-function sanitizeStrength(value) {
+function sanitizeStrength(value: unknown): Strength {
   if (value === "High" || value === "Medium" || value === "Low") return value;
   return "Low";
 }
 
-function applyExternalSignalSnapshot(snapshot) {
+function applyExternalSignalSnapshot(snapshot: unknown): boolean {
   const result = applySourceSignals({
     categories,
     snapshot,
@@ -750,7 +808,7 @@ function applyExternalSignalSnapshot(snapshot) {
   });
   if (!result.changed) return false;
   appliedExternalSnapshotId = result.appliedSnapshotId;
-  lastSourceSyncAt = snapshot?.generatedAt || new Date().toISOString();
+  lastSourceSyncAt = (snapshot as { generatedAt?: string })?.generatedAt || new Date().toISOString();
   return true;
 }
 
@@ -796,12 +854,13 @@ async function checkScraperHealth() {
     const sources = obs?.sources || {};
     const now = Date.now();
     const staleSourceNames = Object.entries(sources)
-      .filter(([, metrics]) => {
-        if (metrics.consecutiveFailures > 0) return true;
+      .filter(([, rawMetrics]) => {
+        const metrics = rawMetrics as { consecutiveFailures?: number; lastSuccessAt?: string; attempts?: number };
+        if ((metrics.consecutiveFailures ?? 0) > 0) return true;
         if (metrics.lastSuccessAt) {
           const ageMinutes = (now - Date.parse(metrics.lastSuccessAt)) / 60000;
           if (ageMinutes > SCRAPE_STALE_THRESHOLD_MINUTES) return true;
-        } else if (metrics.attempts > 0) {
+        } else if ((metrics.attempts ?? 0) > 0) {
           return true;
         }
         return false;
@@ -824,28 +883,29 @@ function startScraperHealthPolling() {
   setInterval(checkScraperHealth, SCRAPE_HEALTH_POLL_MS);
 }
 
-function parseFilmRecord(record) {
+function parseFilmRecord(record: unknown): Film | null {
   if (!record || typeof record !== "object") return null;
+  const r = record as Record<string, unknown>;
 
-  const title = String(record.title || "").trim();
-  const studio = String(record.studio || "").trim();
+  const title = String(r.title || "").trim();
+  const studio = String(r.studio || "").trim();
   if (!title || !studio) return null;
 
   return {
     title,
     studio,
-    precursor: clamp(Number(record.precursor || 0), 0, 100),
-    history: clamp(Number(record.history || 0), 0, 100),
-    buzz: clamp(Number(record.buzz || 0), 0, 100),
-    strength: sanitizeStrength(String(record.strength || "").trim())
+    precursor: clamp(Number(r.precursor || 0), 0, 100),
+    history: clamp(Number(r.history || 0), 0, 100),
+    buzz: clamp(Number(r.buzz || 0), 0, 100),
+    strength: sanitizeStrength(String(r.strength || "").trim())
   };
 }
 
-function getActiveCategory() {
-  return categories.find((category) => category.id === state.categoryId);
+function getActiveCategory(): Category {
+  return categories.find((category) => category.id === state.categoryId) ?? categories[0];
 }
 
-function scoreFilm(categoryId, film, normalizedWeights) {
+function scoreFilm(categoryId: string, film: Film, normalizedWeights: NormalizedWeights): ScoreResult {
   const precursorContribution = film.precursor * normalizedWeights.precursor;
   const historyContribution = film.history * normalizedWeights.history;
   const buzzContribution = film.buzz * normalizedWeights.buzz;
@@ -868,7 +928,7 @@ function scoreFilm(categoryId, film, normalizedWeights) {
   };
 }
 
-function renderTabs() {
+function renderTabs(): void {
   categoryTabs.innerHTML = "";
 
   const select = document.createElement("select");
@@ -884,7 +944,7 @@ function renderTabs() {
   });
 
   select.addEventListener("change", (event) => {
-    state.categoryId = event.target.value;
+    state.categoryId = (event.target as HTMLSelectElement).value;
     if (searchQuery) {
       searchQuery = "";
       if (contenderSearch) contenderSearch.value = "";
@@ -897,7 +957,7 @@ function renderTabs() {
   categoryTabs.appendChild(select);
 }
 
-function createCard(category, film, filmIndex) {
+function createCard(category: Category, film: Film, filmIndex: number): HTMLDivElement {
   const card = document.createElement("div");
   card.className = "candidate-card";
 
@@ -930,9 +990,9 @@ function createCard(category, film, filmIndex) {
     input.min = "0";
     input.max = "100";
     input.step = "1";
-    input.value = String(film[field.key]);
+    input.value = String((film as unknown as Record<string, unknown>)[field.key]);
     input.addEventListener("input", (event) => {
-      film[field.key] = clamp(Number(event.target.value || 0), 0, 100);
+      (film as unknown as Record<string, number>)[field.key] = clamp(Number((event.target as HTMLInputElement).value || 0), 0, 100);
       saveState();
       render();
     });
@@ -951,9 +1011,8 @@ function createCard(category, film, filmIndex) {
     strengthSelect.appendChild(option);
   });
   strengthSelect.addEventListener("change", (event) => {
-    categories
-      .find((c) => c.id === category.id)
-      .films[filmIndex].strength = event.target.value;
+    const cat = categories.find((c) => c.id === category.id);
+    if (cat) cat.films[filmIndex].strength = (event.target as HTMLSelectElement).value as Strength;
     saveState();
     render();
   });
@@ -964,12 +1023,12 @@ function createCard(category, film, filmIndex) {
   return card;
 }
 
-function getDisplayLimit(category) {
+function getDisplayLimit(category: Category): number {
   return category.id === "picture" ? 10 : 5;
 }
 
-function getPrimaryColumnLabel(categoryId) {
-  const personCategoryLabels = {
+function getPrimaryColumnLabel(categoryId: string): string {
+  const personCategoryLabels: Record<string, string> = {
     director: "Director",
     actor: "Actor",
     actress: "Actress",
@@ -979,7 +1038,7 @@ function getPrimaryColumnLabel(categoryId) {
   return personCategoryLabels[categoryId] || "Film";
 }
 
-function getDisplayTitle(categoryId, title, studio) {
+function getDisplayTitle(categoryId: string, title: string, studio: string): string {
   const isPersonCategory =
     categoryId === "director" ||
     categoryId === "actor" ||
@@ -991,7 +1050,7 @@ function getDisplayTitle(categoryId, title, studio) {
   return `${title} (${studio})`;
 }
 
-function getSelectedFilmTitle(categoryId, entry) {
+function getSelectedFilmTitle(categoryId: string, entry: Projection): string {
   const isPersonCategory =
     categoryId === "director" ||
     categoryId === "actor" ||
@@ -1001,7 +1060,7 @@ function getSelectedFilmTitle(categoryId, entry) {
   return isPersonCategory ? entry.rawStudio : entry.rawTitle;
 }
 
-function trendKeyForEntry(categoryId, entry) {
+function trendKeyForEntry(categoryId: string, entry: Projection): string {
   const isPersonCategory =
     categoryId === "director" ||
     categoryId === "actor" ||
@@ -1012,14 +1071,14 @@ function trendKeyForEntry(categoryId, entry) {
   return `${categoryId}::${normalizeSignalKey(base)}`;
 }
 
-function buildCategoryTrendSignature(category, displayProjections) {
+function buildCategoryTrendSignature(category: Category, displayProjections: Projection[]): string {
   const rows = displayProjections.map((entry) => {
     return `${trendKeyForEntry(category.id, entry)}:${entry.nomination.toFixed(2)}:${entry.winner.toFixed(2)}`;
   });
   return `${category.id}|${appliedExternalSnapshotId || "manual"}|${rows.join("|")}`;
 }
 
-function captureTrendSnapshot(category, projections) {
+function captureTrendSnapshot(category: Category, projections: Projection[]): boolean {
   const displayProjections = projections.slice(0, getDisplayLimit(category));
   if (displayProjections.length === 0) return false;
 
@@ -1045,7 +1104,7 @@ function captureTrendSnapshot(category, projections) {
   return true;
 }
 
-function pointsForEntryTrend(category, entry) {
+function pointsForEntryTrend(category: Category, entry: Projection): TrendPoint[] {
   const key = trendKeyForEntry(category.id, entry);
   const pointLimit = TREND_WINDOW_OPTIONS.includes(Number(state.trendWindow)) ? Number(state.trendWindow) : 30;
   return trendHistory.snapshots
@@ -1060,17 +1119,17 @@ function pointsForEntryTrend(category, entry) {
         winner: Number(contender.winner || 0)
       };
     })
-    .filter(Boolean)
+    .filter((p): p is TrendPoint => p !== null)
     .slice(-pointLimit);
 }
 
-function formatTrendStamp(value) {
+function formatTrendStamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return "Unknown";
   return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function buildPolylinePath(points, metric, width, height, minY, maxY) {
+function buildPolylinePath(points: TrendPoint[], metric: "nomination" | "winner", width: number, height: number, minY: number, maxY: number): string {
   if (!points.length) return "";
   const range = Math.max(maxY - minY, 1);
   return points
@@ -1082,7 +1141,7 @@ function buildPolylinePath(points, metric, width, height, minY, maxY) {
     .join(" ");
 }
 
-function renderTrendChart(points) {
+function renderTrendChart(points: TrendPoint[]): void {
   if (!trendChart) return;
   trendChart.innerHTML = "";
 
@@ -1113,7 +1172,7 @@ function renderTrendChart(points) {
         x: padX + (index / Math.max(points.length - 1, 1)) * chartWidth
       };
     })
-    .filter(Boolean);
+    .filter((m): m is { x: number } => m !== null);
 
   const yTicks = [0, 25, 50, 75, 100].filter((tick) => tick >= minValue && tick <= maxValue);
   const grid = yTicks
@@ -1140,7 +1199,7 @@ function renderTrendChart(points) {
   `;
 }
 
-function renderSourceMovement(points) {
+function renderSourceMovement(points: TrendPoint[]): void {
   if (!trendSourceMoves) return;
   trendSourceMoves.innerHTML = "";
 
@@ -1151,7 +1210,7 @@ function renderSourceMovement(points) {
       if (previous?.sourceSnapshotId === point.sourceSnapshotId) return null;
       return index;
     })
-    .filter((value) => Number.isInteger(value));
+    .filter((value): value is number => value !== null && Number.isInteger(value));
 
   if (sourcePointIndexes.length === 0) {
     trendSourceMoves.innerHTML = `<div class="trend-source-row"><span>No source refresh markers in this window.</span><span class="stamp">-</span></div>`;
@@ -1172,7 +1231,7 @@ function renderSourceMovement(points) {
   });
 }
 
-function renderTrendAnalytics(category, entry) {
+function renderTrendAnalytics(category: Category, entry: Projection | null): void {
   if (!entry) {
     trendTitle.textContent = "Trend Analytics";
     trendMeta.textContent = "Select a contender to view movement over time.";
@@ -1199,17 +1258,17 @@ function renderTrendAnalytics(category, entry) {
   renderSourceMovement(points);
 }
 
-function showPosterSkeleton() {
+function showPosterSkeleton(): void {
   if (posterSkeleton) posterSkeleton.hidden = false;
   if (movieDetailPoster) movieDetailPoster.classList.add("hidden");
   if (movieDetailPosterLink) movieDetailPosterLink.classList.add("hidden");
 }
 
-function hidePosterSkeleton() {
+function hidePosterSkeleton(): void {
   if (posterSkeleton) posterSkeleton.hidden = true;
 }
 
-function setPosterState(posterUrl, movieUrl) {
+function setPosterState(posterUrl: string, movieUrl: string): void {
   const src = normalizePosterRenderUrl(posterUrl) || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
   const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
   posterFallbackActive = !posterUrl;
@@ -1220,7 +1279,7 @@ function setPosterState(posterUrl, movieUrl) {
   movieDetailPosterLink.classList.remove("hidden");
 }
 
-async function loadPosterForTitle(title) {
+async function loadPosterForTitle(title: string): Promise<void> {
   const requestId = ++activePosterRequestId;
   showPosterSkeleton();
 
@@ -1254,7 +1313,7 @@ movieDetailPoster?.addEventListener("error", () => {
   movieDetailPosterLink.href = getTmdbSearchUrl(movieDetailTitle.textContent || "");
 });
 
-function renderMovieDetails(category, entry) {
+function renderMovieDetails(category: Category, entry: Projection | null): void {
   if (!entry) {
     activePosterRequestId++;
     movieDetailTitle.textContent = "Selected Film";
@@ -1285,13 +1344,17 @@ function renderMovieDetails(category, entry) {
   movieDetailDescription.textContent = details.description;
 }
 
-function buildProjections(category, overrides = null) {
+interface BuildProjectionsOverrides {
+  films?: Film[];
+  weights?: Partial<NormalizedWeights>;
+}
+function buildProjections(category: Category, overrides: BuildProjectionsOverrides | null = null): Projection[] {
   const films = overrides?.films ?? category.films;
   let normalized;
   if (overrides?.weights) {
     const w = overrides.weights;
-    const total = (w.precursor || 0) + (w.history || 0) + (w.buzz || 0) || 1;
-    normalized = { precursor: w.precursor / total, history: w.history / total, buzz: w.buzz / total };
+    const total = (w.precursor ?? 0) + (w.history ?? 0) + (w.buzz ?? 0) || 1;
+    normalized = { precursor: (w.precursor ?? 0) / total, history: (w.history ?? 0) / total, buzz: (w.buzz ?? 0) / total };
   } else {
     normalized = normalizeWeights();
   }
@@ -1366,7 +1429,7 @@ function buildProjections(category, overrides = null) {
   return [...topContenders, ...projections.slice(displayLimit)];
 }
 
-function renderCandidates(category, projections) {
+function renderCandidates(category: Category, projections: Projection[]): void {
   categoryTitle.textContent = category.name;
   candidateCards.innerHTML = "";
 
@@ -1384,7 +1447,7 @@ function renderCandidates(category, projections) {
   });
 }
 
-function renderSearchResults(query) {
+function renderSearchResults(query: string): void {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = "Film";
   if (thNomination) thNomination.hidden = false;
   if (thWinner) thWinner.textContent = "Winner %";
@@ -1393,7 +1456,7 @@ function renderSearchResults(query) {
   resultsBody.innerHTML = "";
 
   const normalizedQuery = query.toLowerCase();
-  const matches = [];
+  const matches: SearchProjection[] = [];
 
   categories.forEach((category) => {
     const projections = buildProjections(category);
@@ -1465,7 +1528,7 @@ function renderSearchResults(query) {
   renderTrendAnalytics(getActiveCategory(), null);
 }
 
-function renderResults(category, projections) {
+function renderResults(category: Category, projections: Projection[]): void {
   if (searchQuery) {
     renderSearchResults(searchQuery);
     return;
@@ -1528,7 +1591,7 @@ function renderResults(category, projections) {
   renderTrendAnalytics(category, displayProjections[boundedIndex]);
 }
 
-function renderExplanation(category, entry, fieldEntries) {
+function renderExplanation(category: Category, entry: Projection | null, fieldEntries: Projection[]): void {
   if (!entry) {
     explainTitle.textContent = "Why this %";
     explainMeta.textContent = "No contender selected.";
@@ -1580,18 +1643,18 @@ function renderExplanation(category, entry, fieldEntries) {
   explainNotes.textContent = `Strength multiplier ${entry.strengthMultiplier.toFixed(2)}x, winner-history factor ${entry.winnerHistoryMultiplier.toFixed(2)}x.`;
 }
 
-function setCsvStatus(message, type = "") {
+function setCsvStatus(message: string, type = ""): void {
   csvStatus.textContent = message;
   csvStatus.className = `tool-status${type ? ` ${type}` : ""}`;
 }
 
-function csvEscape(value) {
+function csvEscape(value: unknown): string {
   const text = String(value ?? "");
   if (!/[",\n]/.test(text)) return text;
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function exportContendersCsv() {
+function exportContendersCsv(): string {
   const header = ["category_id", "category_name", "title", "studio", "precursor", "history", "buzz", "strength"];
   const rows = [header.join(",")];
 
@@ -1615,7 +1678,7 @@ function exportContendersCsv() {
   return rows.join("\n");
 }
 
-function parseCsv(text) {
+function parseCsv(text: string): string[][] {
   const rows = [];
   let row = [];
   let value = "";
@@ -1661,7 +1724,7 @@ function parseCsv(text) {
   return rows.filter((entry) => entry.some((cell) => cell.trim() !== ""));
 }
 
-function importContendersCsv(text) {
+function importContendersCsv(text: string): void {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error("CSV is empty or missing rows.");
 
@@ -1672,7 +1735,7 @@ function importContendersCsv(text) {
     throw new Error(`Missing required columns: ${missingColumns.join(", ")}`);
   }
 
-  const indexOf = (name) => headerMap.indexOf(name);
+  const indexOf = (name: string): number => headerMap.indexOf(name);
   const filmsByCategory = new Map();
 
   rows.slice(1).forEach((entry, rowIndex) => {
@@ -1709,7 +1772,7 @@ function importContendersCsv(text) {
   });
 }
 
-function bindSearchControls() {
+function bindSearchControls(): void {
   if (!contenderSearch) return;
   contenderSearch.addEventListener("input", () => {
     searchQuery = contenderSearch.value.trim();
@@ -1726,7 +1789,7 @@ function bindSearchControls() {
   }
 }
 
-function bindCsvControls() {
+function bindCsvControls(): void {
   exportCsvButton.addEventListener("click", () => {
     const csvText = exportContendersCsv();
     const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
@@ -1747,7 +1810,7 @@ function bindCsvControls() {
   });
 
   csvFileInput.addEventListener("change", async (event) => {
-    const file = event.target.files?.[0];
+    const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
     try {
@@ -1756,14 +1819,14 @@ function bindCsvControls() {
       render();
       setCsvStatus(`Imported ${file.name}.`, "success");
     } catch (error) {
-      setCsvStatus(error.message || "CSV import failed.", "error");
+      setCsvStatus((error as Error).message || "CSV import failed.", "error");
     } finally {
       csvFileInput.value = "";
     }
   });
 }
 
-function serializeStatePayload() {
+function serializeStatePayload(): StatePayload {
   return {
     categoryId: state.categoryId,
     weights: state.weights,
@@ -1780,44 +1843,48 @@ function serializeStatePayload() {
   };
 }
 
-function applyStatePayload(parsed) {
+function applyStatePayload(parsed: unknown): void {
   if (!parsed || typeof parsed !== "object") return;
+  const p = parsed as StatePayload;
 
-  if (parsed.weights && typeof parsed.weights === "object") {
-    state.weights.precursor = clamp(Number(parsed.weights.precursor || state.weights.precursor), 1, 95);
-    state.weights.history = clamp(Number(parsed.weights.history || state.weights.history), 1, 95);
-    state.weights.buzz = clamp(Number(parsed.weights.buzz || state.weights.buzz), 1, 95);
+  if (p.weights && typeof p.weights === "object") {
+    state.weights.precursor = clamp(Number(p.weights.precursor || state.weights.precursor), 1, 95);
+    state.weights.history = clamp(Number(p.weights.history || state.weights.history), 1, 95);
+    state.weights.buzz = clamp(Number(p.weights.buzz || state.weights.buzz), 1, 95);
   }
 
-  if (TREND_WINDOW_OPTIONS.includes(Number(parsed.trendWindow))) {
-    state.trendWindow = Number(parsed.trendWindow);
+  if (TREND_WINDOW_OPTIONS.includes(Number(p.trendWindow))) {
+    state.trendWindow = Number(p.trendWindow);
   }
 
-  if (typeof parsed.categoryId === "string" && categories.some((category) => category.id === parsed.categoryId)) {
-    state.categoryId = parsed.categoryId;
+  if (typeof p.categoryId === "string" && categories.some((category) => category.id === p.categoryId)) {
+    state.categoryId = p.categoryId;
   }
 
-  if (Array.isArray(parsed.categories)) {
-    parsed.categories.forEach((storedCategory) => {
+  if (Array.isArray(p.categories)) {
+    p.categories.forEach((storedCategory) => {
       if (!storedCategory || typeof storedCategory !== "object") return;
-      const target = categories.find((category) => category.id === storedCategory.id);
-      if (!target || !Array.isArray(storedCategory.films)) return;
+      const sc = storedCategory as Record<string, unknown>;
+      const target = categories.find((category) => category.id === sc.id);
+      if (!target || !Array.isArray(sc.films)) return;
 
-      const films = storedCategory.films.map(parseFilmRecord).filter(Boolean);
+      const films = (sc.films as unknown[]).map(parseFilmRecord).filter((f): f is Film => f !== null);
       if (films.length > 0) target.films = films;
     });
   }
 
-  if (parsed.trendHistory && typeof parsed.trendHistory === "object") {
-    const snapshots = Array.isArray(parsed.trendHistory.snapshots) ? parsed.trendHistory.snapshots : [];
+  if (p.trendHistory && typeof p.trendHistory === "object") {
+    const snapshots = Array.isArray(p.trendHistory.snapshots) ? p.trendHistory.snapshots : [];
     trendHistory.snapshots = snapshots
-      .map((snapshot) => {
+      .map((rawSnapshot) => {
+        const snapshot = rawSnapshot as Record<string, unknown>;
         if (!snapshot || typeof snapshot !== "object") return null;
         if (typeof snapshot.categoryId !== "string") return null;
         const capturedAt = String(snapshot.capturedAt || "");
         const entries = Array.isArray(snapshot.entries)
-          ? snapshot.entries
-              .map((entry) => {
+          ? (snapshot.entries as unknown[])
+              .map((rawEntry) => {
+                const entry = rawEntry as Record<string, unknown>;
                 if (!entry || typeof entry !== "object") return null;
                 if (typeof entry.key !== "string") return null;
                 return {
@@ -1827,7 +1894,7 @@ function applyStatePayload(parsed) {
                   winner: clamp(Number(entry.winner || 0), 0, 100)
                 };
               })
-              .filter(Boolean)
+              .filter((e): e is TrendEntry => e !== null)
           : [];
         if (!entries.length) return null;
         return {
@@ -1837,11 +1904,11 @@ function applyStatePayload(parsed) {
           entries
         };
       })
-      .filter(Boolean)
+      .filter((s): s is TrendSnapshot => s !== null)
       .slice(-TREND_HISTORY_LIMIT);
     trendHistory.lastSignatureByCategory =
-      parsed.trendHistory.lastSignatureByCategory && typeof parsed.trendHistory.lastSignatureByCategory === "object"
-        ? { ...parsed.trendHistory.lastSignatureByCategory }
+      p.trendHistory.lastSignatureByCategory && typeof p.trendHistory.lastSignatureByCategory === "object"
+        ? { ...p.trendHistory.lastSignatureByCategory }
         : {};
   }
 }
@@ -1884,7 +1951,9 @@ async function loadProfiles() {
     }
     setBackendOfflineMode(false);
     const doc = await response.json();
-    const ids = Array.isArray(doc.profiles) ? doc.profiles.map((entry) => entry.id).filter(Boolean) : [];
+    const ids: string[] = Array.isArray(doc.profiles)
+      ? (doc.profiles as Array<{ id?: unknown }>).map((entry) => String(entry.id || "")).filter(Boolean)
+      : [];
     if (!ids.length) ids.push("default");
     profileOptions = [...new Set(ids)];
     if (typeof doc.activeProfileId === "string" && profileOptions.includes(doc.activeProfileId)) {
@@ -1956,7 +2025,7 @@ function loadState() {
 
 function bindProfileControls() {
   profileSelect.addEventListener("change", async (event) => {
-    state.profileId = event.target.value;
+    state.profileId = (event.target as HTMLSelectElement).value;
     loadState();
     await loadStateFromApi();
     if (compareMode) {
@@ -2055,7 +2124,7 @@ function bindTrendControls() {
   if (!trendWindowSelect) return;
   trendWindowSelect.value = String(state.trendWindow);
   trendWindowSelect.addEventListener("change", (event) => {
-    const value = Number(event.target.value || 30);
+    const value = Number((event.target as HTMLSelectElement).value || 30);
     state.trendWindow = TREND_WINDOW_OPTIONS.includes(value) ? value : 30;
     saveState();
     render();
@@ -2069,8 +2138,8 @@ function bindPrintControls() {
   });
 }
 
-async function fetchComparePayload(profileId) {
-  if (comparePayloadCache.has(profileId)) return comparePayloadCache.get(profileId);
+async function fetchComparePayload(profileId: string): Promise<StatePayload | null> {
+  if (comparePayloadCache.has(profileId)) return comparePayloadCache.get(profileId) ?? null;
   try {
     const res = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
     if (!res.ok) {
@@ -2088,19 +2157,19 @@ async function fetchComparePayload(profileId) {
   }
 }
 
-function buildCompareProjectionsFrom(category, payload) {
+function buildCompareProjectionsFrom(category: Category, payload: StatePayload | null | undefined): Projection[] | null {
   if (!payload) return null;
   const payloadCategory = Array.isArray(payload.categories)
     ? payload.categories.find((c) => c.id === category.id)
     : null;
   const films = payloadCategory?.films
-    ? payloadCategory.films.map(parseFilmRecord).filter(Boolean)
+    ? (payloadCategory.films as unknown[]).map(parseFilmRecord).filter((f): f is Film => f !== null)
     : null;
   if (!films || films.length === 0) return null;
-  return buildProjections(category, { films, weights: payload.weights ?? state.weights });
+  return buildProjections(category, { films, weights: payload.weights as NormalizedWeights ?? state.weights });
 }
 
-function setNormalTableHeaders(category) {
+function setNormalTableHeaders(category: Category) {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   if (thNomination) thNomination.hidden = false;
   if (thWinner) thWinner.textContent = "Winner %";
@@ -2108,7 +2177,7 @@ function setNormalTableHeaders(category) {
   if (thDelta) thDelta.hidden = true;
 }
 
-function setCompareTableHeaders(category) {
+function setCompareTableHeaders(category: Category) {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   if (thNomination) thNomination.hidden = true;
   if (thWinner) { thWinner.textContent = state.profileId; thWinner.title = `Winner % for profile "${state.profileId}"`; }
@@ -2127,7 +2196,7 @@ function updateCompareProfileSelect() {
     option.selected = id === compareProfileId;
     compareProfileSelect.appendChild(option);
   });
-  if (!others.includes(compareProfileId)) compareProfileId = others[0] ?? null;
+  if (!compareProfileId || !others.includes(compareProfileId)) compareProfileId = others[0] ?? null;
 }
 
 async function fetchAndRenderCompare() {
@@ -2138,7 +2207,7 @@ async function fetchAndRenderCompare() {
   render();
 }
 
-function renderCompareResults(category, primaryProjections) {
+function renderCompareResults(category: Category, primaryProjections: Projection[]) {
   setCompareTableHeaders(category);
   resultsBody.innerHTML = "";
 
@@ -2155,7 +2224,7 @@ function renderCompareResults(category, primaryProjections) {
     return;
   }
 
-  const comparePayload = comparePayloadCache.get(compareProfileId) ?? null;
+  const comparePayload = compareProfileId ? (comparePayloadCache.get(compareProfileId) ?? null) : null;
   const compareProjections = buildCompareProjectionsFrom(category, comparePayload);
   const compareMap = new Map();
   if (compareProjections) {
@@ -2237,8 +2306,9 @@ function bindCompareControls() {
   });
 
   compareProfileSelect?.addEventListener("change", async (event) => {
-    comparePayloadCache.delete(event.target.value);
-    compareProfileId = event.target.value;
+    const sel = (event.target as HTMLSelectElement).value;
+    comparePayloadCache.delete(sel);
+    compareProfileId = sel;
     await fetchAndRenderCompare();
   });
 }
@@ -2297,7 +2367,7 @@ function renderSummaryBar() {
   });
 
   // Scroll the active card into view within the bar
-  const activeCard = categorySummaryBar.querySelector(".summary-card.active");
+  const activeCard = categorySummaryBar.querySelector<HTMLElement>(".summary-card.active");
   if (activeCard) {
     const bar = categorySummaryBar;
     bar.scrollLeft = activeCard.offsetLeft - bar.clientWidth / 2 + activeCard.offsetWidth / 2;

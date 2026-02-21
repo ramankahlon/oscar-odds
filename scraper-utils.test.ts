@@ -28,7 +28,7 @@ describe("extractLetterboxd", () => {
 
 describe("recencyMultiplier", () => {
   const nowMs = Date.now();
-  const daysAgo = (d) => Math.floor((nowMs - d * 24 * 60 * 60 * 1000) / 1000);
+  const daysAgo = (d: number) => Math.floor((nowMs - d * 24 * 60 * 60 * 1000) / 1000);
 
   it("returns 2.0 for posts within 3 days", () => {
     expect(recencyMultiplier(daysAgo(1), nowMs)).toBe(2.0);
@@ -108,19 +108,19 @@ describe("extractTheGamer + buildAggregate", () => {
 
     const aggregate = buildAggregate(
       [
-        { title: "The Odyssey", score: 0.9 },
-        { title: "Dune: Part Three", score: 0.8 }
+        { title: "The Odyssey", rank: 1, score: 0.9 },
+        { title: "Dune: Part Three", rank: 2, score: 0.8 }
       ],
       [
-        { title: "The Odyssey", count: 4 },
-        { title: "Michael", count: 3 }
+        { title: "The Odyssey", count: 4, weightedScore: 4 },
+        { title: "Michael", count: 3, weightedScore: 3 }
       ],
       tg
     );
 
     const odyssey = aggregate.find((item) => item.title.toLowerCase().includes("odyssey"));
     expect(odyssey).toBeTruthy();
-    expect(odyssey.combinedScore).toBeGreaterThan(0);
+    expect(odyssey!.combinedScore).toBeGreaterThan(0);
   });
 });
 

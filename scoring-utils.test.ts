@@ -45,6 +45,7 @@ describe("scoreFilm", () => {
       "director",
       {
         title: "Steven Spielberg",
+        studio: "",
         precursor: 78,
         history: 90,
         buzz: 72,

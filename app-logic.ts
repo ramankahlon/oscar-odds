@@ -1,6 +1,16 @@
 import { clamp, rebalanceFieldTotal } from "./forecast-utils.js";
+import type {
+  AggregateSignal,
+  ApplySourceSignalsParams,
+  ApplySourceSignalsResult,
+  CalcNomOddsParams,
+  CalcWinOddsParams,
+  Film,
+  RebalanceCategoryOptions,
+  SourceSnapshot
+} from "./types.js";
 
-export function normalizeSignalKey(value) {
+export function normalizeSignalKey(value: unknown): string {
   return String(value || "")
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
@@ -17,7 +27,7 @@ export function calculateNominationOdds({
   uplift = 1,
   min = 0.6,
   max = 99
-}) {
+}: CalcNomOddsParams): number {
   const total = Math.max(Number(nominationTotal) || 0, 1);
   const raw = Number(nominationRaw) || 0;
   const scale = Number(nomineeScale) || 1;
@@ -32,7 +42,7 @@ export function calculateWinnerOdds({
   uplift = 1,
   min = 0.4,
   max = 92
-}) {
+}: CalcWinOddsParams): number {
   const total = Math.max(Number(winnerTotal) || 0, 1);
   const raw = Number(winnerRaw) || 0;
   const nom = Number(nomination) || 0;
@@ -41,7 +51,10 @@ export function calculateWinnerOdds({
   return clamp(blended * uplift, min, max);
 }
 
-export function rebalanceCategory(entries, options = {}) {
+export function rebalanceCategory<T extends { nomination: number; winner: number }>(
+  entries: T[],
+  options: RebalanceCategoryOptions = {}
+): T[] {
   if (!Array.isArray(entries) || entries.length === 0) return entries;
   const {
     winnerToNominationCap = 0.5,
@@ -49,24 +62,29 @@ export function rebalanceCategory(entries, options = {}) {
     winnerBand = { minTotal: 30, maxTotal: 45, targetTotal: 38, minValue: 0.4, maxValue: 24 }
   } = options;
 
-  rebalanceFieldTotal(entries, "nomination", nominationBand);
-  rebalanceFieldTotal(entries, "winner", winnerBand);
+  rebalanceFieldTotal(entries as any[], "nomination", nominationBand);
+  rebalanceFieldTotal(entries as any[], "winner", winnerBand);
   entries.forEach((entry) => {
     entry.winner = Math.min(Number(entry.winner) || 0, (Number(entry.nomination) || 0) * winnerToNominationCap);
   });
   return entries;
 }
 
-export function applySourceSignals({ categories, snapshot, lastAppliedSnapshotId }) {
-  if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.aggregate)) {
+export function applySourceSignals({
+  categories,
+  snapshot,
+  lastAppliedSnapshotId
+}: ApplySourceSignalsParams): ApplySourceSignalsResult {
+  if (!snapshot || typeof snapshot !== "object" || !Array.isArray((snapshot as SourceSnapshot).aggregate)) {
     return { changed: false, updatedCount: 0, appliedSnapshotId: lastAppliedSnapshotId || null };
   }
-  if (!snapshot.generatedAt || snapshot.generatedAt === lastAppliedSnapshotId) {
+  const snap = snapshot as SourceSnapshot;
+  if (!snap.generatedAt || snap.generatedAt === lastAppliedSnapshotId) {
     return { changed: false, updatedCount: 0, appliedSnapshotId: lastAppliedSnapshotId || null };
   }
 
-  const aggregateMap = new Map();
-  snapshot.aggregate.forEach((entry) => {
+  const aggregateMap = new Map<string, AggregateSignal>();
+  snap.aggregate.forEach((entry) => {
     if (!entry || typeof entry !== "object") return;
     const key = normalizeSignalKey(entry.title);
     if (!key) return;
@@ -78,7 +96,7 @@ export function applySourceSignals({ categories, snapshot, lastAppliedSnapshotId
 
   let updatedCount = 0;
   categories.forEach((category) => {
-    category.films.forEach((film) => {
+    category.films.forEach((film: Film) => {
       const match =
         aggregateMap.get(normalizeSignalKey(film.title)) ||
         aggregateMap.get(normalizeSignalKey(film.studio));
@@ -107,5 +125,5 @@ export function applySourceSignals({ categories, snapshot, lastAppliedSnapshotId
   if (updatedCount === 0) {
     return { changed: false, updatedCount: 0, appliedSnapshotId: lastAppliedSnapshotId || null };
   }
-  return { changed: true, updatedCount, appliedSnapshotId: snapshot.generatedAt };
+  return { changed: true, updatedCount, appliedSnapshotId: snap.generatedAt };
 }

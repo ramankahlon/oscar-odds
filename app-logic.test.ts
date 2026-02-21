@@ -6,6 +6,7 @@ import {
   normalizeSignalKey,
   rebalanceCategory
 } from "./app-logic.js";
+import type { Film, Strength } from "./types.js";
 
 describe("calculateNominationOdds", () => {
   it("increases with stronger raw score", () => {
@@ -74,23 +75,23 @@ describe("rebalanceCategory", () => {
   });
 
   it("handles empty entries", () => {
-    const entries = [];
+    const entries: Array<{ nomination: number; winner: number }> = [];
     expect(rebalanceCategory(entries)).toEqual([]);
   });
 });
 
 describe("applySourceSignals", () => {
-  const makeCategories = () => [
+  const makeCategories = (): Array<{ id: string; films: Film[] }> => [
     {
       id: "picture",
       films: [
-        { title: "The Odyssey", studio: "Universal", precursor: 80, history: 80, buzz: 80, strength: "Medium" },
-        { title: "The Dish", studio: "Universal", precursor: 50, history: 50, buzz: 50, strength: "Low" }
+        { title: "The Odyssey", studio: "Universal", precursor: 80, history: 80, buzz: 80, strength: "Medium" as Strength },
+        { title: "The Dish", studio: "Universal", precursor: 50, history: 50, buzz: 50, strength: "Low" as Strength }
       ]
     },
     {
       id: "director",
-      films: [{ title: "Steven Spielberg", studio: "The Dish", precursor: 70, history: 70, buzz: 70, strength: "Medium" }]
+      films: [{ title: "Steven Spielberg", studio: "The Dish", precursor: 70, history: 70, buzz: 70, strength: "Medium" as Strength }]
     }
   ];
 

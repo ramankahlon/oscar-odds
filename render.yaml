@@ -3,7 +3,7 @@ services:
     name: oscar-odds
     runtime: node
     plan: free
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run build:client
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true

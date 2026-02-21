@@ -1,5 +1,40 @@
 import * as cheerio from "cheerio";
 
+interface CanonicalResult {
+  title: string;
+  confidence: number;
+  method: string;
+}
+
+interface ScoreItem {
+  title: string;
+  rank: number;
+  score: number;
+}
+
+interface RedditPost {
+  title: string;
+  score: number;
+  comments: number;
+  createdUtc: number;
+  permalink: string;
+}
+
+interface Mention {
+  title: string;
+  count: number;
+  weightedScore: number;
+}
+
+interface AggregateItem {
+  title: string;
+  letterboxdScore: number;
+  thegamerScore: number;
+  redditCount: number;
+  redditScore: number;
+  combinedScore: number;
+}
+
 const BANNED_EXACT_PHRASES = new Set([
   "best picture",
   "best actor",
@@ -31,7 +66,7 @@ const BANNED_PATTERN_MATCHERS = [
   /\b(best|academy)\s+(picture|actor|actress|director|supporting)\b/i
 ];
 
-const KNOWN_ENTITY_ALIASES = new Map([
+const KNOWN_ENTITY_ALIASES = new Map<string, string>([
   ["odyssey", "The Odyssey"],
   ["the odyssey", "The Odyssey"],
   ["christopher nolan s the odyssey", "The Odyssey"],
@@ -57,7 +92,7 @@ const KNOWN_ENTITY_ALIASES = new Map([
 
 const KNOWN_ENTITIES = [...new Set(KNOWN_ENTITY_ALIASES.values())];
 
-export function normalizeTitle(value) {
+export function normalizeTitle(value: unknown): string {
   return String(value || "")
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
@@ -67,15 +102,15 @@ export function normalizeTitle(value) {
     .trim();
 }
 
-function aliasLookupKey(value) {
+function aliasLookupKey(value: string): string {
   return normalizeTitle(value).replace(/'/g, "");
 }
 
-function tokenSet(value) {
+function tokenSet(value: string): Set<string> {
   return new Set(normalizeTitle(value).split(/\s+/).filter(Boolean));
 }
 
-function jaccardSimilarity(aValue, bValue) {
+function jaccardSimilarity(aValue: string, bValue: string): number {
   const a = tokenSet(aValue);
   const b = tokenSet(bValue);
   if (!a.size || !b.size) return 0;
@@ -88,7 +123,7 @@ function jaccardSimilarity(aValue, bValue) {
   return union === 0 ? 0 : intersection / union;
 }
 
-export function titleCaseWords(text) {
+export function titleCaseWords(text: string): string {
   return text
     .split(/\s+/)
     .filter(Boolean)
@@ -96,8 +131,8 @@ export function titleCaseWords(text) {
     .join(" ");
 }
 
-export function dedupeByNormalized(items, keySelector) {
-  const map = new Map();
+export function dedupeByNormalized<T>(items: T[], keySelector: (item: T) => string): T[] {
+  const map = new Map<string, T>();
   items.forEach((item) => {
     const key = normalizeTitle(keySelector(item));
     if (!key || map.has(key)) return;
@@ -106,7 +141,7 @@ export function dedupeByNormalized(items, keySelector) {
   return [...map.values()];
 }
 
-export function isValidEntityCandidate(rawValue) {
+export function isValidEntityCandidate(rawValue: unknown): boolean {
   const text = String(rawValue || "").trim();
   if (!text) return false;
   if (text.length < 3 || text.length > 80) return false;
@@ -131,7 +166,7 @@ export function isValidEntityCandidate(rawValue) {
   return true;
 }
 
-export function canonicalizeEntity(rawValue, options = {}) {
+export function canonicalizeEntity(rawValue: string, options: { knownEntities?: string[] } = {}): CanonicalResult {
   const normalized = normalizeTitle(rawValue);
   if (!normalized || !isValidEntityCandidate(rawValue)) {
     return { title: "", confidence: 0, method: "rejected" };
@@ -144,7 +179,7 @@ export function canonicalizeEntity(rawValue, options = {}) {
   }
 
   const knownEntities = Array.isArray(options.knownEntities) && options.knownEntities.length ? options.knownEntities : KNOWN_ENTITIES;
-  let best = { title: titleCaseWords(rawValue), confidence: 0, method: "raw" };
+  let best: CanonicalResult = { title: titleCaseWords(rawValue), confidence: 0, method: "raw" };
 
   knownEntities.forEach((entity) => {
     const similarity = jaccardSimilarity(normalized, entity);
@@ -157,9 +192,9 @@ export function canonicalizeEntity(rawValue, options = {}) {
   return { title: titleCaseWords(rawValue), confidence: 0.4, method: "raw" };
 }
 
-export function extractLetterboxd(html) {
+export function extractLetterboxd(html: string): ScoreItem[] {
   const $ = cheerio.load(html);
-  const candidates = [];
+  const candidates: string[] = [];
 
   $("li.poster-container img[alt]").each((_, el) => {
     const title = ($(el).attr("alt") || "").trim();
@@ -183,8 +218,8 @@ export function extractLetterboxd(html) {
   }));
 }
 
-export function extractTitleLikePhrases(text) {
-  const matches = [];
+export function extractTitleLikePhrases(text: string): string[] {
+  const matches: string[] = [];
   const quoted = text.match(/"([^"]{2,80})"/g) || [];
   quoted.forEach((part) => {
     matches.push(part.replaceAll('"', "").trim());
@@ -203,9 +238,9 @@ export function extractTitleLikePhrases(text) {
     .slice(0, 60);
 }
 
-export function extractTheGamer(html) {
+export function extractTheGamer(html: string): ScoreItem[] {
   const $ = cheerio.load(html);
-  const lines = [];
+  const lines: string[] = [];
 
   $("main li, article li, main h2, main h3, article h2, article h3, article p").each((_, el) => {
     const text = $(el).text().replace(/\s+/g, " ").trim();
@@ -213,7 +248,7 @@ export function extractTheGamer(html) {
     lines.push(text);
   });
 
-  const titleCounts = new Map();
+  const titleCounts = new Map<string, { title: string; score: number }>();
   lines.forEach((line, index) => {
     const weight = Math.max(1, 6 - Math.floor(index / 10));
     extractTitleLikePhrases(line).forEach((title) => {
@@ -233,7 +268,7 @@ export function extractTheGamer(html) {
     .map((item, index) => ({ title: item.title, rank: index + 1, score: item.score }));
 }
 
-export function recencyMultiplier(createdUtc, nowMs = Date.now()) {
+export function recencyMultiplier(createdUtc: number | null | undefined, nowMs = Date.now()): number {
   if (!createdUtc || !Number.isFinite(createdUtc)) return 1;
   const ageDays = (nowMs - createdUtc * 1000) / (1000 * 60 * 60 * 24);
   if (ageDays <= 3) return 2.0;
@@ -242,21 +277,22 @@ export function recencyMultiplier(createdUtc, nowMs = Date.now()) {
   return 0.25;
 }
 
-export function extractReddit(data, nowMs = Date.now()) {
-  const children = data?.data?.children || [];
-  const posts = children
+export function extractReddit(data: unknown, nowMs = Date.now()): { posts: RedditPost[]; mentions: Mention[] } {
+  const dataObj = data as { data?: { children?: Array<{ data?: Record<string, unknown> }> } };
+  const children = dataObj?.data?.children || [];
+  const posts: RedditPost[] = children
     .map((child) => child?.data)
     .filter(Boolean)
     .map((post) => ({
-      title: String(post.title || "").trim(),
-      score: Number(post.score || 0),
-      comments: Number(post.num_comments || 0),
-      createdUtc: Number(post.created_utc || 0),
-      permalink: post.permalink ? `https://reddit.com${post.permalink}` : ""
+      title: String(post!.title || "").trim(),
+      score: Number(post!.score || 0),
+      comments: Number(post!.num_comments || 0),
+      createdUtc: Number(post!.created_utc || 0),
+      permalink: post!.permalink ? `https://reddit.com${post!.permalink}` : ""
     }))
     .filter((post) => post.title.length > 0);
 
-  const mentionMap = new Map();
+  const mentionMap = new Map<string, Mention>();
   posts.forEach((post) => {
     extractTitleLikePhrases(post.title).forEach((title) => {
       const canonical = canonicalizeEntity(title);
@@ -278,8 +314,12 @@ export function extractReddit(data, nowMs = Date.now()) {
   return { posts: posts.slice(0, 50), mentions };
 }
 
-export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
-  const aggregate = new Map();
+export function buildAggregate(
+  letterboxdItems: ScoreItem[],
+  redditMentions: Mention[],
+  thegamerItems: ScoreItem[]
+): AggregateItem[] {
+  const aggregate = new Map<string, AggregateItem>();
 
   letterboxdItems.forEach((item) => {
     const canonical = canonicalizeEntity(item.title);
@@ -291,7 +331,8 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
       letterboxdScore: item.score,
       thegamerScore: 0,
       redditCount: 0,
-      redditScore: 0
+      redditScore: 0,
+      combinedScore: 0
     });
   });
 
@@ -306,7 +347,8 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
         letterboxdScore: 0,
         thegamerScore: 0,
         redditCount: 0,
-        redditScore: 0
+        redditScore: 0,
+        combinedScore: 0
       };
     current.thegamerScore = Math.max(current.thegamerScore, Math.max(0, (30 - index) / 30));
     aggregate.set(key, current);
@@ -324,7 +366,8 @@ export function buildAggregate(letterboxdItems, redditMentions, thegamerItems) {
         letterboxdScore: 0,
         thegamerScore: 0,
         redditCount: 0,
-        redditScore: 0
+        redditScore: 0,
+        combinedScore: 0
       };
     current.redditCount = item.count;
     current.redditScore = item.count / maxReddit;

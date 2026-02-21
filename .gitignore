@@ -4,3 +4,5 @@ data/forecast.db
 data/forecast-store.json
 data/source-signals.json
 data/scrape-observability.json
+# Generated client bundle (built from app.ts via esbuild)
+app.js

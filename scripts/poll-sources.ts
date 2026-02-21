@@ -22,7 +22,47 @@ const REDDIT_USER_AGENT = "web:oscar-odds-bot:1.0.0 (scraper for open Oscar fore
 const RETRY_COUNT = 2;
 const RETRY_BACKOFF_MS = 750;
 
-function parseArgs() {
+interface SourceMetrics {
+  attempts: number;
+  successes: number;
+  failures: number;
+  successRate: number;
+  consecutiveFailures: number;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastDurationMs: number | null;
+  averageDurationMs: number | null;
+  lastError: string | null;
+}
+
+interface RecentRun {
+  at: string;
+  status: string | null;
+  durationMs: number;
+  sources: Record<string, { ok: boolean; attempts: number; durationMs: number; error: string | null }>;
+}
+
+interface Observability {
+  updatedAt: string | null;
+  runsTotal: number;
+  runsFailed: number;
+  runSuccessRate: number;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunDurationMs: number | null;
+  sources: Record<string, SourceMetrics>;
+  recentRuns: RecentRun[];
+}
+
+interface RetryResult<T> {
+  ok: boolean;
+  value: T | null;
+  attempts: number;
+  error: string | null;
+}
+
+function parseArgs(): { once: boolean; intervalMinutes: number } {
   const args = process.argv.slice(2);
   const once = args.includes("--once");
   const intervalFlagIndex = args.indexOf("--interval-minutes");
@@ -34,7 +74,7 @@ function parseArgs() {
 }
 
 
-async function fetchText(url) {
+async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
@@ -51,7 +91,7 @@ async function fetchText(url) {
   return response.text();
 }
 
-async function fetchRedditJson(url) {
+async function fetchRedditJson(url: string): Promise<unknown> {
   const response = await fetch(url, {
     headers: {
       "user-agent": REDDIT_USER_AGENT,
@@ -68,13 +108,13 @@ async function fetchRedditJson(url) {
   return response.json();
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
-function defaultSourceMetrics() {
+function defaultSourceMetrics(): SourceMetrics {
   return {
     attempts: 0,
     successes: 0,
@@ -90,7 +130,7 @@ function defaultSourceMetrics() {
   };
 }
 
-function defaultObservability() {
+function defaultObservability(): Observability {
   return {
     updatedAt: null,
     runsTotal: 0,
@@ -108,10 +148,10 @@ function defaultObservability() {
   };
 }
 
-async function readObservability() {
+async function readObservability(): Promise<Observability> {
   try {
     const raw = await fs.readFile(OBSERVABILITY_PATH, "utf8");
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Partial<Observability>;
     if (!parsed || typeof parsed !== "object") return defaultObservability();
     return {
       ...defaultObservability(),
@@ -128,14 +168,14 @@ async function readObservability() {
   }
 }
 
-async function writeObservability(observability) {
+async function writeObservability(observability: Observability): Promise<void> {
   await fs.writeFile(OBSERVABILITY_PATH, `${JSON.stringify(observability, null, 2)}\n`, "utf8");
 }
 
-async function withRetry(task, options = {}) {
-  const retries = Number.isFinite(options.retries) ? options.retries : RETRY_COUNT;
-  const backoffMs = Number.isFinite(options.backoffMs) ? options.backoffMs : RETRY_BACKOFF_MS;
-  let lastError = null;
+async function withRetry<T>(task: () => Promise<T>, options: { retries?: number; backoffMs?: number } = {}): Promise<RetryResult<T>> {
+  const retries = Number.isFinite(options.retries) ? (options.retries as number) : RETRY_COUNT;
+  const backoffMs = Number.isFinite(options.backoffMs) ? (options.backoffMs as number) : RETRY_BACKOFF_MS;
+  let lastError: unknown = null;
   for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
     try {
       const value = await task();
@@ -152,11 +192,17 @@ async function withRetry(task, options = {}) {
     ok: false,
     value: null,
     attempts: retries + 1,
-    error: String(lastError?.message || lastError)
+    error: String((lastError as Error)?.message || lastError)
   };
 }
 
-function updateSourceMetrics(observability, sourceId, attemptAt, durationMs, retryResult) {
+function updateSourceMetrics(
+  observability: Observability,
+  sourceId: string,
+  attemptAt: string,
+  durationMs: number,
+  retryResult: RetryResult<unknown>
+): void {
   const metrics = observability.sources[sourceId] || defaultSourceMetrics();
   metrics.attempts += 1;
   metrics.lastAttemptAt = attemptAt;
@@ -182,7 +228,7 @@ function updateSourceMetrics(observability, sourceId, attemptAt, durationMs, ret
   observability.sources[sourceId] = metrics;
 }
 
-function freshnessMinutes(fromIso, toIso) {
+function freshnessMinutes(fromIso: string | null, toIso: string | null): number | null {
   if (!fromIso || !toIso) return null;
   const fromMs = Date.parse(fromIso);
   const toMs = Date.parse(toIso);
@@ -191,16 +237,16 @@ function freshnessMinutes(fromIso, toIso) {
 }
 
 
-async function writeSnapshot(snapshot) {
+async function writeSnapshot(snapshot: unknown): Promise<void> {
   await fs.writeFile(OUTPUT_PATH, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
 }
 
-async function runOnce() {
+async function runOnce(): Promise<void> {
   const runStartedAt = new Date();
   const generatedAt = new Date().toISOString();
   const observability = await readObservability();
 
-  const sourceTasks = {
+  const sourceTasks: Record<string, () => Promise<unknown>> = {
     letterboxd: async () => extractLetterboxd(await fetchText(SOURCE_URLS.letterboxd)),
     reddit: async () => extractReddit(await fetchRedditJson(SOURCE_URLS.reddit)),
     thegamer: async () => extractTheGamer(await fetchText(SOURCE_URLS.thegamer))
@@ -221,9 +267,9 @@ async function runOnce() {
   const redditRun = sourceRuns.find((item) => item.sourceId === "reddit");
   const thegamerRun = sourceRuns.find((item) => item.sourceId === "thegamer");
 
-  const letterboxdItems = letterboxdRun?.ok ? letterboxdRun.value : [];
-  const redditExtracted = redditRun?.ok ? redditRun.value : { posts: [], mentions: [] };
-  const thegamerItems = thegamerRun?.ok ? thegamerRun.value : [];
+  const letterboxdItems = letterboxdRun?.ok ? (letterboxdRun.value as ReturnType<typeof extractLetterboxd>) : [];
+  const redditExtracted = redditRun?.ok ? (redditRun.value as ReturnType<typeof extractReddit>) : { posts: [], mentions: [] };
+  const thegamerItems = thegamerRun?.ok ? (thegamerRun.value as ReturnType<typeof extractTheGamer>) : [];
 
   const runFailed = sourceRuns.some((item) => !item.ok);
   const runDurationMs = Date.now() - runStartedAt.getTime();
@@ -310,29 +356,29 @@ async function runOnce() {
       attempts: snapshot.sources.letterboxd.attempts,
       successRate: observability.sources.letterboxd.successRate,
       freshnessMinutes: snapshot.sources.letterboxd.freshnessMinutes,
-      items: snapshot.sources.letterboxd.items.length
+      items: letterboxdItems.length
     },
     reddit: {
       ok: snapshot.sources.reddit.ok,
       attempts: snapshot.sources.reddit.attempts,
       successRate: observability.sources.reddit.successRate,
       freshnessMinutes: snapshot.sources.reddit.freshnessMinutes,
-      posts: snapshot.sources.reddit.posts.length,
-      mentions: snapshot.sources.reddit.mentions.length
+      posts: redditExtracted.posts.length,
+      mentions: redditExtracted.mentions.length
     },
     thegamer: {
       ok: snapshot.sources.thegamer.ok,
       attempts: snapshot.sources.thegamer.attempts,
       successRate: observability.sources.thegamer.successRate,
       freshnessMinutes: snapshot.sources.thegamer.freshnessMinutes,
-      items: snapshot.sources.thegamer.items.length
+      items: thegamerItems.length
     },
     aggregate: snapshot.aggregate.length
   };
   console.log(JSON.stringify(summary));
 }
 
-async function main() {
+async function main(): Promise<void> {
   const { once, intervalMinutes } = parseArgs();
   await runOnce();
 
@@ -343,7 +389,7 @@ async function main() {
     try {
       await runOnce();
     } catch (error) {
-      console.error(`[poll-sources] ${new Date().toISOString()} ${error?.message || error}`);
+      console.error(`[poll-sources] ${new Date().toISOString()} ${(error as Error)?.message || error}`);
     }
   }, intervalMs);
 }

@@ -25,14 +25,8 @@ jobs:
       - name: ESLint
         run: npm run lint
 
-      - name: Syntax check (node --check)
-        run: |
-          node --check app.js
-          node --check server.mjs
-          node --check scraper-utils.js
-          node --check forecast-utils.js
-          node --check scoring-utils.js
-          node --check scripts/poll-sources.mjs
+      - name: TypeScript type check
+        run: npm run typecheck
 
   # ── Tests across Node LTS versions ───────────────────────────────────────
   test:
@@ -101,6 +95,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build client bundle
+        run: npm run build:client
 
       - name: Start server and probe API
         run: npm run smoke

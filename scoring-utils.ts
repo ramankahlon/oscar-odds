@@ -1,12 +1,17 @@
 import { clamp } from "./forecast-utils.js";
+import type { Strength, NormalizedWeights, ScoreResult, ExperienceConfig, Film } from "./types.js";
 
-export function strengthBoost(strength) {
+export function strengthBoost(strength: Strength): number {
   if (strength === "High") return 1.06;
   if (strength === "Medium") return 1.0;
   return 0.94;
 }
 
-export function winnerExperienceBoost(categoryId, contenderName, config) {
+export function winnerExperienceBoost(
+  categoryId: string,
+  contenderName: string,
+  config?: ExperienceConfig
+): number {
   const { priorCategoryWins = {}, recentWinnerPenalty = {}, overdueNarrativeBoost = {} } = config || {};
 
   const isPersonCategory =
@@ -33,7 +38,12 @@ export function winnerExperienceBoost(categoryId, contenderName, config) {
   return clamp(boost, 0.55, 1.15);
 }
 
-export function scoreFilm(categoryId, film, normalizedWeights, config) {
+export function scoreFilm(
+  categoryId: string,
+  film: Film,
+  normalizedWeights: NormalizedWeights,
+  config?: ExperienceConfig
+): ScoreResult {
   const precursorContribution = film.precursor * normalizedWeights.precursor;
   const historyContribution = film.history * normalizedWeights.history;
   const buzzContribution = film.buzz * normalizedWeights.buzz;
