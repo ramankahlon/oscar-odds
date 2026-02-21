@@ -1,7 +1,26 @@
-node_modules
-npm-debug.log*
+# ── Version control & CI ──────────────────────────────────────────────────────
 .git
 .github
-coverage
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules
+npm-debug.log*
+
+# ── Generated artefacts (rebuilt inside Docker) ───────────────────────────────
+# app.js is produced by `npm run build:client` inside the builder stage;
+# the local copy (if present) must not shadow it.
+app.js
+
+# ── Runtime data (managed via the ./data volume mount, not baked into image) ──
+data/
+
+# ── Tests & coverage ──────────────────────────────────────────────────────────
+e2e/
+coverage/
+playwright-report/
+test-results/
+
+# ── Dev tooling & local config ────────────────────────────────────────────────
+.claude/
 *.local
 .DS_Store

@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+
+    # Mount ./data so the SQLite database and scraper JSON files survive
+    # container restarts and image rebuilds.
+    volumes:
+      - ./data:/app/data
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Uncomment and fill in to enable TMDB poster resolution:
+      # TMDB_API_KEY: ""
+      # TMDB_API_READ_ACCESS_TOKEN: ""
+      # Uncomment to run the background source-polling process:
+      # ENABLE_SOURCE_POLLER: "true"
+      # SOURCE_POLL_INTERVAL_MINUTES: "30"
+      # Uncomment when terminating TLS upstream (e.g. nginx / Render):
+      # FORCE_HTTPS: "true"
+
+    # Restart the container if it exits unexpectedly (e.g. OOM), but not
+    # when stopped intentionally with `docker compose stop`.
+    restart: unless-stopped
