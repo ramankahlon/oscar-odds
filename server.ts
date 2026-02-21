@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawn, ChildProcess } from "node:child_process";
 import * as cheerio from "cheerio";
 import Database from "better-sqlite3";
+import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,47 @@ interface MetaRow {
 interface CountRow {
   n: number;
 }
+
+// ── Zod schemas ──────────────────────────────────────────────────────────────
+
+const profileIdSchema = z
+  .string()
+  .min(1, "Profile ID is required")
+  .max(100, "Profile ID too long")
+  .regex(/^[a-z0-9_-]+$/, "Profile ID must contain only lowercase letters, numbers, hyphens, or underscores");
+
+const forecastPayloadSchema = z.record(z.string(), z.unknown());
+
+const renameBodySchema = z.object({
+  newId: profileIdSchema,
+});
+
+const tmdbPosterQuerySchema = z.object({
+  title: z.string().min(1, "title is required").max(200, "title too long"),
+});
+
+function parseBody<T>(schema: z.ZodSchema<T>, body: unknown, res: Response): T | null {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    const message = result.error.issues
+      .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
+      .join("; ");
+    res.status(400).json({ error: message });
+    return null;
+  }
+  return result.data;
+}
+
+function parseParam(schema: z.ZodSchema<string>, value: unknown, res: Response): string | null {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    res.status(400).json({ error: result.error.issues[0]?.message ?? "Invalid parameter." });
+    return null;
+  }
+  return result.data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const forecastWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -555,7 +597,8 @@ app.get("/api/profiles", (_: Request, res: Response) => {
 });
 
 app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
-  const profileId = req.params.profileId || DEFAULT_PROFILE_ID;
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
   const row = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(profileId) as ProfileRow | undefined;
   const profile = row
     ? { updatedAt: row.updated_at || null, payload: row.payload != null ? JSON.parse(row.payload) as unknown : null }
@@ -564,13 +607,10 @@ app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
 });
 
 app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Response) => {
-  const payload = req.body as Record<string, unknown> | null;
-  if (!payload || typeof payload !== "object") {
-    res.status(400).json({ error: "Invalid forecast payload." });
-    return;
-  }
-
-  const profileId = req.params.profileId || DEFAULT_PROFILE_ID;
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+  const payload = parseBody(forecastPayloadSchema, req.body, res);
+  if (payload === null) return;
   const updatedAt = new Date().toISOString();
   db.prepare("INSERT OR REPLACE INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(
     profileId,
@@ -582,7 +622,8 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Re
 });
 
 app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
-  const profileId = req.params.profileId;
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
   if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
     res.status(404).json({ error: "Profile not found." });
     return;
@@ -608,13 +649,11 @@ app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
 });
 
 app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
-  const oldId = req.params.profileId;
-  const newId = String((req.body as Record<string, unknown>)?.newId || "").trim();
-
-  if (!newId) {
-    res.status(400).json({ error: "Missing newId." });
-    return;
-  }
+  const oldId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (oldId === null) return;
+  const body = parseBody(renameBodySchema, req.body, res);
+  if (body === null) return;
+  const newId = body.newId;
 
   const existing = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(oldId) as ProfileRow | undefined;
   if (!existing) {
@@ -649,11 +688,9 @@ app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
 });
 
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
-  const title = String(req.query.title || "").trim();
-  if (!title) {
-    res.status(400).json({ error: "Missing title query param." });
-    return;
-  }
+  const query = parseBody(tmdbPosterQuerySchema, req.query, res);
+  if (query === null) return;
+  const title = query.title;
 
   try {
     const result = await fetchTmdbPoster(title);
