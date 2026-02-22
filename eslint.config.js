@@ -30,6 +30,14 @@ export default tseslint.config(
     }
   },
 
+  // Service worker — runs in a restricted worker scope, not the browser window
+  {
+    files: ["sw.js"],
+    languageOptions: {
+      globals: { ...globals.serviceworker }
+    }
+  },
+
   // Vitest test files — expose describe/it/expect globals
   {
     files: ["**/*.test.ts"],
@@ -48,6 +56,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
       // Allow explicit any where intentional
       "@typescript-eslint/no-explicit-any": "off",
+      // Allow namespace inside declare global {} blocks (needed for Express type augmentation)
+      "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }],
       // console is intentional in a server/CLI project
       "no-console": "off"
     }
