@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable background — teal fills the full canvas so the safe zone works on any shape -->
+  <rect width="512" height="512" fill="#0f6f5f"/>
+
+  <!-- Film strip slots — top and bottom decorative bars -->
+  <rect x="0"   y="30"  width="512" height="70" fill="#0a5548"/>
+  <rect x="0"   y="412" width="512" height="70" fill="#0a5548"/>
+
+  <!-- Perforations top -->
+  <rect x="28"  y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="100" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="172" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="244" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="316" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="388" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="460" y="44" width="44" height="42" rx="6" fill="#0f6f5f"/>
+
+  <!-- Perforations bottom -->
+  <rect x="28"  y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="100" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="172" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="244" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="316" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="388" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+  <rect x="460" y="426" width="44" height="42" rx="6" fill="#0f6f5f"/>
+
+  <!-- Five-pointed star centred at 256,248 -->
+  <polygon
+    points="256,148 283,228 368,228 300,278 324,358 256,308 188,358 212,278 144,228 229,228"
+    fill="#f5c842"
+    stroke="#c9981a"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+</svg>

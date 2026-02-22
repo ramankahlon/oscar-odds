@@ -169,7 +169,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https:;"
+    "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; worker-src 'self'; connect-src 'self' https:;"
   );
   if (req.secure || isForwardedHttps) {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
@@ -183,6 +183,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
 
   next();
+});
+
+// Service workers must never be served with a long-lived cache: the browser
+// needs to be able to check for updates on every navigation. Serve sw.js
+// before the static middleware so this header takes precedence.
+app.get("/sw.js", (_: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path.join(__dirname, "sw.js"));
 });
 
 app.use(

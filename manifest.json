@@ -1,0 +1,17 @@
+{
+  "name": "Oscar Odds 2027",
+  "short_name": "Oscar Odds",
+  "description": "Live nomination and winner odds for the 99th Academy Awards, estimated from precursor momentum and historical-style weighting.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5efe3",
+  "theme_color": "#0f6f5f",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -2592,3 +2592,9 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {
+    // SW registration is best-effort; failure doesn't affect core functionality.
+  });
+}
