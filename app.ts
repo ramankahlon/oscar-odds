@@ -851,7 +851,6 @@ function startExternalSignalPolling() {
 }
 
 const SCRAPE_OBSERVABILITY_URL = "/api/scrape-observability";
-const SCRAPE_HEALTH_POLL_MS = 10 * 60 * 1000;
 const SCRAPE_STALE_THRESHOLD_MINUTES = 120;
 
 async function checkScraperHealth() {
@@ -887,9 +886,16 @@ async function checkScraperHealth() {
   }
 }
 
-function startScraperHealthPolling() {
-  checkScraperHealth();
-  setInterval(checkScraperHealth, SCRAPE_HEALTH_POLL_MS);
+function startScraperEventStream() {
+  checkScraperHealth(); // initial badge state on load
+
+  const evtSource = new EventSource("/api/scraper-events");
+
+  evtSource.onmessage = () => {
+    checkScraperHealth();
+  };
+
+  // EventSource reconnects automatically on error; no explicit handling needed
 }
 
 function parseFilmRecord(record: unknown): Film | null {
@@ -2581,7 +2587,7 @@ async function bootstrap() {
   applyShareParam();
   render();
   startExternalSignalPolling();
-  startScraperHealthPolling();
+  startScraperEventStream();
 }
 
 bootstrap();

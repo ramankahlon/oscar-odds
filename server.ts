@@ -48,7 +48,20 @@ const requestMetrics = {
 };
 let pollerProcess: ChildProcess | null = null;
 const pollerState = { running: false, startedAt: null as string | null, lastExitCode: null as number | null, restarts: 0 };
+const scraperEventClients = new Set<Response>();
 let db: Database.Database;
+
+function broadcastScraperEvent(): void {
+  if (scraperEventClients.size === 0) return;
+  const payload = `data: ${JSON.stringify({ type: "scraper-run", ts: new Date().toISOString() })}\n\n`;
+  for (const client of scraperEventClients) {
+    try {
+      client.write(payload);
+    } catch {
+      scraperEventClients.delete(client);
+    }
+  }
+}
 
 interface ProfileRow {
   id: string;
@@ -187,10 +200,27 @@ function startSourcePoller(): void {
   pollerProcess = spawn(process.execPath, args, {
     cwd: __dirname,
     env: process.env,
-    stdio: "inherit"
+    stdio: ["inherit", "pipe", "inherit"]
   });
   pollerState.running = true;
   pollerState.startedAt = new Date().toISOString();
+
+  // Intercept stdout to detect completed scraper runs (the script emits one JSON
+  // summary line per run that contains a `runStatus` field). Forward all bytes to
+  // the server's own stdout so logs remain visible.
+  pollerProcess.stdout?.on("data", (chunk: Buffer) => {
+    process.stdout.write(chunk);
+    for (const line of chunk.toString().split("\n")) {
+      try {
+        const parsed = JSON.parse(line.trim()) as Record<string, unknown>;
+        if (typeof parsed.runStatus === "string") {
+          broadcastScraperEvent();
+        }
+      } catch {
+        // Non-JSON log line — ignore
+      }
+    }
+  });
 
   pollerProcess.on("exit", (code) => {
     pollerState.running = false;
@@ -825,6 +855,30 @@ app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
 });
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
+
+app.get("/api/scraper-events", (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  res.write(": connected\n\n");
+  scraperEventClients.add(res);
+
+  // Send a keepalive comment every 30 s to prevent proxy/load-balancer timeouts
+  const keepalive = setInterval(() => {
+    try {
+      res.write(": keepalive\n\n");
+    } catch {
+      clearInterval(keepalive);
+    }
+  }, 30_000);
+
+  req.on("close", () => {
+    clearInterval(keepalive);
+    scraperEventClients.delete(res);
+  });
+});
 
 app.get("*", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "index.html"));
