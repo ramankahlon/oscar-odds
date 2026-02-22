@@ -1,3 +1,4 @@
+import LZString from "lz-string";
 import { clamp } from "./forecast-utils.js";
 import {
   applySourceSignals,
@@ -52,6 +53,14 @@ interface StatePayload {
     lastSignatureByCategory?: Record<string, string>;
   };
   categories?: Array<{ id: string; films: unknown[] }>;
+}
+
+interface CompactShare {
+  v: 1;
+  c: string;                                                           // categoryId
+  w: [number, number, number];                                         // [precursor, history, buzz] weights
+  t: number;                                                           // trendWindow
+  s: Record<string, Record<string, [number, number, number]>>;        // catId → title → [p,h,b]
 }
 
 interface SearchProjection extends Projection {
@@ -2461,6 +2470,94 @@ function render() {
   if (capturedTrend) saveState();
 }
 
+function serializeSharePayload(): CompactShare {
+  const sliders: Record<string, Record<string, [number, number, number]>> = {};
+  for (const cat of categories) {
+    sliders[cat.id] = {};
+    for (const film of cat.films) {
+      sliders[cat.id][film.title] = [film.precursor, film.history, film.buzz];
+    }
+  }
+  return {
+    v: 1,
+    c: state.categoryId,
+    w: [state.weights.precursor, state.weights.history, state.weights.buzz],
+    t: state.trendWindow,
+    s: sliders
+  };
+}
+
+function buildShareUrl(): string {
+  const json = JSON.stringify(serializeSharePayload());
+  const compressed = LZString.compressToEncodedURIComponent(json);
+  return `${window.location.origin}${window.location.pathname}?share=${compressed}`;
+}
+
+function applyShareParam(): void {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const compressed = params.get("share");
+    if (!compressed) return;
+
+    const json = LZString.decompressFromEncodedURIComponent(compressed);
+    if (!json) return;
+
+    const p = JSON.parse(json) as Record<string, unknown>;
+
+    if (typeof p.c === "string" && categories.some((cat) => cat.id === p.c))
+      state.categoryId = p.c;
+
+    if (Array.isArray(p.w) && p.w.length === 3) {
+      state.weights.precursor = clamp(Number(p.w[0]), 1, 95);
+      state.weights.history   = clamp(Number(p.w[1]), 1, 95);
+      state.weights.buzz      = clamp(Number(p.w[2]), 1, 95);
+    }
+
+    if (TREND_WINDOW_OPTIONS.includes(Number(p.t))) state.trendWindow = Number(p.t);
+
+    if (p.s && typeof p.s === "object") {
+      const sliders = p.s as Record<string, Record<string, unknown>>;
+      for (const cat of categories) {
+        const catSliders = sliders[cat.id];
+        if (!catSliders || typeof catSliders !== "object") continue;
+        for (const film of cat.films) {
+          const vals = catSliders[film.title];
+          if (Array.isArray(vals) && vals.length === 3) {
+            film.precursor = clamp(Number(vals[0]), 0, 100);
+            film.history   = clamp(Number(vals[1]), 0, 100);
+            film.buzz      = clamp(Number(vals[2]), 0, 100);
+          }
+        }
+      }
+    }
+
+    window.history.replaceState(null, "", window.location.pathname);
+    setAppNotice("Shared forecast loaded.", "");
+    setTimeout(() => setAppNotice(""), 4000);
+  } catch {
+    // Malformed or corrupted share param — silently ignore
+  }
+}
+
+function bindShareControls(): void {
+  const shareButton = document.getElementById("shareButton") as HTMLButtonElement | null;
+  if (!shareButton) return;
+
+  shareButton.addEventListener("click", async () => {
+    try {
+      const url = buildShareUrl();
+      await navigator.clipboard.writeText(url);
+      setAppNotice("Share link copied to clipboard.", "");
+      setTimeout(() => setAppNotice(""), 3000);
+    } catch {
+      // Clipboard blocked — surface URL in address bar for manual copy
+      window.history.replaceState(null, "", buildShareUrl());
+      setAppNotice("Clipboard unavailable — copy the URL from the address bar.", "");
+      setTimeout(() => setAppNotice(""), 6000);
+    }
+  });
+}
+
 async function bootstrap() {
   setPanelsBusy(true);
   setAppNotice("Loading forecast workspace...", "loading");
@@ -2473,6 +2570,7 @@ async function bootstrap() {
   bindPrintControls();
   bindSearchControls();
   bindCompareControls();
+  bindShareControls();
   isBootstrapping = false;
   setPanelsBusy(false);
   if (backendOfflineMode) {
@@ -2480,6 +2578,7 @@ async function bootstrap() {
   } else {
     setAppNotice("");
   }
+  applyShareParam();
   render();
   startExternalSignalPolling();
   startScraperHealthPolling();
