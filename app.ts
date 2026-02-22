@@ -2456,8 +2456,9 @@ function renderLeaderboard(): void {
   if (!leaderboardBody) return;
   leaderboardBody.innerHTML = "";
 
-  // Accumulate expected nominations and wins per film across all categories.
-  // For person categories (actor, director, …) the film title lives in rawStudio;
+  // nominations = number of categories the film appears in (as a top contender).
+  // wins        = number of those categories where the film is ranked #1.
+  // For person categories (actor, director, …) the film name lives in rawStudio;
   // for all other categories it lives in rawTitle.
   const filmMap = new Map<string, { nominations: number; wins: number }>();
 
@@ -2465,22 +2466,21 @@ function renderLeaderboard(): void {
     const projections = buildProjections(category);
     const topProjections = projections.slice(0, getDisplayLimit(category));
 
-    for (const entry of topProjections) {
+    topProjections.forEach((entry, rank) => {
       const filmKey = PERSON_CATEGORY_IDS.has(category.id) ? entry.rawStudio : entry.rawTitle;
-      if (!filmKey) continue;
+      if (!filmKey) return;
       const existing = filmMap.get(filmKey) ?? { nominations: 0, wins: 0 };
       filmMap.set(filmKey, {
-        nominations: existing.nominations + entry.nomination / 100,
-        wins: existing.wins + entry.winner / 100
+        nominations: existing.nominations + 1,
+        wins: existing.wins + (rank === 0 ? 1 : 0)
       });
-    }
+    });
   }
 
-  // Primary sort: expected nominations desc. Tiebreaker: expected wins desc.
-  const rows = Array.from(filmMap.entries()).sort(([, a], [, b]) => {
-    const diff = b.nominations - a.nominations;
-    return Math.abs(diff) > 0.0001 ? diff : b.wins - a.wins;
-  });
+  // Sort by nomination count desc; break ties by win count desc. Show top 10 only.
+  const rows = Array.from(filmMap.entries())
+    .sort(([, a], [, b]) => b.nominations - a.nominations || b.wins - a.wins)
+    .slice(0, 10);
 
   if (rows.length === 0) {
     const row = leaderboardBody.insertRow();
@@ -2493,14 +2493,15 @@ function renderLeaderboard(): void {
     row.className = "leaderboard-row";
     row.setAttribute(
       "aria-label",
-      `${index + 1}. ${title}: ${nominations.toFixed(1)} expected nominations, ${wins.toFixed(1)} expected wins`
+      `${index + 1}. ${title}: ${nominations} nomination${nominations !== 1 ? "s" : ""}, ${wins} win${wins !== 1 ? "s" : ""}`
     );
     row.innerHTML = `
       <td class="leaderboard-film">
-        <span class="leaderboard-rank">${index + 1}</span>${title}
+        <span class="leaderboard-rank">${index + 1}</span>
+        <span class="leaderboard-title">${title}</span>
       </td>
-      <td class="leaderboard-num">${nominations.toFixed(1)}</td>
-      <td class="leaderboard-num">${wins.toFixed(1)}</td>
+      <td class="leaderboard-num">${nominations}</td>
+      <td class="leaderboard-num">${wins}</td>
     `;
   });
 }

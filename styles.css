@@ -1240,7 +1240,6 @@ a:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-weight: 600;
 }
 
 .leaderboard-rank {
@@ -1252,10 +1251,17 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.leaderboard-title {
+  font-weight: 600;
+}
+
 /* Gold / silver / bronze tinting for the top three */
-.leaderboard-row:nth-child(1) .leaderboard-rank { color: #b8860b; }
-.leaderboard-row:nth-child(2) .leaderboard-rank { color: #7a8a8a; }
-.leaderboard-row:nth-child(3) .leaderboard-rank { color: #8b5e3c; }
+.leaderboard-row:nth-child(1) .leaderboard-rank,
+.leaderboard-row:nth-child(1) .leaderboard-title { color: #b8860b; }
+.leaderboard-row:nth-child(2) .leaderboard-rank,
+.leaderboard-row:nth-child(2) .leaderboard-title { color: #7a8a8a; }
+.leaderboard-row:nth-child(3) .leaderboard-rank,
+.leaderboard-row:nth-child(3) .leaderboard-title { color: #8b5e3c; }
 
 .leaderboard-num {
   font-variant-numeric: tabular-nums;
