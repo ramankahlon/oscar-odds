@@ -520,6 +520,7 @@ const trendHistory: TrendHistory = {
 
 const categoryTabs = document.querySelector<HTMLElement>("#categoryTabs")!;
 const categorySummaryBar = document.querySelector<HTMLElement>("#categorySummaryBar");
+const leaderboardBody = document.querySelector<HTMLTableSectionElement>("#leaderboardBody");
 const categoryTitle = document.querySelector<HTMLElement>("#categoryTitle")!;
 const candidateCards = document.querySelector<HTMLElement>("#candidateCards")!;
 const resultsBody = document.querySelector<HTMLTableSectionElement>("#resultsBody")!;
@@ -2449,6 +2450,61 @@ function renderSummaryBar() {
   }
 }
 
+const PERSON_CATEGORY_IDS = new Set(["director", "actor", "actress", "supporting-actor", "supporting-actress"]);
+
+function renderLeaderboard(): void {
+  if (!leaderboardBody) return;
+  leaderboardBody.innerHTML = "";
+
+  // Accumulate expected nominations and wins per film across all categories.
+  // For person categories (actor, director, …) the film title lives in rawStudio;
+  // for all other categories it lives in rawTitle.
+  const filmMap = new Map<string, { nominations: number; wins: number }>();
+
+  for (const category of categories) {
+    const projections = buildProjections(category);
+    const topProjections = projections.slice(0, getDisplayLimit(category));
+
+    for (const entry of topProjections) {
+      const filmKey = PERSON_CATEGORY_IDS.has(category.id) ? entry.rawStudio : entry.rawTitle;
+      if (!filmKey) continue;
+      const existing = filmMap.get(filmKey) ?? { nominations: 0, wins: 0 };
+      filmMap.set(filmKey, {
+        nominations: existing.nominations + entry.nomination / 100,
+        wins: existing.wins + entry.winner / 100
+      });
+    }
+  }
+
+  // Primary sort: expected nominations desc. Tiebreaker: expected wins desc.
+  const rows = Array.from(filmMap.entries()).sort(([, a], [, b]) => {
+    const diff = b.nominations - a.nominations;
+    return Math.abs(diff) > 0.0001 ? diff : b.wins - a.wins;
+  });
+
+  if (rows.length === 0) {
+    const row = leaderboardBody.insertRow();
+    row.innerHTML = `<td class="results-empty" colspan="3">No contenders loaded yet.</td>`;
+    return;
+  }
+
+  rows.forEach(([title, { nominations, wins }], index) => {
+    const row = leaderboardBody.insertRow();
+    row.className = "leaderboard-row";
+    row.setAttribute(
+      "aria-label",
+      `${index + 1}. ${title}: ${nominations.toFixed(1)} expected nominations, ${wins.toFixed(1)} expected wins`
+    );
+    row.innerHTML = `
+      <td class="leaderboard-film">
+        <span class="leaderboard-rank">${index + 1}</span>${title}
+      </td>
+      <td class="leaderboard-num">${nominations.toFixed(1)}</td>
+      <td class="leaderboard-num">${wins.toFixed(1)}</td>
+    `;
+  });
+}
+
 function render() {
   setPanelsBusy(isBootstrapping);
   const activeCategory = getActiveCategory();
@@ -2460,6 +2516,7 @@ function render() {
   if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
   renderTabs();
   renderSummaryBar();
+  renderLeaderboard();
   renderCandidates(activeCategory, projections);
   if (compareMode && compareProfileId && !searchQuery) {
     if (comparePayloadCache.has(compareProfileId)) {
