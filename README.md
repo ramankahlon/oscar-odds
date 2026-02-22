@@ -1,5 +1,7 @@
 # Oscar Odds 2027
 
+![Accessibility: WCAG 2.1 AA](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-brightgreen)
+
 A full-stack Oscar forecasting app that combines curated contender data, external source scraping, probabilistic scoring, and explainable UI analytics for the 2027 race.
 
 ## Architecture Diagram
@@ -148,6 +150,26 @@ Observability metrics are written to `data/scrape-observability.json` with:
 
 The app polls this file every 5 minutes and applies the latest aggregate signal deltas to contender inputs.
 Trend analytics snapshots are captured in the forecast payload and persisted per profile.
+
+## Accessibility
+
+The UI targets **WCAG 2.1 Level AA**. An Axe-based audit was performed and all Critical and
+Serious violations were resolved:
+
+| Finding | Severity | Resolution |
+|---|---|---|
+| `role="button"` on `<tr>` (invalid ARIA ownership) | Critical | Removed; table uses `role="grid"` + `aria-selected` on rows |
+| `compareProfileSelect` unlabelled | Serious | Added `aria-label="Comparison profile"` |
+| `aria-live` on large panel containers causes excessive AT announcements | Serious | Removed from outer panels; retained only on inline status elements (`appStateNotice`, `csvStatus`, `oddsLastUpdated`) |
+| No skip-navigation link | Serious | Added "Skip to main content" link |
+| Poster `<img>` alt text static across film changes | Serious | `alt` now set to `"<Film title> poster"` in `setPosterState()` |
+| Compare table headers used `title` attribute (unreliable for AT) | Moderate | Replaced with `aria-label` |
+| Search `outline: none` without `focus-visible` guard | Moderate | Scoped to `:focus`; explicit `:focus-visible` ring added |
+
+Keyboard interaction model:
+- **Tab** — moves through controls in DOM order
+- **Arrow Up / Down** — navigates contender rows within the results table
+- **Enter / Space** — activates a row or button
 
 ## What I Learned
 

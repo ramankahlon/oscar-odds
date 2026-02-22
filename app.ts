@@ -1284,11 +1284,13 @@ function hidePosterSkeleton(): void {
 }
 
 function setPosterState(posterUrl: string, movieUrl: string): void {
-  const src = normalizePosterRenderUrl(posterUrl) || buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
-  const href = movieUrl || getTmdbSearchUrl(movieDetailTitle.textContent || "");
+  const title = movieDetailTitle.textContent || "Selected Movie";
+  const src = normalizePosterRenderUrl(posterUrl) || buildPosterFallbackDataUrl(title);
+  const href = movieUrl || getTmdbSearchUrl(title);
   posterFallbackActive = !posterUrl;
   hidePosterSkeleton();
   movieDetailPoster.src = src;
+  movieDetailPoster.alt = `${title} poster`;
   movieDetailPoster.classList.remove("hidden");
   movieDetailPosterLink.href = href;
   movieDetailPosterLink.classList.remove("hidden");
@@ -1324,8 +1326,10 @@ async function loadPosterForTitle(title: string): Promise<void> {
 movieDetailPoster?.addEventListener("error", () => {
   if (posterFallbackActive) return;
   posterFallbackActive = true;
-  movieDetailPoster.src = buildPosterFallbackDataUrl(movieDetailTitle.textContent || "Selected Movie");
-  movieDetailPosterLink.href = getTmdbSearchUrl(movieDetailTitle.textContent || "");
+  const title = movieDetailTitle.textContent || "Selected Movie";
+  movieDetailPoster.src = buildPosterFallbackDataUrl(title);
+  movieDetailPoster.alt = `${title} poster`;
+  movieDetailPosterLink.href = getTmdbSearchUrl(title);
 });
 
 function renderMovieDetails(category: Category, entry: Projection | null): void {
@@ -1497,7 +1501,6 @@ function renderSearchResults(query: string): void {
       const row = document.createElement("tr");
       row.className = "results-row";
       row.setAttribute("tabindex", "0");
-      row.setAttribute("role", "button");
       row.setAttribute(
         "aria-label",
         `${entry.title}, ${entry.categoryName}. Nomination ${entry.nomination.toFixed(1)}%. Winner ${entry.winner.toFixed(1)}%.`
@@ -1569,7 +1572,6 @@ function renderResults(category: Category, projections: Projection[]): void {
     const row = document.createElement("tr");
     row.className = `results-row${index === boundedIndex ? " active" : ""}`;
     row.setAttribute("tabindex", "0");
-    row.setAttribute("role", "button");
     row.setAttribute("aria-selected", index === boundedIndex ? "true" : "false");
     row.setAttribute("aria-label", `${entry.title}. Nomination ${entry.nomination.toFixed(1)} percent. Winner ${entry.winner.toFixed(1)} percent.`);
     row.addEventListener("click", () => {
@@ -2254,8 +2256,8 @@ function setNormalTableHeaders(category: Category) {
 function setCompareTableHeaders(category: Category) {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
   if (thNomination) thNomination.hidden = true;
-  if (thWinner) { thWinner.textContent = state.profileId; thWinner.title = `Winner % for profile "${state.profileId}"`; }
-  if (thCompareB) { thCompareB.textContent = compareProfileId; thCompareB.title = `Winner % for profile "${compareProfileId}"`; thCompareB.hidden = false; }
+  if (thWinner) { thWinner.textContent = state.profileId; thWinner.setAttribute("aria-label", `Winner % for profile "${state.profileId}"`); }
+  if (thCompareB) { thCompareB.textContent = compareProfileId; thCompareB.setAttribute("aria-label", `Winner % for profile "${compareProfileId}"`); thCompareB.hidden = false; }
   if (thDelta) thDelta.hidden = false;
 }
 
@@ -2326,7 +2328,6 @@ function renderCompareResults(category: Category, primaryProjections: Projection
     const row = document.createElement("tr");
     row.className = `results-row${index === boundedIndex ? " active" : ""}`;
     row.setAttribute("tabindex", "0");
-    row.setAttribute("role", "button");
     row.setAttribute("aria-selected", index === boundedIndex ? "true" : "false");
     row.setAttribute(
       "aria-label",

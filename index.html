@@ -13,7 +13,8 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <main class="app-shell" id="main-content">
       <header class="hero">
         <p class="eyebrow">Forecast Lab</p>
         <h1>Oscar Odds 2027</h1>
@@ -38,9 +39,9 @@
             <button id="printPdfButton" class="action-button action-button--print" type="button">Print / PDF</button>
             <button id="shareButton" class="action-button" type="button">Share</button>
           </div>
-          <div id="compareControls" class="compare-controls" hidden aria-label="Comparison profile">
+          <div id="compareControls" class="compare-controls" hidden>
             <span class="compare-controls-label">vs.</span>
-            <select id="compareProfileSelect"></select>
+            <select id="compareProfileSelect" aria-label="Comparison profile"></select>
           </div>
           <h2>Categories</h2>
           <div class="category-list" id="categoryTabs" aria-label="Oscar categories"></div>
@@ -52,7 +53,7 @@
       </section>
 
       <section class="workspace">
-        <article id="resultsPanel" class="panel results spotlight" aria-live="polite">
+        <article id="resultsPanel" class="panel results spotlight">
           <h2>Projected Odds</h2>
           <p id="oddsLastUpdated" class="odds-last-updated" aria-live="polite"></p>
           <div class="search-bar">
@@ -61,7 +62,7 @@
           </div>
           <div class="spotlight-layout">
             <div class="table-wrap">
-              <table>
+              <table role="grid">
                 <caption class="sr-only">Projected nomination and winner odds by contender</caption>
                 <thead>
                   <tr>
@@ -75,7 +76,7 @@
                 <tbody id="resultsBody"></tbody>
               </table>
             </div>
-            <aside class="movie-panel" aria-live="polite">
+            <aside class="movie-panel" aria-label="Selected film details">
               <div id="posterSkeleton" class="poster-skeleton" hidden aria-hidden="true"></div>
               <img id="movieDetailPoster" class="movie-poster" alt="Selected movie poster" />
               <a id="movieDetailPosterLink" class="movie-poster-link" href="#" target="_blank" rel="noreferrer noopener">Source: TMDB</a>
@@ -86,14 +87,14 @@
               <p class="movie-detail-description" id="movieDetailDescription"></p>
             </aside>
           </div>
-          <section class="explain-panel" id="explainPanel" aria-live="polite">
+          <section class="explain-panel" id="explainPanel">
             <h3 id="explainTitle">Why this %</h3>
             <p class="explain-meta" id="explainMeta"></p>
             <p class="explain-meta" id="explainDelta"></p>
             <div id="explainBreakdown"></div>
             <p class="explain-notes" id="explainNotes"></p>
           </section>
-          <section class="trend-panel" aria-live="polite">
+          <section class="trend-panel">
             <div class="trend-head">
               <h3 id="trendTitle">Trend Analytics</h3>
               <label class="trend-window-control" for="trendWindowSelect">
