@@ -177,6 +177,75 @@ test("keyboard navigation moves selection through rows", async ({ page }) => {
   await expect(secondRow).toHaveAttribute("aria-selected", "false");
 });
 
+test("app loads and renders a table", async ({ page }) => {
+  // Table headers are visible
+  await expect(page.locator("#thNomination")).toBeVisible();
+  await expect(page.locator("#thWinner")).toBeVisible();
+
+  // Table has the grid role for accessibility
+  await expect(page.locator("table[role='grid']")).toBeVisible();
+
+  // Results body contains at least one row
+  const rows = page.locator("#resultsBody tr.results-row");
+  await expect(rows.first()).toBeVisible();
+  const rowCount = await rows.count();
+  expect(rowCount).toBeGreaterThan(0);
+});
+
+test("share URL round-trip restores sliders", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+
+  // Change the first number input in the candidate panel to 42
+  const input = page.locator("#candidateCards input[type='number']").first();
+  await expect(input).toBeVisible();
+  await input.fill("42");
+  await input.dispatchEvent("input");
+  await page.waitForLoadState("networkidle");
+
+  // Click the Share button
+  await page.locator("#shareButton").click();
+  await page.waitForLoadState("networkidle");
+
+  // Get the share URL from the clipboard or (fallback) address bar
+  let shareUrl: string;
+  const currentUrl = page.url();
+  if (currentUrl.includes("?share=")) {
+    shareUrl = currentUrl;
+  } else {
+    shareUrl = await page.evaluate(() => navigator.clipboard.readText());
+  }
+  expect(shareUrl).toContain("?share=");
+
+  // Navigate to the share URL in a fresh page load
+  await page.goto(shareUrl);
+  await page.waitForLoadState("networkidle");
+
+  // App should display the "Shared forecast loaded." notice
+  await expect(page.locator("#appStateNotice")).toContainText("Shared forecast loaded.");
+
+  // The slider value should be restored to 42
+  const restoredInput = page.locator("#candidateCards input[type='number']").first();
+  await expect(restoredInput).toHaveValue("42");
+});
+
+test("leaderboard shows at least one row", async ({ page }) => {
+  const rows = page.locator("#leaderboardBody tr.leaderboard-row");
+  await expect(rows.first()).toBeVisible();
+
+  const rowCount = await rows.count();
+  expect(rowCount).toBeGreaterThan(0);
+
+  // Film title cell should be non-empty text
+  const firstTitle = rows.first().locator(".leaderboard-title");
+  const titleText = await firstTitle.textContent();
+  expect(titleText?.trim().length).toBeGreaterThan(0);
+
+  // Nominations column should be a positive integer
+  const firstNomCell = rows.first().locator("td.leaderboard-num").first();
+  const nomText = await firstNomCell.textContent();
+  expect(parseInt(nomText ?? "0", 10)).toBeGreaterThan(0);
+});
+
 test.describe("compare mode", () => {
   const compareProfileId = "e2e-compare";
 
