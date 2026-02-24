@@ -1,5 +1,6 @@
 # Oscar Odds 2027
 
+[![CI](https://github.com/ramankahlon/oscar-odds/actions/workflows/ci.yml/badge.svg)](https://github.com/ramankahlon/oscar-odds/actions/workflows/ci.yml)
 ![Accessibility: WCAG 2.1 AA](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-brightgreen)
 
 A full-stack Oscar forecasting app that combines curated contender data, external source scraping, probabilistic scoring, and explainable UI analytics for the 2027 race.
