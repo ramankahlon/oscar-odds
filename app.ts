@@ -570,6 +570,12 @@ const renameProfileButton = document.querySelector<HTMLButtonElement>("#renamePr
 const deleteProfileButton = document.querySelector<HTMLButtonElement>("#deleteProfileButton");
 const printPdfButton = document.querySelector<HTMLButtonElement>("#printPdfButton");
 const printMeta = document.querySelector<HTMLElement>("#printMeta");
+const backtestStatus         = document.querySelector<HTMLElement>("#backtestStatus");
+const backtestOverview       = document.querySelector<HTMLElement>("#backtestOverview");
+const backtestStatGrid       = document.querySelector<HTMLElement>("#backtestStatGrid");
+const backtestCategoryBody   = document.querySelector<HTMLTableSectionElement>("#backtestCategoryBody");
+const backtestYearBody       = document.querySelector<HTMLTableSectionElement>("#backtestYearBody");
+const backtestCategoryFilter = document.querySelector<HTMLSelectElement>("#backtestCategoryFilter");
 let profileOptions: string[] = ["default"];
 const explainSelectionByCategory: Record<string, number> = {};
 let activePosterRequestId = 0;
@@ -2623,6 +2629,168 @@ function bindShareControls(): void {
   });
 }
 
+// ── Backtest interfaces ───────────────────────────────────────────────────
+
+interface BacktestCategorySummary {
+  categoryId: string;
+  nominationAccuracyAvg: number;
+  winnerAccuracyPct: number;
+  nominationBrierAvg: number;
+  winnerBrierAvg: number;
+}
+
+interface BacktestYearRow {
+  year: number;
+  ceremony: number;
+  categoryId: string;
+  nominationAccuracy: number;
+  winnerCorrect: boolean;
+  nominationBrierScore: number;
+  winnerBrierScore: number;
+  topPredicted: string;
+  actualWinner: string;
+}
+
+interface BacktestOverall {
+  nominationAccuracyAvg: number;
+  winnerAccuracyPct: number;
+  nominationBrierAvg: number;
+  winnerBrierAvg: number;
+}
+
+interface BacktestApiResult {
+  computedAt: string;
+  yearsBacktested: number;
+  yearRange: { from: number; to: number };
+  overall: BacktestOverall;
+  byCategory: BacktestCategorySummary[];
+  byYear: BacktestYearRow[];
+}
+
+// ── Backtest rendering ────────────────────────────────────────────────────
+
+const BACKTEST_CATEGORY_LABELS: Record<string, string> = {
+  "picture": "Best Picture",
+  "director": "Best Director",
+  "actor": "Best Actor",
+  "actress": "Best Actress",
+  "supporting-actor": "Best Supporting Actor",
+  "supporting-actress": "Best Supporting Actress"
+};
+
+function renderBacktestStatGrid(overall: BacktestOverall): void {
+  if (!backtestStatGrid) return;
+  const stats = [
+    {
+      label: "Nom. Accuracy",
+      value: `${(overall.nominationAccuracyAvg * 100).toFixed(1)}%`,
+      sub: "avg across categories"
+    },
+    {
+      label: "Winner Accuracy",
+      value: `${overall.winnerAccuracyPct.toFixed(1)}%`,
+      sub: "top pick = actual winner"
+    },
+    {
+      label: "Nom. Brier Score",
+      value: overall.nominationBrierAvg.toFixed(3),
+      sub: "lower is better"
+    },
+    {
+      label: "Win. Brier Score",
+      value: overall.winnerBrierAvg.toFixed(3),
+      sub: "lower is better"
+    }
+  ];
+  backtestStatGrid.innerHTML = stats
+    .map(
+      (s) => `<div class="backtest-stat-card">
+        <span class="backtest-stat-label">${s.label}</span>
+        <span class="backtest-stat-value">${s.value}</span>
+        <span class="backtest-stat-sub">${s.sub}</span>
+      </div>`
+    )
+    .join("");
+}
+
+function renderBacktestCategoryTable(categories: BacktestCategorySummary[]): void {
+  if (!backtestCategoryBody) return;
+  backtestCategoryBody.innerHTML = categories
+    .map((cat) => {
+      const label = BACKTEST_CATEGORY_LABELS[cat.categoryId] ?? cat.categoryId;
+      return `<tr>
+        <td>${label}</td>
+        <td class="backtest-num">${(cat.nominationAccuracyAvg * 100).toFixed(1)}%</td>
+        <td class="backtest-num">${cat.winnerAccuracyPct.toFixed(1)}%</td>
+        <td class="backtest-num">${cat.nominationBrierAvg.toFixed(3)}</td>
+        <td class="backtest-num">${cat.winnerBrierAvg.toFixed(3)}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function renderBacktestYearTable(rows: BacktestYearRow[], filterCategoryId: string): void {
+  if (!backtestYearBody) return;
+  const filtered = filterCategoryId === "all"
+    ? rows
+    : rows.filter((r) => r.categoryId === filterCategoryId);
+  if (filtered.length === 0) {
+    backtestYearBody.innerHTML = `<tr><td class="results-empty" colspan="5">No data for selected category.</td></tr>`;
+    return;
+  }
+  backtestYearBody.innerHTML = filtered
+    .map((r) => {
+      const correctClass = r.winnerCorrect ? "backtest-correct" : "backtest-miss";
+      const correctLabel = r.winnerCorrect ? "✓" : "✗";
+      return `<tr>
+        <td>${r.year}</td>
+        <td>${r.topPredicted}</td>
+        <td>${r.actualWinner}</td>
+        <td class="backtest-num">${(r.nominationAccuracy * 100).toFixed(1)}%</td>
+        <td class="backtest-num ${correctClass}">${correctLabel}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function populateBacktestFilter(categories: BacktestCategorySummary[]): void {
+  if (!backtestCategoryFilter) return;
+  backtestCategoryFilter.innerHTML =
+    `<option value="all">All Categories</option>` +
+    categories
+      .map((cat) => {
+        const label = BACKTEST_CATEGORY_LABELS[cat.categoryId] ?? cat.categoryId;
+        return `<option value="${cat.categoryId}">${label}</option>`;
+      })
+      .join("");
+}
+
+async function loadBacktest(): Promise<void> {
+  if (backtestStatus) {
+    backtestStatus.textContent = "Loading accuracy data…";
+    backtestStatus.className = "app-notice loading";
+  }
+  try {
+    const res = await fetch("/api/backtest", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json() as BacktestApiResult;
+    if (backtestStatus) { backtestStatus.textContent = ""; backtestStatus.className = "app-notice"; }
+    if (backtestOverview) backtestOverview.hidden = false;
+    renderBacktestStatGrid(data.overall);
+    renderBacktestCategoryTable(data.byCategory);
+    populateBacktestFilter(data.byCategory);
+    renderBacktestYearTable(data.byYear, "all");
+    backtestCategoryFilter?.addEventListener("change", () => {
+      renderBacktestYearTable(data.byYear, backtestCategoryFilter.value);
+    });
+  } catch {
+    if (backtestStatus) {
+      backtestStatus.textContent = "Could not load backtesting data.";
+      backtestStatus.className = "app-notice error";
+    }
+  }
+}
+
 async function bootstrap() {
   setPanelsBusy(true);
   setAppNotice("Loading forecast workspace...", "loading");
@@ -2647,6 +2815,7 @@ async function bootstrap() {
   render();
   startExternalSignalPolling();
   startScraperEventStream();
+  void loadBacktest();
 }
 
 bootstrap();

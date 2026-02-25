@@ -11,6 +11,7 @@ import Database from "better-sqlite3";
 import { z } from "zod";
 import type { Logger } from "pino";
 import { logger } from "./logger.js";
+import { getBacktestResult } from "./backtest.js";
 import swaggerUi from "swagger-ui-express";
 import yaml from "js-yaml";
 
@@ -860,6 +861,10 @@ app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   } catch (error) {
     res.status(502).json({ error: String((error as Error)?.message || error) });
   }
+});
+
+app.get("/api/backtest", (_req: Request, res: Response) => {
+  res.json(getBacktestResult());
 });
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));

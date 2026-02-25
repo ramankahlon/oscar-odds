@@ -1268,3 +1268,21 @@ a:focus-visible {
   font-weight: 600;
   color: var(--accent);
 }
+
+/* ── Backtest panel ───────────────────────────────────────────────────────── */
+.backtest-stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 20px; }
+.backtest-stat-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.backtest-stat-label { display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+.backtest-stat-value { display: block; font-size: 1.7rem; font-weight: 700; color: var(--accent); font-family: "Literata", serif; }
+.backtest-stat-sub { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+.backtest-section-heading { margin: 20px 0 8px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.backtest-table-wrap { overflow-x: auto; margin-bottom: 14px; }
+.backtest-table { width: 100%; border-collapse: collapse; }
+.backtest-table th, .backtest-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 0.9rem; }
+.backtest-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.backtest-num { text-align: right; }
+.backtest-correct { color: var(--accent); font-weight: 700; }
+.backtest-miss { color: var(--warn); }
+.backtest-filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.88rem; }
+.backtest-filter-bar label { font-weight: 700; color: var(--muted); }
+.backtest-filter-bar select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; background: var(--surface-2); color: var(--ink); }

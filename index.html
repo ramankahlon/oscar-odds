@@ -154,6 +154,50 @@
         </div>
       </section>
 
+      <section class="panel backtest-panel" id="backtestPanel" aria-label="Model accuracy backtesting">
+        <h2>Model Accuracy (2000–2024)</h2>
+        <p class="panel-copy">Retrospective accuracy across 25 Oscar cycles (72nd–96th ceremonies).
+          Default weights: Precursor 58%, Historical 30%, Buzz 12%.</p>
+        <p id="backtestStatus" class="app-notice" role="status" aria-live="polite"></p>
+        <div id="backtestOverview" hidden>
+          <div class="backtest-stat-grid" id="backtestStatGrid"></div>
+
+          <h3 class="backtest-section-heading">By Category</h3>
+          <div class="backtest-table-wrap">
+            <table class="backtest-table">
+              <caption class="sr-only">Accuracy by Oscar category</caption>
+              <thead><tr>
+                <th scope="col">Category</th>
+                <th scope="col" class="backtest-num">Nom. Accuracy</th>
+                <th scope="col" class="backtest-num">Winner Accuracy</th>
+                <th scope="col" class="backtest-num">Nom. Brier</th>
+                <th scope="col" class="backtest-num">Win. Brier</th>
+              </tr></thead>
+              <tbody id="backtestCategoryBody"></tbody>
+            </table>
+          </div>
+
+          <h3 class="backtest-section-heading">Year-by-Year Results</h3>
+          <div class="backtest-filter-bar">
+            <label for="backtestCategoryFilter">Category</label>
+            <select id="backtestCategoryFilter" aria-label="Filter by category"></select>
+          </div>
+          <div class="backtest-table-wrap">
+            <table class="backtest-table">
+              <caption class="sr-only">Year-by-year winner prediction results</caption>
+              <thead><tr>
+                <th scope="col">Year</th>
+                <th scope="col">Top Pick</th>
+                <th scope="col">Actual Winner</th>
+                <th scope="col" class="backtest-num">Nom. Acc.</th>
+                <th scope="col" class="backtest-num">Correct?</th>
+              </tr></thead>
+              <tbody id="backtestYearBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="panel methodology">
         <h2>Methodology Snapshot</h2>
         <ul>
