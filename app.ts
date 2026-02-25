@@ -606,6 +606,80 @@ let backendOfflineMode = false;
 let lastOddsRecalculatedAt: string | null = null;
 let lastSourceSyncAt: string | null = null;
 
+// ── Client-side error reporting ──────────────────────────────────────────────
+
+interface ClientErrorPayload {
+  message: string;
+  source?: string;
+  lineno?: number;
+  colno?: number;
+  stack?: string;
+  context?: string;
+}
+
+const CLIENT_ERROR_QUEUE: ClientErrorPayload[] = [];
+let clientErrorFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Returns true for low-signal errors that are not worth reporting. */
+function isNoisyError(message: string, source?: string): boolean {
+  if (!message) return true;
+  // Errors from browser extensions have no actionable context for the app.
+  if (source && /^(chrome|moz|safari)-extension:\/\//i.test(source)) return true;
+  // Cross-origin script errors arrive with no detail (security restriction).
+  if (message === "Script error." || message === "Script error") return true;
+  return false;
+}
+
+/** Sends the current queue to /api/client-errors and clears it. */
+function flushClientErrors(): void {
+  if (CLIENT_ERROR_QUEUE.length === 0) return;
+  const batch = CLIENT_ERROR_QUEUE.splice(0);
+  // keepalive: true ensures the request survives page unload.
+  // Errors in the error reporter must be swallowed to prevent infinite recursion.
+  fetch("/api/client-errors", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(batch),
+    keepalive: true,
+  }).catch(() => { /* intentionally silent */ });
+}
+
+/** Queues an error and schedules a batched flush (max 10 per flush, 3-second window). */
+function reportClientError(payload: ClientErrorPayload): void {
+  if (isNoisyError(payload.message, payload.source)) return;
+  CLIENT_ERROR_QUEUE.push(payload);
+  if (CLIENT_ERROR_QUEUE.length >= 10) {
+    if (clientErrorFlushTimer !== null) { clearTimeout(clientErrorFlushTimer); clientErrorFlushTimer = null; }
+    flushClientErrors();
+  } else if (clientErrorFlushTimer === null) {
+    clientErrorFlushTimer = setTimeout(() => { clientErrorFlushTimer = null; flushClientErrors(); }, 3_000);
+  }
+}
+
+// Capture synchronous JS errors (TypeError, ReferenceError, etc.)
+window.onerror = (message, source, lineno, colno, error): boolean => {
+  reportClientError({
+    message: String(message),
+    source: typeof source === "string" ? source : undefined,
+    lineno: typeof lineno === "number" ? lineno : undefined,
+    colno:  typeof colno  === "number" ? colno  : undefined,
+    stack:  error?.stack,
+    context: window.location.pathname,
+  });
+  return false; // preserve browser's default console output
+};
+
+// Capture unhandled promise rejections (async/await, fetch chains, etc.)
+window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
+  const reason = event.reason as unknown;
+  const err = reason instanceof Error ? reason : null;
+  reportClientError({
+    message: err?.message ?? String(reason ?? "Unhandled promise rejection"),
+    stack:   err?.stack,
+    context: window.location.pathname,
+  });
+});
+
 function setBackendOfflineMode(isOffline: boolean): void {
   backendOfflineMode = Boolean(isOffline);
   if (backendOfflineMode) {
@@ -3089,7 +3163,14 @@ async function bootstrap() {
   void loadBacktest();
 }
 
-bootstrap();
+void bootstrap().catch((err: unknown) => {
+  const error = err instanceof Error ? err : new Error(String(err));
+  reportClientError({
+    message: error.message,
+    stack:   error.stack,
+    context: `bootstrap:${window.location.pathname}`,
+  });
+});
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {

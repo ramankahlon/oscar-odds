@@ -62,6 +62,27 @@ const pollerState = { running: false, startedAt: null as string | null, lastExit
 const scraperEventClients = new Set<Response>();
 let db: Database.Database;
 
+// ── Server-error ring buffer ─────────────────────────────────────────────────
+
+interface ServerErrorEntry {
+  occurredAt: string;
+  type: "uncaughtException" | "unhandledRejection" | "routeError";
+  message: string;
+  stack: string | null;
+  requestId?: string;
+  method?: string;
+  path?: string;
+}
+
+const SERVER_ERROR_RING_SIZE = 100;
+const serverErrorRing: ServerErrorEntry[] = [];
+
+function recordServerError(entry: ServerErrorEntry): void {
+  serverErrorRing.push(entry);
+  if (serverErrorRing.length > SERVER_ERROR_RING_SIZE) serverErrorRing.shift();
+  logger.error(entry, "server error");
+}
+
 function broadcastScraperEvent(): void {
   if (scraperEventClients.size === 0) return;
   const payload = `data: ${JSON.stringify({ type: "scraper-run", ts: new Date().toISOString() })}\n\n`;
@@ -120,6 +141,17 @@ const loginBodySchema = z.object({
   passphrase: z.string().min(1, "Passphrase is required"),
 });
 
+const clientErrorItemSchema = z.object({
+  message: z.string().max(2000),
+  source:  z.string().max(500).optional(),
+  lineno:  z.number().int().nonnegative().optional(),
+  colno:   z.number().int().nonnegative().optional(),
+  stack:   z.string().max(5000).optional(),
+  context: z.string().max(500).optional(),
+});
+
+const clientErrorBatchSchema = z.array(clientErrorItemSchema).min(1).max(20);
+
 const tmdbPosterQuerySchema = z.object({
   title: z.string().min(1, "title is required").max(200, "title too long"),
 });
@@ -162,6 +194,28 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many attempts. Try again later." }
 });
+
+const clientErrorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many error reports." }
+});
+
+/**
+ * Wraps an async route handler so that any rejected promise is forwarded to
+ * Express's error-handling middleware via `next(err)` rather than becoming an
+ * unhandled rejection.  Use for async handlers that don't have their own
+ * try/catch:
+ *
+ *   app.get("/path", asyncHandler(async (req, res) => { ... }));
+ */
+function asyncHandler(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => { fn(req, res, next).catch(next); };
+}
 
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
@@ -284,6 +338,9 @@ function initDb(): void {
 
   // Purge expired sessions on startup.
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(new Date().toISOString());
+  // Prune client errors older than 30 days.
+  db.prepare("DELETE FROM client_errors WHERE occurred_at < ?")
+    .run(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
   // One-time migration from forecast-store.json when the DB is empty.
   const isEmpty = (db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as CountRow).n === 0;
@@ -701,10 +758,10 @@ app.get("/api/metrics", (_: Request, res: Response) => {
   });
 });
 
-app.get("/api/scrape-observability", async (_: Request, res: Response) => {
+app.get("/api/scrape-observability", asyncHandler(async (_req: Request, res: Response) => {
   const doc = await readScrapeObservability();
   res.json(doc);
-});
+}));
 
 app.get("/api/profiles", (_: Request, res: Response) => {
   const profiles = db
@@ -1064,8 +1121,55 @@ app.get("/api/scraper-events", (req: Request, res: Response) => {
   });
 });
 
+app.post("/api/client-errors", clientErrorLimiter, (req: Request, res: Response) => {
+  const batch = parseBody(clientErrorBatchSchema, req.body, res);
+  if (batch === null) return;
+
+  const now = new Date().toISOString();
+  const ua  = req.get("user-agent") ?? null;
+  const insert = db.prepare(
+    "INSERT INTO client_errors (occurred_at, message, source, lineno, colno, stack, context, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  );
+  db.transaction(() => {
+    for (const e of batch) {
+      insert.run(now, e.message, e.source ?? null, e.lineno ?? null, e.colno ?? null, e.stack ?? null, e.context ?? null, ua);
+    }
+  })();
+
+  res.status(204).end();
+});
+
+app.get("/api/errors", (_req: Request, res: Response) => {
+  const clientErrors = db.prepare(
+    "SELECT id, occurred_at, message, source, lineno, colno, stack, context, user_agent FROM client_errors ORDER BY occurred_at DESC LIMIT 50"
+  ).all();
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    serverErrors: [...serverErrorRing].reverse(), // most-recent first
+    clientErrors,
+  });
+});
+
 app.get("*", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// ── Global Express error handler ─────────────────────────────────────────────
+// Must have exactly 4 parameters for Express to recognise it as an error handler.
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction): void => {
+  const error = err instanceof Error ? err : new Error(String(err));
+  recordServerError({
+    occurredAt: new Date().toISOString(),
+    type: "routeError",
+    message: error.message,
+    stack: error.stack ?? null,
+    requestId: res.getHeader("x-request-id") as string | undefined,
+    method: req.method,
+    path: req.path,
+  });
+  if (res.headersSent) return;
+  res.status(500).json({ error: "Internal server error." });
 });
 
 initDb();
@@ -1085,4 +1189,25 @@ function shutdown(signal: string): void {
 }
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGINT",  () => shutdown("SIGINT"));
+
+process.on("uncaughtException", (err: Error) => {
+  recordServerError({
+    occurredAt: new Date().toISOString(),
+    type: "uncaughtException",
+    message: err.message,
+    stack: err.stack ?? null,
+  });
+  shutdown("uncaughtException");
+});
+
+process.on("unhandledRejection", (reason: unknown) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason ?? "unknown rejection"));
+  recordServerError({
+    occurredAt: new Date().toISOString(),
+    type: "unhandledRejection",
+    message: err.message,
+    stack: err.stack ?? null,
+  });
+  // Logged to the ring buffer and pino; does not terminate the process.
+});
