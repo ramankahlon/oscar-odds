@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { Logger } from "pino";
 import { logger } from "./logger.js";
 import { getBacktestResult } from "./backtest.js";
+import { runMigrations } from "./migrate.js";
 import {
   hashPassphrase,
   verifyPassphrase,
@@ -276,44 +277,11 @@ function initDb(): void {
   db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS profiles (
-      id         TEXT PRIMARY KEY,
-      updated_at TEXT,
-      payload    TEXT
-    );
-    CREATE TABLE IF NOT EXISTS meta (
-      key   TEXT PRIMARY KEY,
-      value TEXT
-    );
-    CREATE TABLE IF NOT EXISTS snapshots (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      profile_id      TEXT    NOT NULL,
-      category_id     TEXT    NOT NULL,
-      contender_key   TEXT    NOT NULL,
-      contender_title TEXT    NOT NULL,
-      nom_pct         REAL    NOT NULL,
-      win_pct         REAL    NOT NULL,
-      snapped_at      TEXT    NOT NULL
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshots_unique
-      ON snapshots(profile_id, category_id, contender_key, snapped_at);
-    CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
-      ON snapshots(profile_id, category_id, snapped_at);
-    CREATE TABLE IF NOT EXISTS sessions (
-      token      TEXT PRIMARY KEY,
-      profile_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_sessions_profile_id ON sessions(profile_id);
-  `);
-
-  // Add passphrase_hash column to profiles if it doesn't exist yet (idempotent migration).
-  const cols = (db.prepare("PRAGMA table_info(profiles)").all() as Array<{ name: string }>).map((c) => c.name);
-  if (!cols.includes("passphrase_hash")) {
-    db.exec("ALTER TABLE profiles ADD COLUMN passphrase_hash TEXT");
+  const newMigrations = runMigrations(db);
+  if (newMigrations.length > 0) {
+    logger.info({ migrations: newMigrations }, "db migrations applied");
   }
+
   // Purge expired sessions on startup.
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(new Date().toISOString());
 
