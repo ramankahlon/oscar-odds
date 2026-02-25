@@ -41,6 +41,7 @@
             <button id="newProfileButton" class="action-button" type="button">New</button>
             <button id="renameProfileButton" class="action-button" type="button">Rename</button>
             <button id="deleteProfileButton" class="action-button action-button--danger" type="button">Delete</button>
+            <button id="profileLockButton" class="action-button" type="button">Lock</button>
             <button id="compareToggleButton" class="action-button action-button--compare" type="button" aria-pressed="false">Compare</button>
             <button id="printPdfButton" class="action-button action-button--print" type="button">Print / PDF</button>
             <button id="shareButton" class="action-button" type="button">Share</button>
@@ -209,6 +210,38 @@
         </ul>
       </section>
     </main>
+
+    <dialog id="authDialog" class="auth-dialog" aria-modal="true" aria-labelledby="authDialogTitle">
+      <!-- Passphrase entry form (modes: unlock / set / change) -->
+      <div id="authDialogForm">
+        <h3 id="authDialogTitle" class="auth-dialog-title">Unlock Profile</h3>
+        <p id="authDialogDesc" class="auth-dialog-desc"></p>
+        <div class="auth-dialog-fields">
+          <label for="authPassphraseInput" class="auth-dialog-label">Passphrase</label>
+          <input type="password" id="authPassphraseInput" class="auth-dialog-input" autocomplete="current-password" />
+          <label for="authPassphraseConfirm" id="authConfirmLabel" class="auth-dialog-label">Confirm passphrase</label>
+          <input type="password" id="authPassphraseConfirm" class="auth-dialog-input" autocomplete="new-password" />
+        </div>
+        <p id="authDialogError" class="auth-dialog-error" role="alert" aria-live="polite"></p>
+        <div class="auth-dialog-actions">
+          <button type="button" id="authDialogSubmit" class="action-button">Unlock</button>
+          <button type="button" id="authDialogCancel" class="action-button action-button--ghost">Cancel</button>
+        </div>
+      </div>
+      <!-- Security options panel (shown when already authenticated) -->
+      <div id="authSecurityOptions" hidden>
+        <h3 class="auth-dialog-title">Profile Security</h3>
+        <p class="auth-dialog-desc">This profile is passphrase-protected.</p>
+        <div class="auth-security-buttons">
+          <button type="button" id="authChangePassphraseBtn" class="action-button">Change Passphrase</button>
+          <button type="button" id="authRemovePassphraseBtn" class="action-button action-button--danger">Remove Passphrase</button>
+          <button type="button" id="authLogoutBtn" class="action-button action-button--ghost">Log out</button>
+        </div>
+        <div class="auth-dialog-actions">
+          <button type="button" id="authSecurityClose" class="action-button action-button--ghost">Close</button>
+        </div>
+      </div>
+    </dialog>
 
     <script type="module" src="app.js"></script>
   </body>

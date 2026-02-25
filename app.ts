@@ -568,6 +568,22 @@ const profileSelect = document.querySelector<HTMLSelectElement>("#profileSelect"
 const newProfileButton = document.querySelector<HTMLButtonElement>("#newProfileButton")!;
 const renameProfileButton = document.querySelector<HTMLButtonElement>("#renameProfileButton");
 const deleteProfileButton = document.querySelector<HTMLButtonElement>("#deleteProfileButton");
+const profileLockButton       = document.querySelector<HTMLButtonElement>("#profileLockButton");
+const authDialog              = document.querySelector<HTMLDialogElement>("#authDialog");
+const authDialogTitle         = document.querySelector<HTMLElement>("#authDialogTitle");
+const authDialogDesc          = document.querySelector<HTMLElement>("#authDialogDesc");
+const authDialogForm          = document.querySelector<HTMLElement>("#authDialogForm");
+const authPassphraseInput     = document.querySelector<HTMLInputElement>("#authPassphraseInput");
+const authPassphraseConfirm   = document.querySelector<HTMLInputElement>("#authPassphraseConfirm");
+const authConfirmLabel        = document.querySelector<HTMLElement>("#authConfirmLabel");
+const authDialogError         = document.querySelector<HTMLElement>("#authDialogError");
+const authDialogSubmit        = document.querySelector<HTMLButtonElement>("#authDialogSubmit");
+const authDialogCancel        = document.querySelector<HTMLButtonElement>("#authDialogCancel");
+const authSecurityOptions     = document.querySelector<HTMLElement>("#authSecurityOptions");
+const authChangePassphraseBtn = document.querySelector<HTMLButtonElement>("#authChangePassphraseBtn");
+const authRemovePassphraseBtn = document.querySelector<HTMLButtonElement>("#authRemovePassphraseBtn");
+const authLogoutBtn           = document.querySelector<HTMLButtonElement>("#authLogoutBtn");
+const authSecurityClose       = document.querySelector<HTMLButtonElement>("#authSecurityClose");
 const printPdfButton = document.querySelector<HTMLButtonElement>("#printPdfButton");
 const printMeta = document.querySelector<HTMLElement>("#printMeta");
 const backtestStatus         = document.querySelector<HTMLElement>("#backtestStatus");
@@ -577,6 +593,11 @@ const backtestCategoryBody   = document.querySelector<HTMLTableSectionElement>("
 const backtestYearBody       = document.querySelector<HTMLTableSectionElement>("#backtestYearBody");
 const backtestCategoryFilter = document.querySelector<HTMLSelectElement>("#backtestCategoryFilter");
 let profileOptions: string[] = ["default"];
+// Auth state keyed by profileId; populated by loadProfiles() + refreshAuthStatus()
+const profileAuthMap = new Map<string, { hasPassphrase: boolean; authenticated: boolean }>();
+// Resolve callback and target profileId for the promptUnlock() promise
+let resolveUnlock: ((ok: boolean) => void) | null = null;
+let unlockProfileId: string = "";
 const explainSelectionByCategory: Record<string, number> = {};
 let activePosterRequestId = 0;
 let isBootstrapping = true;
@@ -1953,6 +1974,7 @@ function updatePrintMeta() {
 }
 
 function renderProfileOptions() {
+  updateLockButton();
   profileSelect.innerHTML = "";
   profileOptions.forEach((id) => {
     const option = document.createElement("option");
@@ -1965,6 +1987,225 @@ function renderProfileOptions() {
   if (compareMode) updateCompareProfileSelect();
 }
 
+// Current auth dialog mode — read by the single submit listener
+let authDialogMode: "unlock" | "set" | "change" | null = null;
+
+function updateLockButton(): void {
+  if (!profileLockButton) return;
+  const auth = profileAuthMap.get(state.profileId);
+  if (!auth || !auth.hasPassphrase) {
+    profileLockButton.textContent = "Lock";
+    profileLockButton.title = "Set a passphrase to protect this profile";
+  } else if (!auth.authenticated) {
+    profileLockButton.textContent = "Unlock";
+    profileLockButton.title = "Enter passphrase to allow editing";
+  } else {
+    profileLockButton.textContent = "Secured";
+    profileLockButton.title = "Passphrase active — click to manage";
+  }
+}
+
+async function refreshAuthStatus(profileId: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/auth-status`);
+    if (!res.ok) return;
+    const data = await res.json() as { hasPassphrase: boolean; authenticated: boolean };
+    profileAuthMap.set(profileId, data);
+    updateLockButton();
+  } catch { /* ignore */ }
+}
+
+function openAuthDialog(mode: "unlock" | "set" | "change"): void {
+  if (!authDialog || !authDialogTitle || !authDialogDesc || !authDialogForm || !authSecurityOptions) return;
+  authDialogMode = mode;
+  authDialogForm.hidden = false;
+  authSecurityOptions.hidden = true;
+
+  if (authPassphraseInput) authPassphraseInput.value = "";
+  if (authPassphraseConfirm) authPassphraseConfirm.value = "";
+  if (authDialogError) authDialogError.textContent = "";
+
+  const showConfirm = mode === "set" || mode === "change";
+  if (authConfirmLabel) authConfirmLabel.hidden = !showConfirm;
+  if (authPassphraseConfirm) authPassphraseConfirm.hidden = !showConfirm;
+
+  if (mode === "unlock") {
+    authDialogTitle.textContent = "Unlock Profile";
+    authDialogDesc.textContent = "Enter your passphrase to continue editing.";
+    if (authDialogSubmit) authDialogSubmit.textContent = "Unlock";
+    if (authPassphraseInput) authPassphraseInput.setAttribute("autocomplete", "current-password");
+  } else if (mode === "set") {
+    authDialogTitle.textContent = "Set Passphrase";
+    authDialogDesc.textContent = "Set a passphrase to protect this profile from unauthorized changes.";
+    if (authDialogSubmit) authDialogSubmit.textContent = "Set Passphrase";
+    if (authPassphraseInput) authPassphraseInput.setAttribute("autocomplete", "new-password");
+  } else {
+    authDialogTitle.textContent = "Change Passphrase";
+    authDialogDesc.textContent = "Enter and confirm your new passphrase.";
+    if (authDialogSubmit) authDialogSubmit.textContent = "Change Passphrase";
+    if (authPassphraseInput) authPassphraseInput.setAttribute("autocomplete", "new-password");
+  }
+
+  if (!authDialog.open) authDialog.showModal();
+  authPassphraseInput?.focus();
+}
+
+function closeAuthDialog(): void {
+  if (!authDialog) return;
+  authDialogMode = null;
+  if (authPassphraseInput) authPassphraseInput.value = "";
+  if (authPassphraseConfirm) authPassphraseConfirm.value = "";
+  if (authDialogError) authDialogError.textContent = "";
+  if (authDialog.open) authDialog.close();
+}
+
+function promptUnlock(profileId: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    resolveUnlock = resolve;
+    unlockProfileId = profileId;
+    openAuthDialog("unlock");
+  });
+}
+
+function bindProfileLockButton(): void {
+  if (!profileLockButton) return;
+
+  profileLockButton.addEventListener("click", async () => {
+    const profileId = state.profileId;
+    const auth = profileAuthMap.get(profileId);
+
+    if (!auth || !auth.hasPassphrase) {
+      openAuthDialog("set");
+    } else if (!auth.authenticated) {
+      openAuthDialog("unlock");
+    } else {
+      // Show security options panel
+      if (!authDialog || !authDialogForm || !authSecurityOptions) return;
+      authDialogMode = null;
+      authDialogForm.hidden = true;
+      authSecurityOptions.hidden = false;
+      if (!authDialog.open) authDialog.showModal();
+    }
+  });
+
+  authChangePassphraseBtn?.addEventListener("click", () => {
+    openAuthDialog("change");
+  });
+
+  authRemovePassphraseBtn?.addEventListener("click", async () => {
+    const profileId = state.profileId;
+    try {
+      const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/passphrase`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        setAppNotice(err.error || "Failed to remove passphrase.", "error");
+        return;
+      }
+      closeAuthDialog();
+      await refreshAuthStatus(profileId);
+      setAppNotice("Passphrase removed.");
+    } catch {
+      setAppNotice("Failed to remove passphrase. Check your connection.", "error");
+    }
+  });
+
+  authLogoutBtn?.addEventListener("click", async () => {
+    const profileId = state.profileId;
+    try {
+      await fetch(`/api/profiles/${encodeURIComponent(profileId)}/logout`, { method: "POST" });
+      closeAuthDialog();
+      await refreshAuthStatus(profileId);
+      setAppNotice("Logged out.");
+    } catch {
+      setAppNotice("Logout failed. Check your connection.", "error");
+    }
+  });
+
+  authSecurityClose?.addEventListener("click", () => {
+    closeAuthDialog();
+  });
+
+  authDialogCancel?.addEventListener("click", () => {
+    const cb = resolveUnlock;
+    resolveUnlock = null;
+    closeAuthDialog();
+    cb?.(false);
+  });
+
+  authDialog?.addEventListener("close", () => {
+    const cb = resolveUnlock;
+    resolveUnlock = null;
+    cb?.(false);
+  });
+
+  // Single submit listener — handles unlock / set / change based on authDialogMode
+  authDialogSubmit?.addEventListener("click", async () => {
+    const profileId = authDialogMode === "unlock" ? unlockProfileId || state.profileId : state.profileId;
+    const mode = authDialogMode;
+
+    if (mode === "unlock") {
+      const passphrase = authPassphraseInput?.value ?? "";
+      if (!passphrase) {
+        if (authDialogError) authDialogError.textContent = "Passphrase is required.";
+        return;
+      }
+      try {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ passphrase }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: string };
+          if (authDialogError) authDialogError.textContent = err.error || "Login failed.";
+          return;
+        }
+        const cb = resolveUnlock;
+        resolveUnlock = null;
+        await refreshAuthStatus(profileId);
+        closeAuthDialog();
+        cb?.(true);
+      } catch {
+        if (authDialogError) authDialogError.textContent = "Login failed. Check your connection.";
+      }
+    } else if (mode === "set" || mode === "change") {
+      const passphrase = authPassphraseInput?.value ?? "";
+      const confirm = authPassphraseConfirm?.value ?? "";
+      if (passphrase.length < 8) {
+        if (authDialogError) authDialogError.textContent = "Passphrase must be at least 8 characters.";
+        return;
+      }
+      if (passphrase !== confirm) {
+        if (authDialogError) authDialogError.textContent = "Passphrases do not match.";
+        return;
+      }
+      try {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/passphrase`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ passphrase }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: string };
+          if (authDialogError) authDialogError.textContent = err.error || "Failed to set passphrase.";
+          return;
+        }
+        closeAuthDialog();
+        // Log in immediately after setting passphrase so the session cookie is established
+        const loginRes = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ passphrase }),
+        });
+        if (loginRes.ok) await refreshAuthStatus(profileId);
+        setAppNotice(mode === "set" ? "Passphrase set successfully." : "Passphrase changed successfully.");
+      } catch {
+        if (authDialogError) authDialogError.textContent = "Failed to set passphrase. Check your connection.";
+      }
+    }
+  });
+}
+
 async function loadProfiles() {
   try {
     const response = await fetch(API_PROFILE_LIST_URL, { cache: "no-store" });
@@ -1975,17 +2216,22 @@ async function loadProfiles() {
     }
     setBackendOfflineMode(false);
     const doc = await response.json();
-    const ids: string[] = Array.isArray(doc.profiles)
-      ? (doc.profiles as Array<{ id?: unknown }>).map((entry) => String(entry.id || "")).filter(Boolean)
-      : [];
+    const entries: Array<{ id?: unknown; hasPassphrase?: unknown }> = Array.isArray(doc.profiles) ? doc.profiles : [];
+    const ids: string[] = entries.map((e) => String(e.id || "")).filter(Boolean);
     if (!ids.length) ids.push("default");
     profileOptions = [...new Set(ids)];
+    // Seed the auth map from the profile list response
+    for (const entry of entries) {
+      const id = String(entry.id || "");
+      if (id) profileAuthMap.set(id, { hasPassphrase: !!entry.hasPassphrase, authenticated: profileAuthMap.get(id)?.authenticated ?? false });
+    }
     if (typeof doc.activeProfileId === "string" && profileOptions.includes(doc.activeProfileId)) {
       state.profileId = doc.activeProfileId;
     } else if (!profileOptions.includes(state.profileId)) {
       state.profileId = profileOptions[0];
     }
     renderProfileOptions();
+    await refreshAuthStatus(state.profileId);
   } catch {
     setBackendOfflineMode(true);
     renderProfileOptions();
@@ -1999,6 +2245,11 @@ async function saveStateToApi() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(serializeStatePayload())
     });
+    if (response.status === 401) {
+      const ok = await promptUnlock(state.profileId);
+      if (ok) void saveStateToApi(); // retry once after successful login
+      return;
+    }
     if (!response.ok) {
       setBackendOfflineMode(true);
       return;
@@ -2111,6 +2362,7 @@ function bindProfileControls() {
     state.profileId = (event.target as HTMLSelectElement).value;
     loadState();
     await loadStateFromApi();
+    await refreshAuthStatus(state.profileId);
     if (compareMode) {
       updateCompareProfileSelect();
       if (compareProfileId === state.profileId || !compareProfileId) {
@@ -2149,15 +2401,20 @@ function bindProfileControls() {
     const newId = input.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
     if (!newId || newId === current) return;
 
-    try {
+    const doRename = async (): Promise<void> => {
       const res = await fetch(`${API_FORECAST_BASE_URL}/${encodeURIComponent(current)}/rename`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ newId })
       });
+      if (res.status === 401) {
+        const ok = await promptUnlock(current);
+        if (ok) await doRename();
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setAppNotice(err.error || "Rename failed.", "error");
+        setAppNotice((err as { error?: string }).error || "Rename failed.", "error");
         return;
       }
       const oldKey = getLocalStorageKeyForProfile(current);
@@ -2171,6 +2428,10 @@ function bindProfileControls() {
       state.profileId = newId;
       renderProfileOptions();
       setAppNotice(`Profile renamed to "${newId}".`);
+    };
+
+    try {
+      await doRename();
     } catch {
       setAppNotice("Rename failed. Check your connection.", "error");
     }
@@ -2181,22 +2442,31 @@ function bindProfileControls() {
     const current = state.profileId;
     if (!window.confirm(`Delete profile "${current}"? This cannot be undone.`)) return;
 
-    try {
+    const doDelete = async (): Promise<void> => {
       const res = await fetch(getForecastApiUrl(current), { method: "DELETE" });
+      if (res.status === 401) {
+        const ok = await promptUnlock(current);
+        if (ok) await doDelete();
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setAppNotice(err.error || "Delete failed.", "error");
+        setAppNotice((err as { error?: string }).error || "Delete failed.", "error");
         return;
       }
       const doc = await res.json();
       localStorage.removeItem(getLocalStorageKeyForProfile(current));
       profileOptions = profileOptions.filter((id) => id !== current);
-      state.profileId = doc.activeProfileId || profileOptions[0];
+      state.profileId = (doc as { activeProfileId?: string }).activeProfileId || profileOptions[0];
       renderProfileOptions();
       loadState();
       await loadStateFromApi();
       render();
       setAppNotice("Profile deleted.");
+    };
+
+    try {
+      await doDelete();
     } catch {
       setAppNotice("Delete failed. Check your connection.", "error");
     }
@@ -2798,6 +3068,7 @@ async function bootstrap() {
   loadState();
   await loadStateFromApi();
   bindProfileControls();
+  bindProfileLockButton();
   bindTrendControls();
   bindCsvControls();
   bindPrintControls();

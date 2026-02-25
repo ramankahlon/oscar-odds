@@ -1286,3 +1286,29 @@ a:focus-visible {
 .backtest-filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.88rem; }
 .backtest-filter-bar label { font-weight: 700; color: var(--muted); }
 .backtest-filter-bar select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; background: var(--surface-2); color: var(--ink); }
+
+/* ── Auth dialog ───────────────────────────────────────────────────────────── */
+.auth-dialog {
+  border: 1px solid var(--line); border-radius: 16px;
+  background: var(--surface); color: var(--ink);
+  padding: 28px 32px; max-width: 380px; width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+}
+.auth-dialog::backdrop { background: rgba(0,0,0,0.48); }
+.auth-dialog-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 8px; }
+.auth-dialog-desc  { font-size: .875rem; color: var(--muted); margin: 0 0 16px; }
+.auth-dialog-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.auth-dialog-label { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.auth-dialog-input {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--surface-2); color: var(--ink);
+  font-size: .9rem; box-sizing: border-box;
+}
+.auth-dialog-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.auth-dialog-error { font-size: .8rem; color: var(--warn); min-height: 1.2em; margin: 0 0 12px; }
+.auth-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.auth-security-buttons { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.action-button--ghost {
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+}
+.action-button--ghost:hover { border-color: var(--accent); color: var(--accent); }

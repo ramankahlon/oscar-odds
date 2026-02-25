@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import fs from "node:fs/promises";
 import { readFileSync, mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -12,6 +13,14 @@ import { z } from "zod";
 import type { Logger } from "pino";
 import { logger } from "./logger.js";
 import { getBacktestResult } from "./backtest.js";
+import {
+  hashPassphrase,
+  verifyPassphrase,
+  generateSessionToken,
+  sessionExpiresAt,
+  isSessionExpired,
+  SESSION_COOKIE,
+} from "./auth-utils.js";
 import swaggerUi from "swagger-ui-express";
 import yaml from "js-yaml";
 
@@ -68,6 +77,7 @@ interface ProfileRow {
   id: string;
   updated_at: string | null;
   payload: string | null;
+  passphrase_hash: string | null;
 }
 
 interface MetaRow {
@@ -99,6 +109,14 @@ const forecastPayloadSchema = z.record(z.string(), z.unknown());
 
 const renameBodySchema = z.object({
   newId: profileIdSchema,
+});
+
+const passphraseBodySchema = z.object({
+  passphrase: z.string().min(8, "Passphrase must be at least 8 characters").max(128),
+});
+
+const loginBodySchema = z.object({
+  passphrase: z.string().min(1, "Passphrase is required"),
 });
 
 const tmdbPosterQuerySchema = z.object({
@@ -136,7 +154,16 @@ const forecastWriteLimiter = rateLimit({
   message: { error: "Too many requests, please slow down." }
 });
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Try again later." }
+});
+
 app.use(express.json({ limit: "1mb" }));
+app.use(cookieParser());
 app.set("trust proxy", 1);
 
 // ── Request logging ───────────────────────────────────────────────────────────
@@ -273,7 +300,22 @@ function initDb(): void {
       ON snapshots(profile_id, category_id, contender_key, snapped_at);
     CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
       ON snapshots(profile_id, category_id, snapped_at);
+    CREATE TABLE IF NOT EXISTS sessions (
+      token      TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_profile_id ON sessions(profile_id);
   `);
+
+  // Add passphrase_hash column to profiles if it doesn't exist yet (idempotent migration).
+  const cols = (db.prepare("PRAGMA table_info(profiles)").all() as Array<{ name: string }>).map((c) => c.name);
+  if (!cols.includes("passphrase_hash")) {
+    db.exec("ALTER TABLE profiles ADD COLUMN passphrase_hash TEXT");
+  }
+  // Purge expired sessions on startup.
+  db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(new Date().toISOString());
 
   // One-time migration from forecast-store.json when the DB is empty.
   const isEmpty = (db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as CountRow).n === 0;
@@ -301,6 +343,31 @@ function initDb(): void {
       db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", DEFAULT_PROFILE_ID);
     }
   }
+}
+
+function requireProfileAuth(req: Request, res: Response, next: NextFunction): void {
+  const profileId = req.params.profileId;
+  const row = db
+    .prepare("SELECT passphrase_hash FROM profiles WHERE id = ?")
+    .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
+  if (!row?.passphrase_hash) { next(); return; } // unprotected → allow through
+
+  const token = (req.cookies as Record<string, string>)[SESSION_COOKIE];
+  if (!token) { res.status(401).json({ error: "Authentication required." }); return; }
+
+  const session = db
+    .prepare("SELECT profile_id, expires_at FROM sessions WHERE token = ?")
+    .get(token) as { profile_id: string; expires_at: string } | undefined;
+
+  if (!session || session.profile_id !== profileId) {
+    res.status(401).json({ error: "Authentication required." }); return;
+  }
+  if (isSessionExpired(session.expires_at)) {
+    db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    res.clearCookie(SESSION_COOKIE, { path: "/" });
+    res.status(401).json({ error: "Session expired." }); return;
+  }
+  next();
 }
 
 async function readScrapeObservability(): Promise<Record<string, unknown>> {
@@ -673,11 +740,11 @@ app.get("/api/scrape-observability", async (_: Request, res: Response) => {
 
 app.get("/api/profiles", (_: Request, res: Response) => {
   const profiles = db
-    .prepare("SELECT id, updated_at FROM profiles ORDER BY id")
+    .prepare("SELECT id, updated_at, passphrase_hash FROM profiles ORDER BY id")
     .all()
     .map((row) => {
-      const r = row as { id: string; updated_at: string | null };
-      return { id: r.id, updatedAt: r.updated_at || null };
+      const r = row as { id: string; updated_at: string | null; passphrase_hash: string | null };
+      return { id: r.id, updatedAt: r.updated_at || null, hasPassphrase: !!r.passphrase_hash };
     });
   const activeProfileId =
     (db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined)?.value || DEFAULT_PROFILE_ID;
@@ -694,7 +761,7 @@ app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
   res.json({ profileId, ...profile });
 });
 
-app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Response) => {
+app.put("/api/forecast/:profileId", forecastWriteLimiter, requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
   const payload = parseBody(forecastPayloadSchema, req.body, res);
@@ -748,7 +815,7 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, (req: Request, res: Re
   res.json({ profileId, updatedAt, payload });
 });
 
-app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
+app.delete("/api/forecast/:profileId", requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
   if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
@@ -764,6 +831,7 @@ app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
 
   db.transaction(() => {
     db.prepare("DELETE FROM snapshots WHERE profile_id = ?").run(profileId);
+    db.prepare("DELETE FROM sessions WHERE profile_id = ?").run(profileId);
     db.prepare("DELETE FROM profiles WHERE id = ?").run(profileId);
     const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined;
     if (!activeRow?.value || activeRow.value === profileId) {
@@ -776,14 +844,14 @@ app.delete("/api/forecast/:profileId", (req: Request, res: Response) => {
   res.json({ deleted: profileId, activeProfileId });
 });
 
-app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
+app.patch("/api/forecast/:profileId/rename", requireProfileAuth, (req: Request, res: Response) => {
   const oldId = parseParam(profileIdSchema, req.params.profileId, res);
   if (oldId === null) return;
   const body = parseBody(renameBodySchema, req.body, res);
   if (body === null) return;
   const newId = body.newId;
 
-  const existing = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(oldId) as ProfileRow | undefined;
+  const existing = db.prepare("SELECT id, updated_at, payload, passphrase_hash FROM profiles WHERE id = ?").get(oldId) as ProfileRow | undefined;
   if (!existing) {
     res.status(404).json({ error: "Profile not found." });
     return;
@@ -801,12 +869,14 @@ app.patch("/api/forecast/:profileId/rename", (req: Request, res: Response) => {
 
   db.transaction(() => {
     db.prepare("UPDATE snapshots SET profile_id = ? WHERE profile_id = ?").run(newId, oldId);
-    db.prepare("INSERT INTO profiles (id, updated_at, payload) VALUES (?, ?, ?)").run(
+    db.prepare("INSERT INTO profiles (id, updated_at, payload, passphrase_hash) VALUES (?, ?, ?, ?)").run(
       newId,
       existing.updated_at,
-      existing.payload
+      existing.payload,
+      existing.passphrase_hash ?? null
     );
     db.prepare("DELETE FROM profiles WHERE id = ?").run(oldId);
+    db.prepare("UPDATE sessions SET profile_id = ? WHERE profile_id = ?").run(newId, oldId);
     const activeRow = db.prepare("SELECT value FROM meta WHERE key = ?").get("active_profile_id") as MetaRow | undefined;
     if (activeRow?.value === oldId) {
       db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("active_profile_id", newId);
@@ -861,6 +931,139 @@ app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   } catch (error) {
     res.status(502).json({ error: String((error as Error)?.message || error) });
   }
+});
+
+app.get("/api/profiles/:profileId/auth-status", (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const row = db
+    .prepare("SELECT passphrase_hash FROM profiles WHERE id = ?")
+    .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
+
+  if (!row) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  const hasPassphrase = !!row.passphrase_hash;
+  let authenticated = false;
+
+  if (hasPassphrase) {
+    const token = (req.cookies as Record<string, string>)[SESSION_COOKIE];
+    if (token) {
+      const session = db
+        .prepare("SELECT profile_id, expires_at FROM sessions WHERE token = ?")
+        .get(token) as { profile_id: string; expires_at: string } | undefined;
+      if (session && session.profile_id === profileId && !isSessionExpired(session.expires_at)) {
+        authenticated = true;
+      }
+    }
+  }
+
+  res.json({ profileId, hasPassphrase, authenticated });
+});
+
+app.post("/api/profiles/:profileId/login", authLimiter, async (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const body = parseBody(loginBodySchema, req.body, res);
+  if (body === null) return;
+
+  const row = db
+    .prepare("SELECT passphrase_hash FROM profiles WHERE id = ?")
+    .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
+
+  if (!row) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  if (!row.passphrase_hash) {
+    res.status(400).json({ error: "Profile is not password protected." });
+    return;
+  }
+
+  const valid = await verifyPassphrase(body.passphrase, row.passphrase_hash);
+  if (!valid) {
+    res.status(401).json({ error: "Incorrect passphrase." });
+    return;
+  }
+
+  const token = generateSessionToken();
+  const expiresAt = sessionExpiresAt();
+  db.prepare("INSERT INTO sessions (token, profile_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+    .run(token, profileId, new Date().toISOString(), expiresAt.toISOString());
+
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: FORCE_HTTPS,
+    path: "/",
+    expires: expiresAt,
+  });
+
+  res.json({ ok: true });
+});
+
+app.post("/api/profiles/:profileId/logout", (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const token = (req.cookies as Record<string, string>)[SESSION_COOKIE];
+  if (token) {
+    db.prepare("DELETE FROM sessions WHERE token = ? AND profile_id = ?").run(token, profileId);
+  }
+
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
+
+app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth, async (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const body = parseBody(passphraseBodySchema, req.body, res);
+  if (body === null) return;
+
+  const row = db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId) as { id: string } | undefined;
+  if (!row) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  const hash = await hashPassphrase(body.passphrase);
+  db.prepare("UPDATE profiles SET passphrase_hash = ? WHERE id = ?").run(hash, profileId);
+  db.prepare("DELETE FROM sessions WHERE profile_id = ?").run(profileId);
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+
+  res.json({ ok: true });
+});
+
+app.delete("/api/profiles/:profileId/passphrase", requireProfileAuth, (req: Request, res: Response) => {
+  const profileId = parseParam(profileIdSchema, req.params.profileId, res);
+  if (profileId === null) return;
+
+  const row = db
+    .prepare("SELECT passphrase_hash FROM profiles WHERE id = ?")
+    .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
+
+  if (!row) {
+    res.status(404).json({ error: "Profile not found." });
+    return;
+  }
+
+  if (!row.passphrase_hash) {
+    res.status(400).json({ error: "Profile does not have a passphrase." });
+    return;
+  }
+
+  db.prepare("UPDATE profiles SET passphrase_hash = NULL WHERE id = ?").run(profileId);
+  db.prepare("DELETE FROM sessions WHERE profile_id = ?").run(profileId);
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+
+  res.json({ ok: true });
 });
 
 app.get("/api/backtest", (_req: Request, res: Response) => {
