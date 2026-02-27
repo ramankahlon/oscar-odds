@@ -24,6 +24,12 @@ import {
 } from "./auth-utils.js";
 import swaggerUi from "swagger-ui-express";
 import yaml from "js-yaml";
+import {
+  buildSsrLeaderboard,
+  renderLeaderboardRows,
+  splitIndexHtml,
+  type SplitHtml,
+} from "./ssr.js";
 
 declare global {
   namespace Express {
@@ -61,6 +67,16 @@ let pollerProcess: ChildProcess | null = null;
 const pollerState = { running: false, startedAt: null as string | null, lastExitCode: null as number | null, restarts: 0 };
 const scraperEventClients = new Set<Response>();
 let db: Database.Database;
+// Cached split of index.html at the leaderboard tbody injection point.
+// Populated once on first request so __dirname is available after module init.
+let splitHtml: SplitHtml | null = null;
+
+function getSplitHtml(): SplitHtml {
+  if (!splitHtml) {
+    splitHtml = splitIndexHtml(path.join(__dirname, "index.html"));
+  }
+  return splitHtml;
+}
 
 // ── Server-error ring buffer ─────────────────────────────────────────────────
 
@@ -276,10 +292,13 @@ app.get("/sw.js", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "sw.js"));
 });
 
+// index:false — we serve "/" ourselves via the SSR route below so the browser
+// always gets pre-rendered leaderboard HTML rather than the bare index.html file.
 app.use(
   express.static(__dirname, {
     maxAge: "1h",
-    etag: true
+    etag: true,
+    index: false,
   })
 );
 
@@ -1151,6 +1170,47 @@ app.get("/api/errors", (_req: Request, res: Response) => {
   });
 });
 
+// ── SSR root handler ──────────────────────────────────────────────────────────
+// Streams the initial HTML response for GET "/" in two chunks:
+//
+//   Chunk 1 — <head> + body up to the leaderboard <tbody> open tag.
+//             The browser sees <link rel="stylesheet"> and <script src="app.js">
+//             immediately and starts loading those assets in parallel.
+//
+//   Chunk 2 — Pre-rendered leaderboard rows (computed from the active profile)
+//             followed by the rest of the document.
+//
+// On hydration, app.js calls renderLeaderboard() which overwrites these rows
+// with the fully-interactive version including per-film experience boosts.
+app.get("/", (_: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  // No long-lived cache: the leaderboard reflects the current profile state.
+  res.setHeader("Cache-Control", "no-cache");
+
+  const parts = getSplitHtml();
+
+  // Chunk 1: flush the document head + body prefix to the client immediately.
+  // This lets the browser start downloading CSS, fonts, and app.js without
+  // waiting for the DB read + scoring pass below.
+  res.write(parts.before);
+
+  // Compute the leaderboard synchronously (SQLite read + pure-math scoring).
+  // The dataset is small so this is effectively zero extra latency vs. sendFile.
+  let rows: import("./ssr.js").LeaderboardRow[];
+  try {
+    rows = buildSsrLeaderboard(db);
+  } catch {
+    rows = [];
+  }
+
+  // Chunk 2: the pre-rendered rows + remainder of the document.
+  res.write(renderLeaderboardRows(rows));
+  res.end(parts.after);
+});
+
+// ── SPA catch-all ─────────────────────────────────────────────────────────────
+// All non-API, non-file routes return the bare index.html so client-side routing
+// (share links, direct-URL navigation) works without SSR overhead.
 app.get("*", (_: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
