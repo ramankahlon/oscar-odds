@@ -69,6 +69,23 @@ interface SearchProjection extends Projection {
   categoryName: string;
 }
 
+interface WeightPreset {
+  name: string;
+  precursor: number;
+  history: number;
+  buzz: number;
+  builtin?: true;
+}
+
+const BUILTIN_PRESETS: WeightPreset[] = [
+  { name: "Balanced",        precursor: 58, history: 30, buzz: 12, builtin: true },
+  { name: "Precursor-heavy", precursor: 75, history: 18, buzz:  7, builtin: true },
+  { name: "History-heavy",   precursor: 40, history: 48, buzz: 12, builtin: true },
+  { name: "Buzz-driven",     precursor: 35, history: 25, buzz: 40, builtin: true },
+];
+
+const WEIGHT_PRESETS_KEY = "oscar-odds:weight-presets";
+
 const schedule2026Films = [
   "The Mother and the Bear",
   "We Bury the Dead",
@@ -553,6 +570,7 @@ let searchQuery = "";
 let compareMode = false;
 let compareProfileId: string | null = null;
 const lockedCategories = new Set<string>();
+let userPresets: WeightPreset[] = [];
 const comparePayloadCache = new Map<string, StatePayload>();
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
@@ -566,6 +584,14 @@ const movieDetailPosterLink = document.querySelector<HTMLAnchorElement>("#movieD
 const exportCsvButton = document.querySelector<HTMLButtonElement>("#exportCsvButton")!;
 const importCsvButton = document.querySelector<HTMLButtonElement>("#importCsvButton")!;
 const lockNomineesButton = document.querySelector<HTMLButtonElement>("#lockNomineesButton");
+const precursorSlider  = document.querySelector<HTMLInputElement>("#precursorSlider");
+const historySlider    = document.querySelector<HTMLInputElement>("#historySlider");
+const buzzSlider       = document.querySelector<HTMLInputElement>("#buzzSlider");
+const precursorDisplay = document.querySelector<HTMLElement>("#precursorDisplay");
+const historyDisplay   = document.querySelector<HTMLElement>("#historyDisplay");
+const buzzDisplay      = document.querySelector<HTMLElement>("#buzzDisplay");
+const weightPresetsEl  = document.querySelector<HTMLElement>("#weightPresets");
+const savePresetButton = document.querySelector<HTMLButtonElement>("#savePresetButton");
 const csvFileInput = document.querySelector<HTMLInputElement>("#csvFileInput")!;
 const csvStatus = document.querySelector<HTMLElement>("#csvStatus")!;
 const profileSelect = document.querySelector<HTMLSelectElement>("#profileSelect")!;
@@ -874,6 +900,167 @@ function normalizeWeights(): NormalizedWeights {
     buzz: state.weights.buzz / total
   };
 }
+
+// ── Weight presets ────────────────────────────────────────────────────────────
+
+function loadUserPresets(): WeightPreset[] {
+  try {
+    const raw = localStorage.getItem(WEIGHT_PRESETS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((p): p is WeightPreset => {
+        if (!p || typeof p !== "object") return false;
+        const q = p as Record<string, unknown>;
+        return (
+          typeof q.name === "string" && q.name.trim() !== "" &&
+          typeof q.precursor === "number" &&
+          typeof q.history   === "number" &&
+          typeof q.buzz      === "number"
+        );
+      })
+      .map((p) => ({
+        name:      p.name.trim().slice(0, 40),
+        precursor: clamp(p.precursor, 1, 95),
+        history:   clamp(p.history,   1, 95),
+        buzz:      clamp(p.buzz,      1, 95),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function saveUserPresetsToStorage(presets: WeightPreset[]): void {
+  try {
+    localStorage.setItem(WEIGHT_PRESETS_KEY, JSON.stringify(presets));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+/** Returns the preset whose normalised weights match the current state, or null. */
+function getActivePreset(): WeightPreset | null {
+  const total = state.weights.precursor + state.weights.history + state.weights.buzz || 1;
+  const np = state.weights.precursor / total;
+  const nh = state.weights.history   / total;
+  const nb = state.weights.buzz      / total;
+
+  return [...BUILTIN_PRESETS, ...userPresets].find((preset) => {
+    const pt = preset.precursor + preset.history + preset.buzz || 1;
+    return (
+      Math.abs(np - preset.precursor / pt) < 0.005 &&
+      Math.abs(nh - preset.history   / pt) < 0.005 &&
+      Math.abs(nb - preset.buzz      / pt) < 0.005
+    );
+  }) ?? null;
+}
+
+/** Sync slider positions and the % labels to the current state.weights. */
+function renderWeightSliders(): void {
+  const total = state.weights.precursor + state.weights.history + state.weights.buzz || 1;
+  const pct   = (v: number) => `${Math.round((v / total) * 100)}%`;
+
+  if (precursorSlider)  precursorSlider.value  = String(state.weights.precursor);
+  if (historySlider)    historySlider.value    = String(state.weights.history);
+  if (buzzSlider)       buzzSlider.value       = String(state.weights.buzz);
+
+  if (precursorDisplay) precursorDisplay.textContent = pct(state.weights.precursor);
+  if (historyDisplay)   historyDisplay.textContent   = pct(state.weights.history);
+  if (buzzDisplay)      buzzDisplay.textContent      = pct(state.weights.buzz);
+}
+
+/** Re-render the preset chips, highlighting whichever matches current weights. */
+function renderWeightPresets(): void {
+  if (!weightPresetsEl) return;
+  weightPresetsEl.innerHTML = "";
+
+  const activePreset  = getActivePreset();
+  const allPresets    = [...BUILTIN_PRESETS, ...userPresets];
+
+  allPresets.forEach((preset, index) => {
+    const isActive  = activePreset === preset;
+    const isBuiltin = preset.builtin === true;
+
+    const chip = document.createElement("span");
+    chip.className = "weight-preset-chip" + (isActive ? " weight-preset-chip--active" : "");
+
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.className = "weight-preset-name";
+    nameBtn.textContent = preset.name;
+    nameBtn.setAttribute("aria-pressed", String(isActive));
+    nameBtn.title = `Precursor ${preset.precursor}  ·  Historical ${preset.history}  ·  Buzz ${preset.buzz}`;
+    nameBtn.addEventListener("click", () => {
+      state.weights.precursor = preset.precursor;
+      state.weights.history   = preset.history;
+      state.weights.buzz      = preset.buzz;
+      saveState();
+      render();
+    });
+    chip.appendChild(nameBtn);
+
+    if (!isBuiltin) {
+      const userIndex = index - BUILTIN_PRESETS.length;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "weight-preset-delete";
+      del.textContent = "×";
+      del.setAttribute("aria-label", `Delete preset "${preset.name}"`);
+      del.addEventListener("click", () => {
+        userPresets.splice(userIndex, 1);
+        saveUserPresetsToStorage(userPresets);
+        renderWeightPresets();
+      });
+      chip.appendChild(del);
+    }
+
+    weightPresetsEl.appendChild(chip);
+  });
+}
+
+function bindWeightSliders(): void {
+  function handleSlider(key: "precursor" | "history" | "buzz") {
+    return (event: Event) => {
+      state.weights[key] = clamp(Number((event.target as HTMLInputElement).value), 1, 95);
+      renderWeightSliders();   // update % labels immediately while dragging
+      renderWeightPresets();   // update active-preset highlight immediately
+      saveState();
+      render();
+    };
+  }
+
+  precursorSlider?.addEventListener("input", handleSlider("precursor"));
+  historySlider  ?.addEventListener("input", handleSlider("history"));
+  buzzSlider     ?.addEventListener("input", handleSlider("buzz"));
+}
+
+function bindSavePresetButton(): void {
+  if (!savePresetButton) return;
+  savePresetButton.addEventListener("click", () => {
+    const name = prompt("Name for this preset:")?.trim();
+    if (!name) return;
+    if (name.length > 40) {
+      alert("Preset name must be 40 characters or fewer.");
+      return;
+    }
+    const allNames = [...BUILTIN_PRESETS, ...userPresets].map((p) => p.name.toLowerCase());
+    if (allNames.includes(name.toLowerCase())) {
+      alert(`A preset named "${name}" already exists.`);
+      return;
+    }
+    userPresets.push({
+      name,
+      precursor: state.weights.precursor,
+      history:   state.weights.history,
+      buzz:      state.weights.buzz,
+    });
+    saveUserPresetsToStorage(userPresets);
+    renderWeightPresets();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function logistic(z: number): number {
   return 1 / (1 + Math.exp(-z));
@@ -2942,6 +3129,8 @@ function render() {
   const capturedTrend = captureTrendSnapshot(activeCategory, projections);
   if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
   renderTabs();
+  renderWeightSliders();
+  renderWeightPresets();
   renderSummaryBar();
   renderLeaderboard();
   renderCandidates(activeCategory, projections);
@@ -3225,11 +3414,14 @@ async function bootstrap() {
   await loadProfiles();
   loadState();
   await loadStateFromApi();
+  userPresets = loadUserPresets();
   bindProfileControls();
   bindProfileLockButton();
   bindTrendControls();
   bindCsvControls();
   bindLockNomineesButton();
+  bindWeightSliders();
+  bindSavePresetButton();
   bindPrintControls();
   bindSearchControls();
   bindCompareControls();

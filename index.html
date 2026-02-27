@@ -50,6 +50,28 @@
             <span class="compare-controls-label">vs.</span>
             <select id="compareProfileSelect" aria-label="Comparison profile"></select>
           </div>
+          <div class="weight-controls" id="weightControls">
+            <h2>Model Weights</h2>
+            <div class="weight-sliders" aria-label="Model weight sliders">
+              <div class="weight-row">
+                <label class="weight-label" for="precursorSlider">Precursor</label>
+                <input type="range" id="precursorSlider" class="weight-slider" min="1" max="95" step="1" value="58" aria-label="Precursor weight" />
+                <span class="weight-display" id="precursorDisplay" aria-live="polite">58%</span>
+              </div>
+              <div class="weight-row">
+                <label class="weight-label" for="historySlider">Historical</label>
+                <input type="range" id="historySlider" class="weight-slider" min="1" max="95" step="1" value="30" aria-label="Historical weight" />
+                <span class="weight-display" id="historyDisplay" aria-live="polite">30%</span>
+              </div>
+              <div class="weight-row">
+                <label class="weight-label" for="buzzSlider">Buzz</label>
+                <input type="range" id="buzzSlider" class="weight-slider" min="1" max="95" step="1" value="12" aria-label="Buzz weight" />
+                <span class="weight-display" id="buzzDisplay" aria-live="polite">12%</span>
+              </div>
+            </div>
+            <div id="weightPresets" class="weight-presets" aria-label="Weight presets"></div>
+            <button id="savePresetButton" class="action-button action-button--ghost weight-preset-save-btn" type="button">+ Save preset</button>
+          </div>
           <h2>Categories</h2>
           <div class="category-list" id="categoryTabs" aria-label="Oscar categories"></div>
         </div>
