@@ -7,6 +7,7 @@ export interface Film {
   history: number;
   buzz: number;
   strength: Strength;
+  nominated?: boolean;
 }
 
 export interface Projection {

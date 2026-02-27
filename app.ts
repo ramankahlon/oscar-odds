@@ -54,6 +54,7 @@ interface StatePayload {
     lastSignatureByCategory?: Record<string, string>;
   };
   categories?: Array<{ id: string; films: unknown[] }>;
+  lockedCategories?: string[];
 }
 
 interface CompactShare {
@@ -551,6 +552,7 @@ const thDelta = document.querySelector<HTMLElement>("#thDelta");
 let searchQuery = "";
 let compareMode = false;
 let compareProfileId: string | null = null;
+const lockedCategories = new Set<string>();
 const comparePayloadCache = new Map<string, StatePayload>();
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
@@ -563,6 +565,7 @@ const movieDetailPoster = document.querySelector<HTMLImageElement>("#movieDetail
 const movieDetailPosterLink = document.querySelector<HTMLAnchorElement>("#movieDetailPosterLink")!;
 const exportCsvButton = document.querySelector<HTMLButtonElement>("#exportCsvButton")!;
 const importCsvButton = document.querySelector<HTMLButtonElement>("#importCsvButton")!;
+const lockNomineesButton = document.querySelector<HTMLButtonElement>("#lockNomineesButton");
 const csvFileInput = document.querySelector<HTMLInputElement>("#csvFileInput")!;
 const csvStatus = document.querySelector<HTMLElement>("#csvStatus")!;
 const profileSelect = document.querySelector<HTMLSelectElement>("#profileSelect")!;
@@ -1015,7 +1018,8 @@ function parseFilmRecord(record: unknown): Film | null {
     precursor: clamp(Number(r.precursor || 0), 0, 100),
     history: clamp(Number(r.history || 0), 0, 100),
     buzz: clamp(Number(r.buzz || 0), 0, 100),
-    strength: sanitizeStrength(String(r.strength || "").trim())
+    strength: sanitizeStrength(String(r.strength || "").trim()),
+    nominated: r.nominated === true
   };
 }
 
@@ -1081,8 +1085,11 @@ function renderTabs(): void {
 }
 
 function createCard(category: Category, film: Film, filmIndex: number): HTMLDivElement {
+  const isLocked = lockedCategories.has(category.id);
+  const isSnubbed = isLocked && !film.nominated;
+
   const card = document.createElement("div");
-  card.className = "candidate-card";
+  card.className = "candidate-card" + (isSnubbed ? " candidate-card--snubbed" : "");
 
   const head = document.createElement("div");
   head.className = "candidate-head";
@@ -1094,7 +1101,21 @@ function createCard(category: Category, film: Film, filmIndex: number): HTMLDivE
   badge.className = "badge";
   badge.textContent = `${film.studio}`;
 
-  head.append(title, badge);
+  const nominatedLabel = document.createElement("label");
+  nominatedLabel.className = "nominated-checkbox-label";
+  const nominatedCheckbox = document.createElement("input");
+  nominatedCheckbox.type = "checkbox";
+  nominatedCheckbox.checked = film.nominated === true;
+  nominatedCheckbox.addEventListener("change", () => {
+    const cat = categories.find((c) => c.id === category.id);
+    if (cat) cat.films[filmIndex].nominated = nominatedCheckbox.checked;
+    saveState();
+    render();
+  });
+  nominatedLabel.appendChild(nominatedCheckbox);
+  nominatedLabel.append("\u00a0Nom.");
+
+  head.append(title, badge, nominatedLabel);
 
   const grid = document.createElement("div");
   grid.className = "mini-grid";
@@ -1476,7 +1497,13 @@ interface BuildProjectionsOverrides {
   weights?: Partial<NormalizedWeights>;
 }
 function buildProjections(category: Category, overrides: BuildProjectionsOverrides | null = null): Projection[] {
-  const films = overrides?.films ?? category.films;
+  const rawFilms = overrides?.films ?? category.films;
+  // When nominees are locked and no override films are supplied, only score
+  // films that have been marked as nominated — the rest are excluded from odds.
+  const films =
+    !overrides?.films && lockedCategories.has(category.id)
+      ? rawFilms.filter((f) => f.nominated)
+      : rawFilms;
   let normalized;
   if (overrides?.weights) {
     const w = overrides.weights;
@@ -1560,18 +1587,39 @@ function renderCandidates(category: Category, projections: Projection[]): void {
   categoryTitle.textContent = category.name;
   candidateCards.innerHTML = "";
 
-  const display = projections.slice(0, getDisplayLimit(category));
-  if (display.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "panel-copy";
-    empty.textContent = "No contenders available for this category. Import CSV or adjust source data.";
-    candidateCards.appendChild(empty);
-    return;
+  const isLocked = lockedCategories.has(category.id);
+
+  if (lockNomineesButton) {
+    lockNomineesButton.textContent = isLocked ? "Unlock Nominees" : "Lock Nominees";
+    lockNomineesButton.setAttribute("aria-pressed", String(isLocked));
+    lockNomineesButton.classList.toggle("action-button--lock-active", isLocked);
   }
 
-  display.forEach((entry) => {
-    candidateCards.appendChild(createCard(category, category.films[entry.index], entry.index));
-  });
+  if (isLocked) {
+    // Show all films so the user can see which are nominated/snubbed.
+    if (category.films.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "panel-copy";
+      empty.textContent = "No contenders available for this category. Import CSV or adjust source data.";
+      candidateCards.appendChild(empty);
+      return;
+    }
+    category.films.forEach((film, filmIndex) => {
+      candidateCards.appendChild(createCard(category, film, filmIndex));
+    });
+  } else {
+    const display = projections.slice(0, getDisplayLimit(category));
+    if (display.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "panel-copy";
+      empty.textContent = "No contenders available for this category. Import CSV or adjust source data.";
+      candidateCards.appendChild(empty);
+      return;
+    }
+    display.forEach((entry) => {
+      candidateCards.appendChild(createCard(category, category.films[entry.index], entry.index));
+    });
+  }
 }
 
 function renderSearchResults(query: string): void {
@@ -1914,6 +1962,20 @@ function bindSearchControls(): void {
   }
 }
 
+function bindLockNomineesButton(): void {
+  if (!lockNomineesButton) return;
+  lockNomineesButton.addEventListener("click", () => {
+    const categoryId = state.categoryId;
+    if (lockedCategories.has(categoryId)) {
+      lockedCategories.delete(categoryId);
+    } else {
+      lockedCategories.add(categoryId);
+    }
+    saveState();
+    render();
+  });
+}
+
 function bindCsvControls(): void {
   exportCsvButton.addEventListener("click", () => {
     const csvText = exportContendersCsv();
@@ -1964,7 +2026,8 @@ function serializeStatePayload(): StatePayload {
     categories: categories.map((category) => ({
       id: category.id,
       films: category.films
-    }))
+    })),
+    lockedCategories: [...lockedCategories]
   };
 }
 
@@ -1995,6 +2058,13 @@ function applyStatePayload(parsed: unknown): void {
 
       const films = (sc.films as unknown[]).map(parseFilmRecord).filter((f): f is Film => f !== null);
       if (films.length > 0) target.films = films;
+    });
+  }
+
+  if (Array.isArray(p.lockedCategories)) {
+    lockedCategories.clear();
+    p.lockedCategories.forEach((id) => {
+      if (typeof id === "string") lockedCategories.add(id);
     });
   }
 
@@ -3159,6 +3229,7 @@ async function bootstrap() {
   bindProfileLockButton();
   bindTrendControls();
   bindCsvControls();
+  bindLockNomineesButton();
   bindPrintControls();
   bindSearchControls();
   bindCompareControls();
