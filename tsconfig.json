@@ -12,5 +12,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules", "coverage"]
+  "exclude": ["node_modules", "coverage", "wasm"]
 }

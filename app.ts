@@ -8,6 +8,7 @@ import {
   rebalanceCategory
 } from "./app-logic.js";
 import type { Category, Film, NormalizedWeights, Projection, ScoreResult, Strength } from "./types.js";
+import { initScoringWasm, isScoringWasmReady, scoreFilmWasm } from "./scoring-wasm.js";
 
 interface TrendEntry {
   key: string;
@@ -1023,26 +1024,31 @@ function getActiveCategory(): Category {
 }
 
 function scoreFilm(categoryId: string, film: Film, normalizedWeights: NormalizedWeights): ScoreResult {
+  // winnerHistoryMultiplier requires string lookups against JS config objects.
+  // Pre-compute it here so the WASM kernel only receives a plain f64.
+  const winnerHistoryMultiplier = winnerExperienceBoost(categoryId, film.title);
+
+  if (isScoringWasmReady()) {
+    // Delegate the pure-math core to the WASM kernel.
+    // Inputs cross the boundary as f64 (film numbers/weights) and i32 (strength enum).
+    // Results are read from a pinned Float64Array in WASM linear memory.
+    return scoreFilmWasm(
+      film.precursor, film.history, film.buzz,
+      normalizedWeights.precursor, normalizedWeights.history, normalizedWeights.buzz,
+      film.strength, winnerHistoryMultiplier,
+    );
+  }
+
+  // JS fallback — used during the brief window before WASM finishes loading.
   const precursorContribution = film.precursor * normalizedWeights.precursor;
   const historyContribution = film.history * normalizedWeights.history;
   const buzzContribution = film.buzz * normalizedWeights.buzz;
   const linear = precursorContribution + historyContribution + buzzContribution;
-
   const centered = (linear - 55) / 12;
   const strengthMultiplier = strengthBoost(film.strength);
-  const winnerHistoryMultiplier = winnerExperienceBoost(categoryId, film.title);
   const nominationRaw = logistic(centered) * strengthMultiplier;
   const winnerRaw = nominationRaw * (0.6 + film.precursor / 190) * winnerHistoryMultiplier;
-
-  return {
-    nominationRaw,
-    winnerRaw,
-    precursorContribution,
-    historyContribution,
-    buzzContribution,
-    strengthMultiplier,
-    winnerHistoryMultiplier
-  };
+  return { nominationRaw, winnerRaw, precursorContribution, historyContribution, buzzContribution, strengthMultiplier, winnerHistoryMultiplier };
 }
 
 function renderTabs(): void {
@@ -3138,6 +3144,14 @@ async function loadBacktest(): Promise<void> {
 async function bootstrap() {
   setPanelsBusy(true);
   setAppNotice("Loading forecast workspace...", "loading");
+
+  // Kick off WASM load in parallel with profile/state fetching.
+  // Non-fatal: the JS fallback in scoreFilm() remains active until the module
+  // is ready, and transparently stays active if the fetch ever fails.
+  void initScoringWasm("/wasm/scoring.wasm").catch(() => {
+    // WASM unavailable — JS fallback handles all scoring silently.
+  });
+
   await loadProfiles();
   loadState();
   await loadStateFromApi();
