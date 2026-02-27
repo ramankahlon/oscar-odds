@@ -400,6 +400,39 @@ label {
   color: var(--accent);
 }
 
+/* ── Category completion dot ─────────────────────────────────────────────── */
+
+.summary-card-completion {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  /* default: hidden — only shown when parent card has a data-completion value */
+  background: transparent;
+  border: 1.5px solid transparent;
+}
+
+.summary-card[data-completion="complete"] .summary-card-completion {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.summary-card[data-completion="partial"] .summary-card-completion {
+  background: var(--warn);
+  border-color: var(--warn);
+  opacity: 0.75;
+}
+
+.summary-card[data-completion="untouched"] .summary-card-completion {
+  background: transparent;
+  border-color: var(--muted);
+  opacity: 0.55;
+}
+
 .workspace {
   display: grid;
   gap: 18px;

@@ -1214,6 +1214,24 @@ function getActiveCategory(): Category {
   return categories.find((category) => category.id === state.categoryId) ?? categories[0];
 }
 
+type CompletionState = "complete" | "partial" | "untouched";
+
+/**
+ * Returns the completion state of a category based on whether films still
+ * carry the "TBD" studio placeholder that createSeedFilms() stamps on them.
+ *
+ *   complete  — every film has real data (no TBD studios)
+ *   partial   — some films are real, some are still placeholders
+ *   untouched — all films are still placeholders (nothing edited yet)
+ */
+function getCategoryCompletion(category: Category): CompletionState {
+  if (category.films.length === 0) return "untouched";
+  const filled = category.films.filter((f) => f.studio !== "TBD").length;
+  if (filled === 0)                          return "untouched";
+  if (filled === category.films.length)      return "complete";
+  return "partial";
+}
+
 function scoreFilm(categoryId: string, film: Film, normalizedWeights: NormalizedWeights): ScoreResult {
   // winnerHistoryMultiplier requires string lookups against JS config objects.
   // Pre-compute it here so the WASM kernel only receives a plain f64.
@@ -1249,10 +1267,19 @@ function renderTabs(): void {
   select.className = "category-select";
   select.setAttribute("aria-label", "Oscar category");
 
+  // Completion suffixes appended to option text — Unicode chars work in all
+  // browsers and are read aloud by screen readers ("check mark", "circle").
+  const COMPLETION_SUFFIX: Record<CompletionState, string> = {
+    complete:  " ✓",
+    partial:   " ◑",
+    untouched: " ○",
+  };
+
   categories.forEach((category) => {
+    const completion = getCategoryCompletion(category);
     const option = document.createElement("option");
     option.value = category.id;
-    option.textContent = category.name;
+    option.textContent = category.name + COMPLETION_SUFFIX[completion];
     option.selected = category.id === state.categoryId;
     select.appendChild(option);
   });
@@ -3023,17 +3050,27 @@ function renderSummaryBar() {
       else if (gap >= 15) gapClass = "gap-clear";
     }
 
+    const completion = getCategoryCompletion(category);
+    const completionLabel = completion === "complete"
+      ? "complete"
+      : completion === "partial"
+        ? "partially filled"
+        : "not yet filled";
+
     const card = document.createElement("button");
     card.type = "button";
     card.className = `summary-card${isActive ? " active" : ""}`;
+    card.dataset.completion = completion;
     card.setAttribute(
       "aria-label",
-      `${category.name}: ${displayName}, ${top.winner.toFixed(1)}% winner odds${gap !== null ? `, +${gap.toFixed(1)}pp lead` : ""}`
+      `${category.name} (${completionLabel}): ${displayName}, ${top.winner.toFixed(1)}% winner odds${gap !== null ? `, +${gap.toFixed(1)}pp lead` : ""}`
     );
     card.setAttribute("aria-pressed", isActive ? "true" : "false");
 
     card.innerHTML = `
-      <span class="summary-card-category">${shortName}</span>
+      <span class="summary-card-category">
+        ${shortName}<span class="summary-card-completion" aria-hidden="true"></span>
+      </span>
       <span class="summary-card-title">${displayName}</span>
       <span class="summary-card-footer">
         <span class="summary-card-odds">${top.winner.toFixed(1)}%</span>
