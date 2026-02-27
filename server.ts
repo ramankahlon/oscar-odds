@@ -1,3 +1,10 @@
+// ── OpenTelemetry must be initialised before any other import ─────────────────
+// In ESM, module bodies evaluate depth-first in import order.  Placing this
+// import first guarantees the SDK patches Express.Router.prototype and node:http
+// before server.ts registers any middleware or routes.
+import { tracingEnabled } from "./tracing.js";
+import { trace } from "@opentelemetry/api";
+
 import express, { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
@@ -758,6 +765,12 @@ app.get("/api/health", (_: Request, res: Response) => {
     ok: true,
     now: new Date().toISOString(),
     uptimeSeconds: Math.floor((Date.now() - bootAt) / 1000),
+    tracing: {
+      enabled: tracingEnabled,
+      exporter: tracingEnabled
+        ? (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? "otlp" : "console")
+        : "none",
+    },
     poller: {
       enabled: ENABLE_SOURCE_POLLER,
       ...pollerState
@@ -798,6 +811,8 @@ app.get("/api/profiles", (_: Request, res: Response) => {
 app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
+  // Annotate the active span so traces are filterable by profile in Jaeger/Honeycomb.
+  trace.getActiveSpan()?.setAttribute("app.profile_id", profileId);
   const row = db.prepare("SELECT id, updated_at, payload FROM profiles WHERE id = ?").get(profileId) as ProfileRow | undefined;
   const profile = row
     ? { updatedAt: row.updated_at || null, payload: row.payload != null ? JSON.parse(row.payload) as unknown : null }
@@ -808,6 +823,7 @@ app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
 app.put("/api/forecast/:profileId", forecastWriteLimiter, requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
+  trace.getActiveSpan()?.setAttribute("app.profile_id", profileId);
   const payload = parseBody(forecastPayloadSchema, req.body, res);
   if (payload === null) return;
   const updatedAt = new Date().toISOString();
