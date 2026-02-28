@@ -573,6 +573,7 @@ let searchQuery = "";
 let compareMode = false;
 let compareProfileId: string | null = null;
 const lockedCategories = new Set<string>();
+const surpriseBuzzUndo = new Map<string, number[]>(); // categoryId → original buzz values
 let userPresets: WeightPreset[] = [];
 type OddsMode = "both" | "nomination" | "winner";
 let oddsMode: OddsMode = "both";
@@ -588,7 +589,9 @@ const movieDetailPoster = document.querySelector<HTMLImageElement>("#movieDetail
 const movieDetailPosterLink = document.querySelector<HTMLAnchorElement>("#movieDetailPosterLink")!;
 const exportCsvButton = document.querySelector<HTMLButtonElement>("#exportCsvButton")!;
 const importCsvButton = document.querySelector<HTMLButtonElement>("#importCsvButton")!;
-const lockNomineesButton = document.querySelector<HTMLButtonElement>("#lockNomineesButton");
+const lockNomineesButton  = document.querySelector<HTMLButtonElement>("#lockNomineesButton");
+const surpriseMeButton    = document.querySelector<HTMLButtonElement>("#surpriseMeButton");
+const restoreBuzzButton   = document.querySelector<HTMLButtonElement>("#restoreBuzzButton");
 const precursorSlider  = document.querySelector<HTMLInputElement>("#precursorSlider");
 const historySlider    = document.querySelector<HTMLInputElement>("#historySlider");
 const buzzSlider       = document.querySelector<HTMLInputElement>("#buzzSlider");
@@ -1814,6 +1817,10 @@ function renderCandidates(category: Category, projections: Projection[]): void {
     lockNomineesButton.classList.toggle("action-button--lock-active", isLocked);
   }
 
+  if (restoreBuzzButton) {
+    restoreBuzzButton.hidden = !surpriseBuzzUndo.has(category.id);
+  }
+
   if (isLocked) {
     // Show all films so the user can see which are nominated/snubbed.
     if (category.films.length === 0) {
@@ -2222,6 +2229,47 @@ function bindLockNomineesButton(): void {
     } else {
       lockedCategories.add(categoryId);
     }
+    saveState();
+    render();
+  });
+}
+
+function bindSurpriseMe(): void {
+  if (!surpriseMeButton || !restoreBuzzButton) return;
+
+  surpriseMeButton.addEventListener("click", () => {
+    const category = categories.find((c) => c.id === state.categoryId);
+    if (!category || category.films.length === 0) return;
+
+    // Save original buzz values only on the first randomization (preserve clean undo state).
+    if (!surpriseBuzzUndo.has(category.id)) {
+      surpriseBuzzUndo.set(category.id, category.films.map((f) => f.buzz));
+    }
+
+    // Apply ±5–15 pt random noise to every film's buzz score.
+    category.films.forEach((film) => {
+      const magnitude = 5 + Math.random() * 10; // [5, 15)
+      const delta = Math.random() < 0.5 ? magnitude : -magnitude;
+      film.buzz = Math.round(clamp(film.buzz + delta, 1, 95));
+    });
+
+    saveState();
+    render();
+  });
+
+  restoreBuzzButton.addEventListener("click", () => {
+    const category = categories.find((c) => c.id === state.categoryId);
+    if (!category) return;
+
+    const original = surpriseBuzzUndo.get(category.id);
+    if (!original) return;
+
+    // Restore each film's buzz to its pre-randomization value.
+    category.films.forEach((film, i) => {
+      if (original[i] !== undefined) film.buzz = original[i];
+    });
+    surpriseBuzzUndo.delete(category.id);
+
     saveState();
     render();
   });
@@ -3509,6 +3557,7 @@ async function bootstrap() {
   bindTrendControls();
   bindCsvControls();
   bindLockNomineesButton();
+  bindSurpriseMe();
   bindWeightSliders();
   bindSavePresetButton();
   bindOddsModeToggle();

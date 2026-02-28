@@ -609,6 +609,17 @@ th#thDelta {
   background: var(--accent-soft);
 }
 
+.action-button--surprise {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: transparent;
+}
+.action-button--surprise:hover {
+  color: #b060e8;
+  border-color: #b060e8;
+  background: rgba(176, 96, 232, 0.08);
+}
+
 .candidate-head {
   display: flex;
   justify-content: space-between;
