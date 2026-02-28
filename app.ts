@@ -555,6 +555,11 @@ const trendMeta = document.querySelector<HTMLElement>("#trendMeta")!;
 const trendChart = document.querySelector<SVGElement>("#trendChart");
 const trendSourceMoves = document.querySelector<HTMLElement>("#trendSourceMoves");
 const trendWindowSelect = document.querySelector<HTMLSelectElement>("#trendWindowSelect");
+const trendWindowControl = document.querySelector<HTMLElement>("#trendWindowControl");
+const snapshotCompareToggle = document.querySelector<HTMLButtonElement>("#snapshotCompareToggle");
+const snapshotCompareControls = document.querySelector<HTMLElement>("#snapshotCompareControls");
+const snapshotDateASelect = document.querySelector<HTMLSelectElement>("#snapshotDateA");
+const snapshotDateBSelect = document.querySelector<HTMLSelectElement>("#snapshotDateB");
 const appStateNotice = document.querySelector<HTMLElement>("#appStateNotice");
 const scraperHealthBadge = document.querySelector<HTMLElement>("#scraperHealthBadge");
 const contenderSearch = document.querySelector<HTMLInputElement>("#contenderSearch");
@@ -572,6 +577,9 @@ const thLeaderboardWins = document.querySelector<HTMLElement>("#thLeaderboardWin
 let searchQuery = "";
 let compareMode = false;
 let compareProfileId: string | null = null;
+let snapshotCompareMode = false;
+let snapshotDateA: string | null = null;
+let snapshotDateB: string | null = null;
 const lockedCategories = new Set<string>();
 const surpriseBuzzUndo = new Map<string, number[]>(); // categoryId → original buzz values
 let userPresets: WeightPreset[] = [];
@@ -1487,6 +1495,217 @@ function pointsForEntryTrend(category: Category, entry: Projection): TrendPoint[
     })
     .filter((p): p is TrendPoint => p !== null)
     .slice(-pointLimit);
+}
+
+function getSnapshotDays(categoryId: string): string[] {
+  const daySet = new Set<string>();
+  trendHistory.snapshots
+    .filter(s => s.categoryId === categoryId)
+    .forEach(s => daySet.add(s.capturedAt.slice(0, 10)));
+  return Array.from(daySet).sort();
+}
+
+function getSnapshotForDay(categoryId: string, day: string): TrendSnapshot | null {
+  const matches = trendHistory.snapshots.filter(
+    s => s.categoryId === categoryId && s.capturedAt.startsWith(day)
+  );
+  return matches[matches.length - 1] ?? null;
+}
+
+function getContenderOddsFromSnapshot(
+  snapshot: TrendSnapshot | null,
+  entry: Projection
+): { nomination: number; winner: number } | null {
+  if (!snapshot) return null;
+  const key = trendKeyForEntry(snapshot.categoryId, entry);
+  const found = snapshot.entries.find(e => e.key === key);
+  return found ? { nomination: found.nomination, winner: found.winner } : null;
+}
+
+function formatSnapshotDay(yyyyMMdd: string): string {
+  const d = new Date(`${yyyyMMdd}T12:00:00`);
+  if (Number.isNaN(d.valueOf())) return yyyyMMdd;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function renderSnapshotCompareDatePickers(category: Category): void {
+  if (!snapshotCompareMode) {
+    if (snapshotCompareControls) snapshotCompareControls.hidden = true;
+    if (trendWindowControl) trendWindowControl.hidden = false;
+    return;
+  }
+  if (snapshotCompareControls) snapshotCompareControls.hidden = false;
+  if (trendWindowControl) trendWindowControl.hidden = true;
+
+  const days = getSnapshotDays(category.id);
+
+  // Populate selects
+  [snapshotDateASelect, snapshotDateBSelect].forEach((sel) => {
+    if (!sel) return;
+    sel.innerHTML = "";
+    days.forEach((day) => {
+      const opt = document.createElement("option");
+      opt.value = day;
+      opt.textContent = formatSnapshotDay(day);
+      sel.appendChild(opt);
+    });
+  });
+
+  // Reset dates if no longer valid for this category
+  if (snapshotDateA === null || !days.includes(snapshotDateA)) {
+    snapshotDateA = days[0] ?? null;
+  }
+  if (snapshotDateB === null || !days.includes(snapshotDateB)) {
+    snapshotDateB = days[days.length - 1] ?? null;
+  }
+
+  if (snapshotDateASelect && snapshotDateA) snapshotDateASelect.value = snapshotDateA;
+  if (snapshotDateBSelect && snapshotDateB) snapshotDateBSelect.value = snapshotDateB;
+}
+
+function setSnapshotCompareTableHeaders(category: Category, labelA: string, labelB: string): void {
+  if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
+  if (thNomination) thNomination.hidden = true;
+  if (thWinner) {
+    thWinner.textContent = labelA;
+    thWinner.setAttribute("aria-label", `Winner % on ${labelA}`);
+    thWinner.hidden = false;
+  }
+  if (thCompareB) {
+    thCompareB.textContent = labelB;
+    thCompareB.setAttribute("aria-label", `Winner % on ${labelB}`);
+    thCompareB.hidden = false;
+  }
+  if (thDelta) thDelta.hidden = false;
+}
+
+function renderSnapshotCompareResults(category: Category, projections: Projection[]): void {
+  const labelA = snapshotDateA ? formatSnapshotDay(snapshotDateA) : "Date A";
+  const labelB = snapshotDateB ? formatSnapshotDay(snapshotDateB) : "Date B";
+  setSnapshotCompareTableHeaders(category, labelA, labelB);
+  resultsBody.innerHTML = "";
+
+  const displayLimit = getDisplayLimit(category);
+  const primaryTop = projections.slice(0, displayLimit);
+
+  if (primaryTop.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="results-empty" colspan="4">No projected contenders for this category.</td>`;
+    resultsBody.appendChild(row);
+    renderExplanation(category, null, []);
+    renderMovieDetails(category, null);
+    renderTrendAnalytics(category, null);
+    return;
+  }
+
+  const snapshotA = snapshotDateA ? getSnapshotForDay(category.id, snapshotDateA) : null;
+  const snapshotB = snapshotDateB ? getSnapshotForDay(category.id, snapshotDateB) : null;
+
+  const selectedIndex = explainSelectionByCategory[category.id] ?? 0;
+  const boundedIndex = clamp(selectedIndex, 0, Math.max(0, primaryTop.length - 1));
+  explainSelectionByCategory[category.id] = boundedIndex;
+
+  primaryTop.forEach((entry, index) => {
+    const oddsA = getContenderOddsFromSnapshot(snapshotA, entry);
+    const oddsB = getContenderOddsFromSnapshot(snapshotB, entry);
+    const aWinner = oddsA?.winner ?? null;
+    const bWinner = oddsB?.winner ?? null;
+    const delta = aWinner !== null && bWinner !== null ? bWinner - aWinner : null;
+
+    let deltaCell;
+    if (delta === null) {
+      deltaCell = `<td data-label="Δ" class="delta-na">—</td>`;
+    } else {
+      const sign = delta >= 0 ? "+" : "";
+      const cls = delta > 0.5 ? "delta-pos" : delta < -0.5 ? "delta-neg" : "delta-neutral";
+      deltaCell = `<td data-label="Δ" class="${cls}">${sign}${delta.toFixed(1)}pp</td>`;
+    }
+
+    const row = document.createElement("tr");
+    row.className = `results-row${index === boundedIndex ? " active" : ""}`;
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-selected", index === boundedIndex ? "true" : "false");
+    row.setAttribute(
+      "aria-label",
+      `${entry.title}. ${labelA}: ${aWinner !== null ? aWinner.toFixed(1) + "%" : "no data"}. ${labelB}: ${bWinner !== null ? bWinner.toFixed(1) + "%" : "no data"}.`
+    );
+
+    row.addEventListener("click", () => { explainSelectionByCategory[category.id] = index; render(); });
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); explainSelectionByCategory[category.id] = index; render(); return; }
+      if (event.key === "ArrowDown") { event.preventDefault(); explainSelectionByCategory[category.id] = clamp(index + 1, 0, primaryTop.length - 1); render(); return; }
+      if (event.key === "ArrowUp") { event.preventDefault(); explainSelectionByCategory[category.id] = clamp(index - 1, 0, primaryTop.length - 1); render(); }
+    });
+
+    row.innerHTML = `
+      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>
+      <td data-label="${labelA}">${aWinner !== null ? aWinner.toFixed(1) + "%" : "—"}</td>
+      <td data-label="${labelB}">${bWinner !== null ? bWinner.toFixed(1) + "%" : "—"}</td>
+      ${deltaCell}
+    `;
+    resultsBody.appendChild(row);
+  });
+
+  renderExplanation(category, primaryTop[boundedIndex], primaryTop);
+  renderMovieDetails(category, primaryTop[boundedIndex]);
+  renderTrendAnalytics(category, primaryTop[boundedIndex]);
+}
+
+function bindSnapshotCompareControls(): void {
+  snapshotCompareToggle?.addEventListener("click", () => {
+    if (snapshotCompareMode) {
+      snapshotCompareMode = false;
+      snapshotDateA = null;
+      snapshotDateB = null;
+      if (snapshotCompareControls) snapshotCompareControls.hidden = true;
+      if (trendWindowControl) trendWindowControl.hidden = false;
+      if (snapshotCompareToggle) {
+        snapshotCompareToggle.textContent = "Compare dates";
+        snapshotCompareToggle.setAttribute("aria-pressed", "false");
+        snapshotCompareToggle.classList.remove("action-button--lock-active");
+      }
+      render();
+      return;
+    }
+
+    const activeCategory = getActiveCategory();
+    const days = getSnapshotDays(activeCategory.id);
+    if (days.length < 2) {
+      setAppNotice("Need at least 2 snapshot days to compare.", "error");
+      return;
+    }
+
+    // Disable profile compare if active
+    if (compareMode) {
+      compareMode = false;
+      compareProfileId = null;
+      if (compareControls) compareControls.hidden = true;
+      if (compareToggleButton) {
+        compareToggleButton.textContent = "Compare";
+        compareToggleButton.setAttribute("aria-pressed", "false");
+      }
+    }
+
+    snapshotCompareMode = true;
+    snapshotDateA = days[0];
+    snapshotDateB = days[days.length - 1];
+    if (snapshotCompareToggle) {
+      snapshotCompareToggle.textContent = "✕ Compare dates";
+      snapshotCompareToggle.setAttribute("aria-pressed", "true");
+      snapshotCompareToggle.classList.add("action-button--lock-active");
+    }
+    render();
+  });
+
+  snapshotDateASelect?.addEventListener("change", (event) => {
+    snapshotDateA = (event.target as HTMLSelectElement).value;
+    render();
+  });
+
+  snapshotDateBSelect?.addEventListener("change", (event) => {
+    snapshotDateB = (event.target as HTMLSelectElement).value;
+    render();
+  });
 }
 
 function formatTrendStamp(value: string): string {
@@ -3104,6 +3323,19 @@ function bindCompareControls() {
       setAppNotice("Create a second profile to use comparison mode.", "error");
       return;
     }
+    // Disable snapshot compare if active
+    if (snapshotCompareMode) {
+      snapshotCompareMode = false;
+      snapshotDateA = null;
+      snapshotDateB = null;
+      if (snapshotCompareControls) snapshotCompareControls.hidden = true;
+      if (trendWindowControl) trendWindowControl.hidden = false;
+      if (snapshotCompareToggle) {
+        snapshotCompareToggle.textContent = "Compare dates";
+        snapshotCompareToggle.setAttribute("aria-pressed", "false");
+        snapshotCompareToggle.classList.remove("action-button--lock-active");
+      }
+    }
     compareMode = true;
     compareProfileId = others[0];
     updateCompareProfileSelect();
@@ -3271,6 +3503,7 @@ function render() {
   renderSummaryBar();
   renderLeaderboard();
   renderCandidates(activeCategory, projections);
+  renderSnapshotCompareDatePickers(activeCategory);
   if (compareMode && compareProfileId && !searchQuery) {
     if (comparePayloadCache.has(compareProfileId)) {
       renderCompareResults(activeCategory, projections);
@@ -3281,6 +3514,8 @@ function render() {
       loadingRow.innerHTML = `<td class="results-empty" colspan="4">Loading comparison profile…</td>`;
       resultsBody.appendChild(loadingRow);
     }
+  } else if (snapshotCompareMode && !searchQuery) {
+    renderSnapshotCompareResults(activeCategory, projections);
   } else {
     renderResults(activeCategory, projections);
   }
@@ -3557,6 +3792,7 @@ async function bootstrap() {
   bindTrendControls();
   bindCsvControls();
   bindLockNomineesButton();
+  bindSnapshotCompareControls();
   bindSurpriseMe();
   bindWeightSliders();
   bindSavePresetButton();

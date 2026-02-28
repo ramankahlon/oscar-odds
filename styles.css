@@ -961,6 +961,32 @@ table {
   margin-bottom: 6px;
 }
 
+.trend-head-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.snapshot-compare-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.snapshot-compare-controls select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 7px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .trend-window-control {
   display: flex;
   gap: 6px;
@@ -1111,6 +1137,11 @@ a:focus-visible {
     align-items: flex-start;
   }
 
+  .trend-head-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .spotlight table,
   .spotlight thead,
   .spotlight tbody,
@@ -1192,7 +1223,8 @@ a:focus-visible {
   .category-select,
   .mini-grid input,
   .mini-grid select,
-  .trend-window-control select {
+  .trend-window-control select,
+  .snapshot-compare-controls select {
     background: var(--surface-2);
     color: var(--ink);
     color-scheme: dark;
@@ -1311,6 +1343,8 @@ a:focus-visible {
   .app-notice,
   .scraper-health-badge,
   .compare-controls,
+  .snapshot-compare-controls,
+  #snapshotCompareToggle,
   .data-tools {
     display: none !important;
   }
