@@ -668,6 +668,38 @@ table {
   margin-bottom: 14px;
 }
 
+/* Results panel header: h2 + odds-mode toggle button on one line */
+.results-panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.results-panel-header h2 {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.odds-mode-btn {
+  font-size: 0.76rem;
+  padding: 4px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Focused column header in nomination/winner mode */
+.th-focused {
+  color: var(--accent) !important;
+}
+
+.th-focused::after {
+  content: " ▲";
+  font-size: 0.65em;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
 .odds-last-updated {
   margin: -6px 0 10px;
   font-size: 0.82rem;

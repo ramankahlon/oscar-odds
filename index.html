@@ -83,7 +83,10 @@
 
       <section class="workspace">
         <article id="resultsPanel" class="panel results spotlight">
-          <h2>Projected Odds</h2>
+          <div class="results-panel-header">
+            <h2>Projected Odds</h2>
+            <button id="oddsModeToggle" class="action-button odds-mode-btn" type="button" aria-pressed="false">Both</button>
+          </div>
           <p id="oddsLastUpdated" class="odds-last-updated" aria-live="polite"></p>
           <div class="search-bar">
             <input id="contenderSearch" type="search" placeholder="Search all contenders…" autocomplete="off" aria-label="Search all contenders across categories" />
@@ -169,8 +172,8 @@
             <thead>
               <tr>
                 <th scope="col">Film</th>
-                <th scope="col" class="leaderboard-num">Nominations</th>
-                <th scope="col" class="leaderboard-num">Wins</th>
+                <th scope="col" id="thLeaderboardNominations" class="leaderboard-num">Nominations</th>
+                <th scope="col" id="thLeaderboardWins" class="leaderboard-num">Wins</th>
               </tr>
             </thead>
             <tbody id="leaderboardBody"></tbody>

@@ -566,11 +566,16 @@ const thNomination = document.querySelector<HTMLElement>("#thNomination");
 const thWinner = document.querySelector<HTMLElement>("#thWinner");
 const thCompareB = document.querySelector<HTMLElement>("#thCompareB");
 const thDelta = document.querySelector<HTMLElement>("#thDelta");
+const oddsModeToggle = document.querySelector<HTMLButtonElement>("#oddsModeToggle");
+const thLeaderboardNominations = document.querySelector<HTMLElement>("#thLeaderboardNominations");
+const thLeaderboardWins = document.querySelector<HTMLElement>("#thLeaderboardWins");
 let searchQuery = "";
 let compareMode = false;
 let compareProfileId: string | null = null;
 const lockedCategories = new Set<string>();
 let userPresets: WeightPreset[] = [];
+type OddsMode = "both" | "nomination" | "winner";
+let oddsMode: OddsMode = "both";
 const comparePayloadCache = new Map<string, StatePayload>();
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
@@ -1838,8 +1843,15 @@ function renderCandidates(category: Category, projections: Projection[]): void {
 
 function renderSearchResults(query: string): void {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = "Film";
-  if (thNomination) thNomination.hidden = false;
-  if (thWinner) thWinner.textContent = "Winner %";
+  if (thNomination) {
+    thNomination.hidden = oddsMode === "winner";
+    thNomination.classList.toggle("th-focused", oddsMode === "nomination");
+  }
+  if (thWinner) {
+    thWinner.textContent = "Winner %";
+    thWinner.hidden = oddsMode === "nomination";
+    thWinner.classList.toggle("th-focused", oddsMode === "winner");
+  }
   if (thCompareB) thCompareB.hidden = true;
   if (thDelta) thDelta.hidden = true;
   resultsBody.innerHTML = "";
@@ -1864,7 +1876,7 @@ function renderSearchResults(query: string): void {
 
   if (matches.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="results-empty" colspan="3">No contenders match "${query}".</td>`;
+    row.innerHTML = `<td class="results-empty" colspan="${oddsMode === "both" ? 3 : 2}">No contenders match "${query}".</td>`;
     resultsBody.appendChild(row);
   } else {
     matches.forEach((entry) => {
@@ -1904,8 +1916,8 @@ function renderSearchResults(query: string): void {
           <strong>${entry.title}</strong>
           <span class="results-category-label">${entry.categoryName}</span>
         </td>
-        <td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>
-        <td data-label="Winner %">${entry.winner.toFixed(1)}%</td>
+        ${oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>` : ""}
+        ${oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`      : ""}
       `;
       resultsBody.appendChild(row);
     });
@@ -1926,7 +1938,7 @@ function renderResults(category: Category, projections: Projection[]): void {
   const displayProjections = projections.slice(0, getDisplayLimit(category));
   if (displayProjections.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="results-empty" colspan="3">No projected contenders for this category.</td>`;
+    row.innerHTML = `<td class="results-empty" colspan="${oddsMode === "both" ? 3 : 2}">No projected contenders for this category.</td>`;
     resultsBody.appendChild(row);
     renderExplanation(category, null, []);
     renderMovieDetails(category, null);
@@ -1967,9 +1979,10 @@ function renderResults(category: Category, projections: Projection[]): void {
         render();
       }
     });
-    row.innerHTML = `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td><td data-label="Nomination %">${entry.nomination.toFixed(
-      1
-    )}%</td><td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`;
+    row.innerHTML =
+      `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>` +
+      (oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>` : "") +
+      (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`       : "");
     resultsBody.appendChild(row);
   });
 
@@ -2174,6 +2187,30 @@ function bindSearchControls(): void {
       render();
     });
   }
+}
+
+function updateOddsModeButton(): void {
+  if (!oddsModeToggle) return;
+  // In compare mode the table has a different 4-column layout — hide the toggle.
+  oddsModeToggle.hidden = compareMode;
+  const LABELS: Record<OddsMode, string> = {
+    both:       "Both",
+    nomination: "Nom. only",
+    winner:     "Win. only",
+  };
+  oddsModeToggle.textContent = LABELS[oddsMode];
+  oddsModeToggle.setAttribute("aria-pressed", String(oddsMode !== "both"));
+  oddsModeToggle.classList.toggle("action-button--lock-active", oddsMode !== "both");
+}
+
+function bindOddsModeToggle(): void {
+  if (!oddsModeToggle) return;
+  oddsModeToggle.addEventListener("click", () => {
+    if (oddsMode === "both")       oddsMode = "nomination";
+    else if (oddsMode === "nomination") oddsMode = "winner";
+    else                           oddsMode = "both";
+    render();
+  });
 }
 
 function bindLockNomineesButton(): void {
@@ -2888,8 +2925,15 @@ function buildCompareProjectionsFrom(category: Category, payload: StatePayload |
 
 function setNormalTableHeaders(category: Category) {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = getPrimaryColumnLabel(category.id);
-  if (thNomination) thNomination.hidden = false;
-  if (thWinner) thWinner.textContent = "Winner %";
+  if (thNomination) {
+    thNomination.hidden = oddsMode === "winner";
+    thNomination.classList.toggle("th-focused", oddsMode === "nomination");
+  }
+  if (thWinner) {
+    thWinner.textContent = "Winner %";
+    thWinner.hidden = oddsMode === "nomination";
+    thWinner.classList.toggle("th-focused", oddsMode === "winner");
+  }
   if (thCompareB) thCompareB.hidden = true;
   if (thDelta) thDelta.hidden = true;
 }
@@ -3127,14 +3171,22 @@ function renderLeaderboard(): void {
     });
   }
 
-  // Sort by nomination count desc; break ties by win count desc. Show top 10 only.
+  // Apply column visibility to headers based on current odds focus mode.
+  if (thLeaderboardNominations) thLeaderboardNominations.hidden = oddsMode === "winner";
+  if (thLeaderboardWins)        thLeaderboardWins.hidden        = oddsMode === "nomination";
+
+  // Sort order matches the focused column: wins-first in winner mode, nominations-first otherwise.
   const rows = Array.from(filmMap.entries())
-    .sort(([, a], [, b]) => b.nominations - a.nominations || b.wins - a.wins)
+    .sort(([, a], [, b]) =>
+      oddsMode === "winner"
+        ? b.wins - a.wins || b.nominations - a.nominations
+        : b.nominations - a.nominations || b.wins - a.wins
+    )
     .slice(0, 10);
 
   if (rows.length === 0) {
     const row = leaderboardBody.insertRow();
-    row.innerHTML = `<td class="results-empty" colspan="3">No contenders loaded yet.</td>`;
+    row.innerHTML = `<td class="results-empty" colspan="${oddsMode === "both" ? 3 : 2}">No contenders loaded yet.</td>`;
     return;
   }
 
@@ -3145,14 +3197,13 @@ function renderLeaderboard(): void {
       "aria-label",
       `${index + 1}. ${title}: ${nominations} nomination${nominations !== 1 ? "s" : ""}, ${wins} win${wins !== 1 ? "s" : ""}`
     );
-    row.innerHTML = `
-      <td class="leaderboard-film">
-        <span class="leaderboard-rank">${index + 1}</span>
-        <span class="leaderboard-title">${title}</span>
-      </td>
-      <td class="leaderboard-num">${nominations}</td>
-      <td class="leaderboard-num">${wins}</td>
-    `;
+    row.innerHTML =
+      `<td class="leaderboard-film">` +
+        `<span class="leaderboard-rank">${index + 1}</span>` +
+        `<span class="leaderboard-title">${title}</span>` +
+      `</td>` +
+      (oddsMode !== "winner"     ? `<td class="leaderboard-num">${nominations}</td>` : "") +
+      (oddsMode !== "nomination" ? `<td class="leaderboard-num">${wins}</td>`        : "");
   });
 }
 
@@ -3168,6 +3219,7 @@ function render() {
   renderTabs();
   renderWeightSliders();
   renderWeightPresets();
+  updateOddsModeButton();
   renderSummaryBar();
   renderLeaderboard();
   renderCandidates(activeCategory, projections);
@@ -3459,6 +3511,7 @@ async function bootstrap() {
   bindLockNomineesButton();
   bindWeightSliders();
   bindSavePresetButton();
+  bindOddsModeToggle();
   bindPrintControls();
   bindSearchControls();
   bindCompareControls();
