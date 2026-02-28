@@ -1298,6 +1298,11 @@ a:focus-visible {
   .legend-dot.source {
     background: var(--muted);
   }
+
+  .consensus-import-textarea {
+    background: var(--surface-2);
+    color-scheme: dark;
+  }
 }
 
 @page {
@@ -1582,3 +1587,29 @@ a:focus-visible {
   background: transparent; border: 1px solid var(--line); color: var(--muted);
 }
 .action-button--ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Consensus Import dialog */
+.consensus-import-textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-top: 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.consensus-import-status {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.consensus-import-status.error {
+  color: #c0392b;
+}

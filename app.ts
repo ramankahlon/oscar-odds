@@ -599,6 +599,13 @@ const exportCsvButton = document.querySelector<HTMLButtonElement>("#exportCsvBut
 const importCsvButton = document.querySelector<HTMLButtonElement>("#importCsvButton")!;
 const lockNomineesButton  = document.querySelector<HTMLButtonElement>("#lockNomineesButton");
 const surpriseMeButton    = document.querySelector<HTMLButtonElement>("#surpriseMeButton");
+const consensusImportButton   = document.querySelector<HTMLButtonElement>("#consensusImportButton");
+const consensusImportDialog   = document.querySelector<HTMLDialogElement>("#consensusImportDialog");
+const consensusImportInput    = document.querySelector<HTMLTextAreaElement>("#consensusImportInput");
+const consensusImportStatus   = document.querySelector<HTMLElement>("#consensusImportStatus");
+const consensusImportCategory = document.querySelector<HTMLElement>("#consensusImportCategory");
+const consensusImportApply    = document.querySelector<HTMLButtonElement>("#consensusImportApply");
+const consensusImportCancel   = document.querySelector<HTMLButtonElement>("#consensusImportCancel");
 const restoreBuzzButton   = document.querySelector<HTMLButtonElement>("#restoreBuzzButton");
 const precursorSlider  = document.querySelector<HTMLInputElement>("#precursorSlider");
 const historySlider    = document.querySelector<HTMLInputElement>("#historySlider");
@@ -2494,6 +2501,112 @@ function bindSurpriseMe(): void {
   });
 }
 
+function parseConsensusInput(text: string): string[] {
+  return text
+    .split(/[\n,]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+function applyConsensusRanking(
+  category: Category,
+  rankedTitles: string[]
+): { matched: string[]; unmatched: string[] } {
+  const TOP = 88;
+  const PREFERRED_STEP = 15;
+
+  const matched: Array<{ film: Film; label: string }> = [];
+  const unmatched: string[] = [];
+  const usedIndices = new Set<number>();
+
+  for (const label of rankedTitles) {
+    const key = normalizeSignalKey(label);
+    let foundIndex = -1;
+
+    // Exact normalized match
+    for (let i = 0; i < category.films.length; i++) {
+      if (usedIndices.has(i)) continue;
+      if (normalizeSignalKey(category.films[i].title) === key) { foundIndex = i; break; }
+    }
+    // Starts-with fallback (handles extra year / subtitle in stored title)
+    if (foundIndex === -1) {
+      for (let i = 0; i < category.films.length; i++) {
+        if (usedIndices.has(i)) continue;
+        const filmKey = normalizeSignalKey(category.films[i].title);
+        if (filmKey.startsWith(key) || key.startsWith(filmKey)) { foundIndex = i; break; }
+      }
+    }
+
+    if (foundIndex !== -1) {
+      matched.push({ film: category.films[foundIndex], label });
+      usedIndices.add(foundIndex);
+    } else {
+      unmatched.push(label);
+    }
+  }
+
+  const N = matched.length;
+  if (N === 1) {
+    matched[0].film.precursor = TOP;
+  } else if (N > 1) {
+    const bottom = Math.max(10, TOP - PREFERRED_STEP * (N - 1));
+    const step = (TOP - bottom) / (N - 1);
+    matched.forEach(({ film }, i) => {
+      film.precursor = Math.round(clamp(TOP - i * step, 5, 95));
+    });
+  }
+
+  return { matched: matched.map(m => m.label), unmatched };
+}
+
+function setConsensusImportStatus(msg: string, isError: boolean): void {
+  if (!consensusImportStatus) return;
+  consensusImportStatus.textContent = msg;
+  consensusImportStatus.className = `consensus-import-status${isError ? " error" : ""}`;
+  consensusImportStatus.hidden = false;
+}
+
+function bindConsensusImport(): void {
+  consensusImportButton?.addEventListener("click", () => {
+    if (!consensusImportDialog) return;
+    if (consensusImportCategory) consensusImportCategory.textContent = getActiveCategory().name;
+    if (consensusImportInput) consensusImportInput.value = "";
+    if (consensusImportStatus) consensusImportStatus.hidden = true;
+    consensusImportDialog.showModal();
+    consensusImportInput?.focus();
+  });
+
+  consensusImportApply?.addEventListener("click", () => {
+    if (!consensusImportInput || !consensusImportDialog) return;
+    const titles = parseConsensusInput(consensusImportInput.value);
+    if (titles.length === 0) {
+      setConsensusImportStatus("Enter at least one film title.", true);
+      return;
+    }
+    const category = getActiveCategory();
+    const { matched, unmatched } = applyConsensusRanking(category, titles);
+    if (matched.length === 0) {
+      setConsensusImportStatus(`No titles matched films in ${category.name}.`, true);
+      return;
+    }
+    saveState();
+    render();
+    consensusImportDialog.close();
+    const note = unmatched.length > 0 ? ` Unmatched: ${unmatched.join(", ")}.` : "";
+    setCsvStatus(
+      `Consensus applied: ${matched.length} film${matched.length !== 1 ? "s" : ""} ranked in ${category.name}.${note}`,
+      "success"
+    );
+  });
+
+  consensusImportCancel?.addEventListener("click", () => consensusImportDialog?.close());
+
+  // Close on backdrop click
+  consensusImportDialog?.addEventListener("click", (e) => {
+    if (e.target === consensusImportDialog) consensusImportDialog.close();
+  });
+}
+
 function bindCsvControls(): void {
   exportCsvButton.addEventListener("click", () => {
     const csvText = exportContendersCsv();
@@ -3794,6 +3907,7 @@ async function bootstrap() {
   bindLockNomineesButton();
   bindSnapshotCompareControls();
   bindSurpriseMe();
+  bindConsensusImport();
   bindWeightSliders();
   bindSavePresetButton();
   bindOddsModeToggle();

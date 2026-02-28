@@ -167,6 +167,8 @@
             <button id="restoreBuzzButton" class="action-button action-button--ghost" type="button" hidden>Restore buzz</button>
             <button id="exportCsvButton" class="action-button" type="button">Export CSV</button>
             <button id="importCsvButton" class="action-button" type="button">Import CSV</button>
+            <button id="consensusImportButton" class="action-button" type="button"
+                    title="Adjust precursor scores to match a published ranking">Consensus Import</button>
             <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
             <p class="tool-status" id="csvStatus" role="status" aria-live="polite"></p>
           </div>
@@ -277,6 +279,25 @@
         <div class="auth-dialog-actions">
           <button type="button" id="authSecurityClose" class="action-button action-button--ghost">Close</button>
         </div>
+      </div>
+    </dialog>
+
+    <dialog id="consensusImportDialog" class="auth-dialog" aria-modal="true"
+            aria-labelledby="consensusImportTitle">
+      <h3 id="consensusImportTitle" class="auth-dialog-title">Consensus Import</h3>
+      <p class="auth-dialog-desc">
+        Paste film titles ranked by odds — one per line or comma-separated
+        (e.g. from Gold Derby, Variety). Precursor scores for matched contenders in
+        <strong id="consensusImportCategory"></strong> will be adjusted to reflect this ordering.
+      </p>
+      <textarea id="consensusImportInput" class="consensus-import-textarea" rows="7"
+        placeholder="Anora&#10;The Brutalist&#10;Emilia Pérez&#10;A Complete Unknown&#10;Conclave"
+        aria-label="Ranked film titles, one per line or comma-separated"></textarea>
+      <p id="consensusImportStatus" class="consensus-import-status" hidden></p>
+      <div class="auth-dialog-actions">
+        <button type="button" id="consensusImportApply" class="action-button">Apply</button>
+        <button type="button" id="consensusImportCancel"
+                class="action-button action-button--ghost">Cancel</button>
       </div>
     </dialog>
 
