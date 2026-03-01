@@ -1613,3 +1613,28 @@ a:focus-visible {
 .consensus-import-status.error {
   color: #c0392b;
 }
+
+/* Buzz sync cross-category banner */
+.buzz-sync-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.buzz-sync-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.buzz-sync-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

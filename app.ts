@@ -582,6 +582,7 @@ let snapshotDateA: string | null = null;
 let snapshotDateB: string | null = null;
 const lockedCategories = new Set<string>();
 const surpriseBuzzUndo = new Map<string, number[]>(); // categoryId → original buzz values
+let pendingBuzzSync: { title: string; buzz: number; targets: Category[] } | null = null;
 let userPresets: WeightPreset[] = [];
 type OddsMode = "both" | "nomination" | "winner";
 let oddsMode: OddsMode = "both";
@@ -606,6 +607,10 @@ const consensusImportStatus   = document.querySelector<HTMLElement>("#consensusI
 const consensusImportCategory = document.querySelector<HTMLElement>("#consensusImportCategory");
 const consensusImportApply    = document.querySelector<HTMLButtonElement>("#consensusImportApply");
 const consensusImportCancel   = document.querySelector<HTMLButtonElement>("#consensusImportCancel");
+const buzzSyncBanner  = document.querySelector<HTMLElement>("#buzzSyncBanner");
+const buzzSyncMessage = document.querySelector<HTMLElement>("#buzzSyncMessage");
+const buzzSyncApply   = document.querySelector<HTMLButtonElement>("#buzzSyncApply");
+const buzzSyncDismiss = document.querySelector<HTMLButtonElement>("#buzzSyncDismiss");
 const restoreBuzzButton   = document.querySelector<HTMLButtonElement>("#restoreBuzzButton");
 const precursorSlider  = document.querySelector<HTMLInputElement>("#precursorSlider");
 const historySlider    = document.querySelector<HTMLInputElement>("#historySlider");
@@ -1308,6 +1313,7 @@ function renderTabs(): void {
   });
 
   select.addEventListener("change", (event) => {
+    clearBuzzSyncBanner();
     state.categoryId = (event.target as HTMLSelectElement).value;
     if (searchQuery) {
       searchQuery = "";
@@ -1376,6 +1382,7 @@ function createCard(category: Category, film: Film, filmIndex: number): HTMLDivE
       (film as unknown as Record<string, number>)[field.key] = clamp(Number((event.target as HTMLInputElement).value || 0), 0, 100);
       saveState();
       render();
+      if (field.key === "buzz") showBuzzSyncBanner(film, category);
     });
     wrapper.appendChild(input);
     grid.appendChild(wrapper);
@@ -2605,6 +2612,50 @@ function bindConsensusImport(): void {
   consensusImportDialog?.addEventListener("click", (e) => {
     if (e.target === consensusImportDialog) consensusImportDialog.close();
   });
+}
+
+function findBuzzSyncTargets(filmTitle: string, excludeCategoryId: string): Category[] {
+  const key = normalizeSignalKey(filmTitle);
+  return categories.filter((cat) => {
+    if (cat.id === excludeCategoryId) return false;
+    return cat.films.some((f) => normalizeSignalKey(f.title) === key);
+  });
+}
+
+function showBuzzSyncBanner(film: Film, sourceCategory: Category): void {
+  const targets = findBuzzSyncTargets(film.title, sourceCategory.id);
+  if (targets.length === 0) { clearBuzzSyncBanner(); return; }
+  pendingBuzzSync = { title: film.title, buzz: film.buzz, targets };
+  if (buzzSyncMessage) {
+    const catNames = targets.map(c => c.name).join(", ");
+    buzzSyncMessage.textContent = `"${film.title}" buzz → ${film.buzz}. Sync to: ${catNames}?`;
+  }
+  if (buzzSyncBanner) buzzSyncBanner.hidden = false;
+}
+
+function clearBuzzSyncBanner(): void {
+  pendingBuzzSync = null;
+  if (buzzSyncBanner) buzzSyncBanner.hidden = true;
+}
+
+function applyBuzzSync(): void {
+  if (!pendingBuzzSync) return;
+  const { title, buzz, targets } = pendingBuzzSync;
+  const key = normalizeSignalKey(title);
+  targets.forEach((cat) => {
+    cat.films.forEach((f) => {
+      if (normalizeSignalKey(f.title) === key) f.buzz = buzz;
+    });
+  });
+  clearBuzzSyncBanner();
+  saveState();
+  render();
+  setCsvStatus(`Buzz synced to ${targets.length} other categor${targets.length === 1 ? "y" : "ies"}.`, "success");
+}
+
+function bindBuzzSync(): void {
+  buzzSyncApply?.addEventListener("click", applyBuzzSync);
+  buzzSyncDismiss?.addEventListener("click", clearBuzzSyncBanner);
 }
 
 function bindCsvControls(): void {
@@ -3908,6 +3959,7 @@ async function bootstrap() {
   bindSnapshotCompareControls();
   bindSurpriseMe();
   bindConsensusImport();
+  bindBuzzSync();
   bindWeightSliders();
   bindSavePresetButton();
   bindOddsModeToggle();

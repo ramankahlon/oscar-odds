@@ -171,6 +171,13 @@
                     title="Adjust precursor scores to match a published ranking">Consensus Import</button>
             <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
             <p class="tool-status" id="csvStatus" role="status" aria-live="polite"></p>
+            <div id="buzzSyncBanner" class="buzz-sync-banner" hidden>
+              <span id="buzzSyncMessage" class="buzz-sync-message"></span>
+              <div class="buzz-sync-actions">
+                <button type="button" id="buzzSyncApply" class="action-button">Sync</button>
+                <button type="button" id="buzzSyncDismiss" class="action-button action-button--ghost">Dismiss</button>
+              </div>
+            </div>
           </div>
           <div id="candidateCards"></div>
         </article>
