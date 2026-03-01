@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   // Ignore generated and dependency directories
   {
-    ignores: ["coverage/", "node_modules/", "app.js"]
+    ignores: ["coverage/", "node_modules/", "app.js", "wasm/"]
   },
 
   // Base recommended rules for all files
