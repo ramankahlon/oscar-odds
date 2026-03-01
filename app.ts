@@ -1378,9 +1378,19 @@ function createCard(category: Category, film: Film, filmIndex: number): HTMLDivE
     input.max = "100";
     input.step = "1";
     input.value = String((film as unknown as Record<string, unknown>)[field.key]);
+    input.inputMode = "numeric";
+    input.setAttribute("autocomplete", "off");
+
+    input.addEventListener("focus", () => { input.select(); });
+
     input.addEventListener("input", (event) => {
-      (film as unknown as Record<string, number>)[field.key] = clamp(Number((event.target as HTMLInputElement).value || 0), 0, 100);
+      (film as unknown as Record<string, number>)[field.key] = clamp(
+        Number((event.target as HTMLInputElement).value || 0), 0, 100
+      );
       saveState();
+    });
+
+    input.addEventListener("change", () => {
       render();
       if (field.key === "buzz") showBuzzSyncBanner(film, category);
     });

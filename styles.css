@@ -663,6 +663,16 @@ th#thDelta {
   background: #fff;
 }
 
+.mini-grid input[type="number"]::-webkit-outer-spin-button,
+.mini-grid input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.mini-grid input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1185,6 +1195,12 @@ a:focus-visible {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     margin-bottom: 2px;
+  }
+
+  .mini-grid input[type="number"] {
+    padding: 12px 8px;
+    font-size: 1.05rem;
+    text-align: center;
   }
 }
 
