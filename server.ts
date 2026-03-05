@@ -374,6 +374,13 @@ function initDb(): void {
   db.prepare("DELETE FROM snapshots WHERE snapped_at < ?")
     .run(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 
+  // Periodically purge expired sessions while the server is running.
+  const SESSION_PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+  const purgeExpiredSessions = db.prepare("DELETE FROM sessions WHERE expires_at < ?");
+  setInterval(() => {
+    purgeExpiredSessions.run(new Date().toISOString());
+  }, SESSION_PURGE_INTERVAL_MS).unref();
+
   // One-time migration from forecast-store.json when the DB is empty.
   const isEmpty = (db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as CountRow).n === 0;
   if (isEmpty) {
