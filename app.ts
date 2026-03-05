@@ -2937,6 +2937,7 @@ function bindProfileLockButton(): void {
       authDialogForm.hidden = true;
       authSecurityOptions.hidden = false;
       if (!authDialog.open) authDialog.showModal();
+      authChangePassphraseBtn?.focus();
     }
   });
 
