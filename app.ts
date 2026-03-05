@@ -648,6 +648,7 @@ const authRemovePassphraseBtn = document.querySelector<HTMLButtonElement>("#auth
 const authLogoutBtn           = document.querySelector<HTMLButtonElement>("#authLogoutBtn");
 const authSecurityClose       = document.querySelector<HTMLButtonElement>("#authSecurityClose");
 const printPdfButton = document.querySelector<HTMLButtonElement>("#printPdfButton");
+const themeToggleButton = document.querySelector<HTMLButtonElement>("#themeToggleButton");
 const printMeta = document.querySelector<HTMLElement>("#printMeta");
 const backtestStatus         = document.querySelector<HTMLElement>("#backtestStatus");
 const backtestOverview       = document.querySelector<HTMLElement>("#backtestOverview");
@@ -1049,6 +1050,38 @@ function renderWeightPresets(): void {
     }
 
     weightPresetsEl.appendChild(chip);
+  });
+}
+
+const THEME_STORAGE_KEY = "oscar-odds:theme";
+type Theme = "dark" | "light";
+
+function applyTheme(theme: Theme): void {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+  if (themeToggleButton) {
+    themeToggleButton.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+    themeToggleButton.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  }
+}
+
+function initTheme(): void {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+  const osDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const effective: Theme = stored ?? (osDark ? "dark" : "light");
+  if (stored) document.documentElement.dataset.theme = stored;
+  if (themeToggleButton) {
+    themeToggleButton.textContent = effective === "dark" ? "Light mode" : "Dark mode";
+    themeToggleButton.setAttribute("aria-label", effective === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  }
+}
+
+function bindThemeToggle(): void {
+  themeToggleButton?.addEventListener("click", () => {
+    const current = document.documentElement.dataset.theme as Theme | undefined;
+    const osDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const effective: Theme = current ?? (osDark ? "dark" : "light");
+    applyTheme(effective === "dark" ? "light" : "dark");
   });
 }
 
@@ -3964,6 +3997,7 @@ async function loadBacktest(): Promise<void> {
 }
 
 async function bootstrap() {
+  initTheme();
   setPanelsBusy(true);
   setAppNotice("Loading forecast workspace...", "loading");
 
@@ -3990,6 +4024,7 @@ async function bootstrap() {
   bindWeightSliders();
   bindSavePresetButton();
   bindOddsModeToggle();
+  bindThemeToggle();
   bindPrintControls();
   bindSearchControls();
   bindCompareControls();
