@@ -3354,6 +3354,7 @@ async function fetchComparePayload(profileId: string): Promise<StatePayload | nu
     const doc = await res.json();
     if (!doc?.payload) return null;
     setBackendOfflineMode(false);
+    if (comparePayloadCache.size >= 20) comparePayloadCache.delete(comparePayloadCache.keys().next().value!);
     comparePayloadCache.set(profileId, doc.payload);
     return doc.payload;
   } catch {
