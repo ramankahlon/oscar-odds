@@ -1205,9 +1205,13 @@ a:focus-visible {
     margin-bottom: 2px;
   }
 
-  .mini-grid input[type="number"] {
+  .mini-grid input[type="number"],
+  .mini-grid select {
     padding: 12px 8px;
     font-size: 1.05rem;
+  }
+
+  .mini-grid input[type="number"] {
     text-align: center;
   }
 }
