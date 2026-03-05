@@ -10,6 +10,11 @@ import {
 import type { Category, Film, NormalizedWeights, Projection, ScoreResult, Strength } from "./types.js";
 import { initScoringWasm, isScoringWasmReady, scoreFilmWasm } from "./scoring-wasm.js";
 
+/** Escape user-supplied strings before interpolating into innerHTML. */
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 interface TrendEntry {
   key: string;
   title: string;
@@ -1672,7 +1677,7 @@ function renderSnapshotCompareResults(category: Category, projections: Projectio
     });
 
     row.innerHTML = `
-      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>
+      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${esc(entry.title)}</strong></td>
       <td data-label="${labelA}">${aWinner !== null ? aWinner.toFixed(1) + "%" : "—"}</td>
       <td data-label="${labelB}">${bWinner !== null ? bWinner.toFixed(1) + "%" : "—"}</td>
       ${deltaCell}
@@ -2173,7 +2178,7 @@ function renderSearchResults(query: string): void {
 
       row.innerHTML = `
         <td data-label="Film">
-          <strong>${entry.title}</strong>
+          <strong>${esc(entry.title)}</strong>
           <span class="results-category-label">${entry.categoryName}</span>
         </td>
         ${oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>` : ""}
@@ -2240,7 +2245,7 @@ function renderResults(category: Category, projections: Projection[]): void {
       }
     });
     row.innerHTML =
-      `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>` +
+      `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${esc(entry.title)}</strong></td>` +
       (oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>` : "") +
       (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`       : "");
     resultsBody.appendChild(row);
@@ -3480,7 +3485,7 @@ function renderCompareResults(category: Category, primaryProjections: Projection
     });
 
     row.innerHTML = `
-      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${entry.title}</strong></td>
+      <td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${esc(entry.title)}</strong></td>
       <td data-label="${state.profileId}">${entry.winner.toFixed(1)}%</td>
       <td data-label="${compareProfileId}">${bWinner !== null ? bWinner.toFixed(1) + "%" : "—"}</td>
       ${deltaCell}
@@ -3581,7 +3586,7 @@ function renderSummaryBar() {
       <span class="summary-card-category">
         ${shortName}<span class="summary-card-completion" aria-hidden="true"></span>
       </span>
-      <span class="summary-card-title">${displayName}</span>
+      <span class="summary-card-title">${esc(displayName)}</span>
       <span class="summary-card-footer">
         <span class="summary-card-odds">${top.winner.toFixed(1)}%</span>
         ${gap !== null ? `<span class="summary-card-gap ${gapClass}">+${gap.toFixed(1)}pp</span>` : ""}
@@ -3666,7 +3671,7 @@ function renderLeaderboard(): void {
     row.innerHTML =
       `<td class="leaderboard-film">` +
         `<span class="leaderboard-rank">${index + 1}</span>` +
-        `<span class="leaderboard-title">${title}</span>` +
+        `<span class="leaderboard-title">${esc(title)}</span>` +
       `</td>` +
       (oddsMode !== "winner"     ? `<td class="leaderboard-num">${nominations}</td>` : "") +
       (oddsMode !== "nomination" ? `<td class="leaderboard-num">${wins}</td>`        : "");
@@ -3911,8 +3916,8 @@ function renderBacktestYearTable(rows: BacktestYearRow[], filterCategoryId: stri
       const correctLabel = r.winnerCorrect ? "✓" : "✗";
       return `<tr>
         <td>${r.year}</td>
-        <td>${r.topPredicted}</td>
-        <td>${r.actualWinner}</td>
+        <td>${esc(r.topPredicted)}</td>
+        <td>${esc(r.actualWinner)}</td>
         <td class="backtest-num">${(r.nominationAccuracy * 100).toFixed(1)}%</td>
         <td class="backtest-num ${correctClass}">${correctLabel}</td>
       </tr>`;
