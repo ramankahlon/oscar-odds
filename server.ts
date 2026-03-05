@@ -370,6 +370,9 @@ function initDb(): void {
   // Prune client errors older than 30 days.
   db.prepare("DELETE FROM client_errors WHERE occurred_at < ?")
     .run(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+  // Prune snapshots older than 90 days.
+  db.prepare("DELETE FROM snapshots WHERE snapped_at < ?")
+    .run(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 
   // One-time migration from forecast-store.json when the DB is empty.
   const isEmpty = (db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as CountRow).n === 0;
