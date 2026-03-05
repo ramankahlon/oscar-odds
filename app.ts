@@ -1047,14 +1047,24 @@ function renderWeightPresets(): void {
   });
 }
 
+function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return (...args: T) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
 function bindWeightSliders(): void {
+  const debouncedRender = debounce(render, 100);
+
   function handleSlider(key: "precursor" | "history" | "buzz") {
     return (event: Event) => {
       state.weights[key] = clamp(Number((event.target as HTMLInputElement).value), 1, 95);
       renderWeightSliders();   // update % labels immediately while dragging
       renderWeightPresets();   // update active-preset highlight immediately
       saveState();
-      render();
+      debouncedRender();
     };
   }
 
