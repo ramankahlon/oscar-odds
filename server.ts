@@ -54,7 +54,10 @@ const STORE_PATH = path.join(__dirname, "data", "forecast-store.json"); // kept 
 const DB_PATH = path.join(__dirname, "data", "forecast.db");
 const SCRAPE_OBSERVABILITY_PATH = path.join(__dirname, "data", "scrape-observability.json");
 const DEFAULT_PROFILE_ID = "default";
-const posterCache = new Map<string, { posterUrl: string; movieUrl: string } | null>();
+type PosterResult = { posterUrl: string; movieUrl: string } | null;
+type PosterCacheEntry = { result: PosterResult; fetchedAt: number };
+const posterCache = new Map<string, PosterCacheEntry>();
+const POSTER_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const TMDB_BASE_URL = "https://www.themoviedb.org";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
@@ -695,7 +698,11 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
   if (!query) return null;
 
   const cacheKey = normalizePosterKey(query);
-  if (posterCache.has(cacheKey)) return posterCache.get(cacheKey) ?? null;
+  const cached = posterCache.get(cacheKey);
+  if (cached) {
+    if (Date.now() - cached.fetchedAt < POSTER_CACHE_TTL_MS) return cached.result;
+    posterCache.delete(cacheKey);
+  }
 
   const queryVariants = [query];
   if (query === "The Odyssey") queryVariants.push("The Odyssey Christopher Nolan");
@@ -705,7 +712,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
   for (const candidateQuery of queryVariants) {
     const apiResult = await fetchFromTmdbApi(candidateQuery);
     if (apiResult?.movieUrl) {
-      posterCache.set(cacheKey, apiResult);
+      posterCache.set(cacheKey, { result: apiResult, fetchedAt: Date.now() });
       return apiResult;
     }
   }
@@ -713,7 +720,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
   for (const candidateQuery of queryVariants) {
     const remoteResult = await fetchFromTmdbRemoteMulti(candidateQuery);
     if (remoteResult?.movieUrl) {
-      posterCache.set(cacheKey, remoteResult);
+      posterCache.set(cacheKey, { result: remoteResult, fetchedAt: Date.now() });
       return remoteResult;
     }
   }
@@ -731,7 +738,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
   const searchHtml = await searchResponse.text();
   const moviePaths = extractMoviePathsFromSearchHtml(searchHtml);
   if (moviePaths.length === 0) {
-    posterCache.set(cacheKey, null);
+    posterCache.set(cacheKey, { result: null, fetchedAt: Date.now() });
     return null;
   }
 
@@ -752,11 +759,11 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
 
     const posterUrl = await resolveValidPosterUrl(extractPosterUrlFromMovieHtml(movieHtml));
     const payload = { posterUrl: posterUrl || "", movieUrl };
-    posterCache.set(cacheKey, payload);
+    posterCache.set(cacheKey, { result: payload, fetchedAt: Date.now() });
     return payload;
   }
 
-  posterCache.set(cacheKey, null);
+  posterCache.set(cacheKey, { result: null, fetchedAt: Date.now() });
   return null;
 }
 
