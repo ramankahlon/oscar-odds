@@ -588,6 +588,8 @@ let snapshotDateB: string | null = null;
 const lockedCategories = new Set<string>();
 const surpriseBuzzUndo = new Map<string, number[]>(); // categoryId → original buzz values
 let pendingBuzzSync: { title: string; buzz: number; targets: Category[] } | null = null;
+let pendingUndo: (() => void) | null = null;
+let undoToastTimer: ReturnType<typeof setTimeout> | null = null;
 let userPresets: WeightPreset[] = [];
 type OddsMode = "both" | "nomination" | "winner";
 let oddsMode: OddsMode = "both";
@@ -617,6 +619,10 @@ const buzzSyncMessage = document.querySelector<HTMLElement>("#buzzSyncMessage");
 const buzzSyncApply   = document.querySelector<HTMLButtonElement>("#buzzSyncApply");
 const buzzSyncDismiss = document.querySelector<HTMLButtonElement>("#buzzSyncDismiss");
 const restoreBuzzButton   = document.querySelector<HTMLButtonElement>("#restoreBuzzButton");
+const undoToast        = document.querySelector<HTMLElement>("#undoToast");
+const undoToastMessage = document.querySelector<HTMLElement>("#undoToastMessage");
+const undoToastButton  = document.querySelector<HTMLButtonElement>("#undoToastButton");
+const undoToastDismiss = document.querySelector<HTMLButtonElement>("#undoToastDismiss");
 const precursorSlider  = document.querySelector<HTMLInputElement>("#precursorSlider");
 const historySlider    = document.querySelector<HTMLInputElement>("#historySlider");
 const buzzSlider       = document.querySelector<HTMLInputElement>("#buzzSlider");
@@ -2525,6 +2531,28 @@ function bindLockNomineesButton(): void {
   });
 }
 
+function dismissUndoToast(): void {
+  if (undoToast) undoToast.hidden = true;
+  if (undoToastTimer) { clearTimeout(undoToastTimer); undoToastTimer = null; }
+  pendingUndo = null;
+}
+
+function showUndoToast(message: string, onUndo: () => void, durationMs = 8000): void {
+  pendingUndo = onUndo;
+  if (undoToastMessage) undoToastMessage.textContent = message;
+  if (undoToast) undoToast.hidden = false;
+  if (undoToastTimer) clearTimeout(undoToastTimer);
+  undoToastTimer = setTimeout(dismissUndoToast, durationMs);
+}
+
+function bindUndoToast(): void {
+  undoToastButton?.addEventListener("click", () => {
+    pendingUndo?.();
+    dismissUndoToast();
+  });
+  undoToastDismiss?.addEventListener("click", dismissUndoToast);
+}
+
 function bindSurpriseMe(): void {
   if (!surpriseMeButton || !restoreBuzzButton) return;
 
@@ -2546,6 +2574,18 @@ function bindSurpriseMe(): void {
 
     saveState();
     render();
+
+    const categoryId = category.id;
+    showUndoToast(`Buzz randomized in ${category.name}.`, () => {
+      const cat = categories.find((c) => c.id === categoryId);
+      if (!cat) return;
+      const original = surpriseBuzzUndo.get(categoryId);
+      if (!original) return;
+      cat.films.forEach((film, i) => { if (original[i] !== undefined) film.buzz = original[i]; });
+      surpriseBuzzUndo.delete(categoryId);
+      saveState();
+      render();
+    });
   });
 
   restoreBuzzButton.addEventListener("click", () => {
@@ -2649,6 +2689,8 @@ function bindConsensusImport(): void {
       return;
     }
     const category = getActiveCategory();
+    // Snapshot precursor values before applying so we can undo.
+    const precursorSnapshot = category.films.map((f) => ({ title: f.title, precursor: f.precursor }));
     const { matched, unmatched } = applyConsensusRanking(category, titles);
     if (matched.length === 0) {
       setConsensusImportStatus(`No titles matched films in ${category.name}.`, true);
@@ -2662,6 +2704,14 @@ function bindConsensusImport(): void {
       `Consensus applied: ${matched.length} film${matched.length !== 1 ? "s" : ""} ranked in ${category.name}.${note}`,
       "success"
     );
+    showUndoToast(`Consensus applied to ${category.name}.`, () => {
+      for (const snap of precursorSnapshot) {
+        const film = category.films.find((f) => f.title === snap.title);
+        if (film) film.precursor = snap.precursor;
+      }
+      saveState();
+      render();
+    });
   });
 
   consensusImportCancel?.addEventListener("click", () => consensusImportDialog?.close());
@@ -4019,6 +4069,7 @@ async function bootstrap() {
   bindLockNomineesButton();
   bindSnapshotCompareControls();
   bindSurpriseMe();
+  bindUndoToast();
   bindConsensusImport();
   bindBuzzSync();
   bindWeightSliders();
