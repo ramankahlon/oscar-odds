@@ -1694,9 +1694,15 @@ function renderSnapshotCompareResults(category: Category, projections: Projectio
     if (delta === null) {
       deltaCell = `<td data-label="Δ" class="delta-na">—</td>`;
     } else {
-      const sign = delta >= 0 ? "+" : "";
       const cls = delta > 0.5 ? "delta-pos" : delta < -0.5 ? "delta-neg" : "delta-neutral";
-      deltaCell = `<td data-label="Δ" class="${cls}">${sign}${delta.toFixed(1)}pp</td>`;
+      const symbol = delta > 0.5 ? "▲" : delta < -0.5 ? "▼" : "";
+      const display = symbol ? `${symbol}${Math.abs(delta).toFixed(1)}pp` : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp`;
+      const ariaLabel = delta > 0.5
+        ? `up ${delta.toFixed(1)} percentage points`
+        : delta < -0.5
+        ? `down ${Math.abs(delta).toFixed(1)} percentage points`
+        : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} percentage points`;
+      deltaCell = `<td data-label="Δ" class="${cls}" aria-label="${ariaLabel}">${display}</td>`;
     }
 
     const row = document.createElement("tr");
@@ -3546,9 +3552,15 @@ function renderCompareResults(category: Category, primaryProjections: Projection
     if (delta === null) {
       deltaCell = `<td data-label="Δ" class="delta-na">—</td>`;
     } else {
-      const sign = delta >= 0 ? "+" : "";
       const cls = delta > 0.5 ? "delta-pos" : delta < -0.5 ? "delta-neg" : "delta-neutral";
-      deltaCell = `<td data-label="Δ" class="${cls}">${sign}${delta.toFixed(1)}pp</td>`;
+      const symbol = delta > 0.5 ? "▲" : delta < -0.5 ? "▼" : "";
+      const display = symbol ? `${symbol}${Math.abs(delta).toFixed(1)}pp` : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp`;
+      const ariaLabel = delta > 0.5
+        ? `up ${delta.toFixed(1)} percentage points`
+        : delta < -0.5
+        ? `down ${Math.abs(delta).toFixed(1)} percentage points`
+        : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} percentage points`;
+      deltaCell = `<td data-label="Δ" class="${cls}" aria-label="${ariaLabel}">${display}</td>`;
     }
 
     const row = document.createElement("tr");
