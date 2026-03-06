@@ -1902,6 +1902,7 @@ function renderSourceMovement(points: TrendPoint[]): void {
 
 function renderTrendAnalytics(category: Category, entry: Projection | null): void {
   if (!entry) {
+    trendChart?.setAttribute("aria-label", "Nomination and winner trend chart — no contender selected");
     trendTitle.textContent = "Trend Analytics";
     trendMeta.textContent = "Select a contender to view movement over time.";
     renderTrendChart([]);
@@ -1909,6 +1910,7 @@ function renderTrendAnalytics(category: Category, entry: Projection | null): voi
     return;
   }
 
+  trendChart?.setAttribute("aria-label", `Trend for ${entry.title} in ${category.name}`);
   const points = pointsForEntryTrend(category, entry);
   trendTitle.textContent = `Trend Analytics: ${entry.title}`;
   if (points.length < 2) {
