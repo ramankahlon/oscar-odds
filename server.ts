@@ -37,6 +37,7 @@ import {
   splitIndexHtml,
   type SplitHtml,
 } from "./ssr.js";
+import type { ApiError } from "./types.js";
 
 declare global {
   namespace Express {
@@ -188,7 +189,7 @@ function parseBody<T>(schema: z.ZodSchema<T>, body: unknown, res: Response): T |
     const message = result.error.issues
       .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
       .join("; ");
-    res.status(400).json({ error: message });
+    sendError(res, 400, message);
     return null;
   }
   return result.data;
@@ -197,10 +198,14 @@ function parseBody<T>(schema: z.ZodSchema<T>, body: unknown, res: Response): T |
 function parseParam(schema: z.ZodSchema<string>, value: unknown, res: Response): string | null {
   const result = schema.safeParse(value);
   if (!result.success) {
-    res.status(400).json({ error: result.error.issues[0]?.message ?? "Invalid parameter." });
+    sendError(res, 400, result.error.issues[0]?.message ?? "Invalid parameter.");
     return null;
   }
   return result.data;
+}
+
+function sendError(res: Response, status: number, message: string): void {
+  res.status(status).json({ error: message } satisfies ApiError);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -417,19 +422,19 @@ function requireProfileAuth(req: Request, res: Response, next: NextFunction): vo
   if (!row?.passphrase_hash) { next(); return; } // unprotected → allow through
 
   const token = (req.cookies as Record<string, string>)[SESSION_COOKIE];
-  if (!token) { res.status(401).json({ error: "Authentication required." }); return; }
+  if (!token) { sendError(res, 401, "Authentication required."); return; }
 
   const session = db
     .prepare("SELECT profile_id, expires_at FROM sessions WHERE token = ?")
     .get(token) as { profile_id: string; expires_at: string } | undefined;
 
   if (!session || session.profile_id !== profileId) {
-    res.status(401).json({ error: "Authentication required." }); return;
+    sendError(res, 401, "Authentication required."); return;
   }
   if (isSessionExpired(session.expires_at)) {
     db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
     res.clearCookie(SESSION_COOKIE, { path: "/" });
-    res.status(401).json({ error: "Session expired." }); return;
+    sendError(res, 401, "Session expired."); return;
   }
   next();
 }
@@ -896,13 +901,13 @@ app.delete("/api/forecast/:profileId", requireProfileAuth, (req: Request, res: R
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
   if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
   const remaining = db.prepare("SELECT id FROM profiles WHERE id != ?").all(profileId) as Array<{ id: string }>;
   if (remaining.length === 0) {
-    res.status(400).json({ error: "Cannot delete the last profile." });
+    sendError(res, 400, "Cannot delete the last profile.");
     return;
   }
 
@@ -930,7 +935,7 @@ app.patch("/api/forecast/:profileId/rename", requireProfileAuth, (req: Request, 
 
   const existing = db.prepare("SELECT id, updated_at, payload, passphrase_hash FROM profiles WHERE id = ?").get(oldId) as ProfileRow | undefined;
   if (!existing) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
@@ -940,7 +945,7 @@ app.patch("/api/forecast/:profileId/rename", requireProfileAuth, (req: Request, 
   }
 
   if (db.prepare("SELECT id FROM profiles WHERE id = ?").get(newId)) {
-    res.status(409).json({ error: "A profile with that name already exists." });
+    sendError(res, 409, "A profile with that name already exists.");
     return;
   }
 
@@ -1006,7 +1011,7 @@ app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
     const result = await fetchTmdbPoster(title);
     res.json({ title, result });
   } catch (error) {
-    res.status(502).json({ error: String((error as Error)?.message || error) });
+    sendError(res, 502, String((error as Error)?.message || error));
   }
 });
 
@@ -1019,7 +1024,7 @@ app.get("/api/profiles/:profileId/auth-status", (req: Request, res: Response) =>
     .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
 
   if (!row) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
@@ -1053,18 +1058,18 @@ app.post("/api/profiles/:profileId/login", authLimiter, async (req: Request, res
     .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
 
   if (!row) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
   if (!row.passphrase_hash) {
-    res.status(400).json({ error: "Profile is not password protected." });
+    sendError(res, 400, "Profile is not password protected.");
     return;
   }
 
   const valid = await verifyPassphrase(body.passphrase, row.passphrase_hash);
   if (!valid) {
-    res.status(401).json({ error: "Incorrect passphrase." });
+    sendError(res, 401, "Incorrect passphrase.");
     return;
   }
 
@@ -1106,7 +1111,7 @@ app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth,
 
   const row = db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId) as { id: string } | undefined;
   if (!row) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
@@ -1127,12 +1132,12 @@ app.delete("/api/profiles/:profileId/passphrase", requireProfileAuth, (req: Requ
     .get(profileId) as Pick<ProfileRow, "passphrase_hash"> | undefined;
 
   if (!row) {
-    res.status(404).json({ error: "Profile not found." });
+    sendError(res, 404, "Profile not found.");
     return;
   }
 
   if (!row.passphrase_hash) {
-    res.status(400).json({ error: "Profile does not have a passphrase." });
+    sendError(res, 400, "Profile does not have a passphrase.");
     return;
   }
 
@@ -1262,7 +1267,7 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction): void =
     path: req.path,
   });
   if (res.headersSent) return;
-  res.status(500).json({ error: "Internal server error." });
+  sendError(res, 500, "Internal server error.");
 });
 
 initDb();

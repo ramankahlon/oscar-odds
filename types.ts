@@ -112,3 +112,6 @@ export interface ApplySourceSignalsParams {
   snapshot: unknown;
   lastAppliedSnapshotId: string | null;
 }
+
+/** Standard error envelope returned by every API route on failure. */
+export type ApiError = { error: string };
