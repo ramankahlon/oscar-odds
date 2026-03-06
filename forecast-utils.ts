@@ -24,9 +24,10 @@ export function rebalanceFieldTotal(entries: any[], field: string, options: Reba
     entry[field] = clamp(entry[field] * scale, minValue, maxValue);
   });
 
-  for (let i = 0; i < 2; i += 1) {
+  for (let i = 0; i < 10; i += 1) {
     const currentTotal = entries.reduce((sum: number, entry: Record<string, number>) => sum + entry[field], 0) as number;
     if (currentTotal >= minTotal && currentTotal <= maxTotal) return;
+    if (Math.abs(currentTotal - clampedTarget) < 0.5) return;
 
     const target = clamp(currentTotal < minTotal ? minTotal : maxTotal, minTotal, maxTotal);
     const delta = target - currentTotal;
