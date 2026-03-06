@@ -1,5 +1,6 @@
 // Bump this string whenever the shell assets change to invalidate the old cache.
-const CACHE = "oscar-odds-shell-v1";
+const CACHE = "oscar-odds-shell-v2";
+const API_CACHE = "oscar-odds-api-v1";
 
 // The minimal set of resources that make the app usable offline.
 const SHELL = ["/", "/styles.css", "/app.js"];
@@ -17,10 +18,11 @@ self.addEventListener("install", (event) => {
 // ── Activate ─────────────────────────────────────────────────────────────────
 // Purge caches from any previous SW version so stale assets don't linger.
 self.addEventListener("activate", (event) => {
+  const KEEP = new Set([CACHE, API_CACHE]);
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))
+        keys.filter((k) => !KEEP.has(k)).map((k) => caches.delete(k))
       )
     )
   );
@@ -36,9 +38,43 @@ self.addEventListener("fetch", (event) => {
   // Only intercept same-origin GET requests.
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // API routes (REST + SSE stream): always go straight to the network.
-  // Caching SSE or dynamic forecast data would break real-time updates.
-  if (url.pathname.startsWith("/api/")) return;
+  // SSE stream: never intercept — it must stay as a live connection.
+  if (url.pathname === "/api/scraper-events") return;
+
+  // API routes: network-first, fall back to last-good cached response.
+  // On a stale hit the response carries X-Sw-Cached: 1 so the app can show
+  // an offline banner while still displaying the cached data.
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(API_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request, { cacheName: API_CACHE }).then((cached) => {
+            if (!cached) {
+              return new Response(JSON.stringify({ error: "offline" }), {
+                status: 503,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
+            // Reconstruct with the stale-data signal header.
+            const headers = new Headers(cached.headers);
+            headers.set("X-Sw-Cached", "1");
+            return new Response(cached.body, {
+              status: cached.status,
+              statusText: cached.statusText,
+              headers,
+            });
+          })
+        )
+    );
+    return;
+  }
 
   // Navigation requests (full-page loads, including share URLs with ?share=…):
   // return the cached shell so the app loads offline, then JS handles routing.

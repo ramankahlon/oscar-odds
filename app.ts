@@ -3155,7 +3155,7 @@ async function loadProfiles() {
       renderProfileOptions();
       return;
     }
-    setBackendOfflineMode(false);
+    setBackendOfflineMode(Boolean(response.headers.get("X-Sw-Cached")));
     const doc = await response.json();
     const entries: Array<{ id?: unknown; hasPassphrase?: unknown }> = Array.isArray(doc.profiles) ? doc.profiles : [];
     const ids: string[] = entries.map((e) => String(e.id || "")).filter(Boolean);
@@ -3268,7 +3268,7 @@ async function loadStateFromApi() {
     }
     const doc = await response.json();
     if (!doc || typeof doc !== "object" || !doc.payload) return;
-    setBackendOfflineMode(false);
+    setBackendOfflineMode(Boolean(response.headers.get("X-Sw-Cached")));
     applyStatePayload(doc.payload);
     await mergeServerHistory(profileId);
   } catch {
