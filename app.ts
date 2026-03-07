@@ -3207,7 +3207,7 @@ async function loadProfiles() {
   }
 }
 
-async function saveStateToApi() {
+async function saveStateToApi(): Promise<boolean> {
   try {
     const response = await fetch(getForecastApiUrl(), {
       method: "PUT",
@@ -3216,16 +3216,21 @@ async function saveStateToApi() {
     });
     if (response.status === 401) {
       const ok = await promptUnlock(state.profileId);
-      if (ok) void saveStateToApi(); // retry once after successful login
-      return;
+      if (ok) {
+        const retryOk = await saveStateToApi();
+        if (!retryOk) setAppNotice("Save failed after unlock — changes may not be persisted.", "error");
+      }
+      return false;
     }
     if (!response.ok) {
       setBackendOfflineMode(true);
-      return;
+      return false;
     }
     setBackendOfflineMode(false);
+    return true;
   } catch {
     setBackendOfflineMode(true);
+    return false;
   }
 }
 
