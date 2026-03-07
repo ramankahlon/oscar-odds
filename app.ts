@@ -3311,6 +3311,10 @@ function saveState() {
     // Ignore storage failures (private mode or blocked storage).
   }
 
+  // Invalidate the compare cache for the current profile so a compare panel
+  // viewing this profile always re-fetches rather than showing stale data.
+  comparePayloadCache.delete(state.profileId);
+
   void saveStateToApi();
 }
 
