@@ -528,6 +528,12 @@ const API_FORECAST_BASE_URL = "/api/forecast";
 const EXTERNAL_SIGNALS_URL = "data/source-signals.json";
 const EXTERNAL_SIGNALS_POLL_MS = 5 * 60 * 1000;
 const TREND_HISTORY_LIMIT = 240;
+// Consensus-ranking score constants
+const CONSENSUS_TOP_SCORE  = 88; // precursor score assigned to the #1 ranked film
+const CONSENSUS_STEP       = 15; // preferred gap between consecutive ranked scores
+const CONSENSUS_BOTTOM_FLOOR = 10; // minimum score the bottom-ranked film can receive
+const CONSENSUS_SCORE_MIN  =  5; // hard clamp floor applied after step distribution
+const CONSENSUS_SCORE_MAX  = 95; // hard clamp ceiling applied after step distribution
 const TREND_WINDOW_OPTIONS = [7, 15, 30];
 const NOMINATION_PERCENT_UPLIFT = 1.14;
 const WINNER_PERCENT_UPLIFT = 1.2;
@@ -2727,9 +2733,6 @@ function applyConsensusRanking(
   category: Category,
   rankedTitles: string[]
 ): { matched: string[]; unmatched: string[] } {
-  const TOP = 88;
-  const PREFERRED_STEP = 15;
-
   const matched: Array<{ film: Film; label: string }> = [];
   const unmatched: string[] = [];
   const usedIndices = new Set<number>();
@@ -2769,12 +2772,12 @@ function applyConsensusRanking(
 
   const N = matched.length;
   if (N === 1) {
-    matched[0].film.precursor = TOP;
+    matched[0].film.precursor = CONSENSUS_TOP_SCORE;
   } else if (N > 1) {
-    const bottom = Math.max(10, TOP - PREFERRED_STEP * (N - 1));
-    const step = (TOP - bottom) / (N - 1);
+    const bottom = Math.max(CONSENSUS_BOTTOM_FLOOR, CONSENSUS_TOP_SCORE - CONSENSUS_STEP * (N - 1));
+    const step = (CONSENSUS_TOP_SCORE - bottom) / (N - 1);
     matched.forEach(({ film }, i) => {
-      film.precursor = Math.round(clamp(TOP - i * step, 5, 95));
+      film.precursor = Math.round(clamp(CONSENSUS_TOP_SCORE - i * step, CONSENSUS_SCORE_MIN, CONSENSUS_SCORE_MAX));
     });
   }
 
