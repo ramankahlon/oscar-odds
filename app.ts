@@ -3375,6 +3375,7 @@ async function mergeServerHistory(profileId: string): Promise<void> {
 
 async function loadStateFromApi() {
   const profileId = state.profileId;
+  setAppNotice("Syncing…", "loading");
   try {
     const response = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
     if (!response.ok) {
@@ -3388,6 +3389,8 @@ async function loadStateFromApi() {
     await mergeServerHistory(profileId);
   } catch {
     setBackendOfflineMode(true);
+  } finally {
+    setAppNotice("");
   }
 }
 
