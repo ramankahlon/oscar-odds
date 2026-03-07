@@ -2504,10 +2504,11 @@ function importContendersCsv(text: string): void {
 
 function bindSearchControls(): void {
   if (!contenderSearch) return;
+  const debouncedRender = debounce(render, 150);
   contenderSearch.addEventListener("input", () => {
     searchQuery = contenderSearch.value.trim();
     if (contenderSearchClear) contenderSearchClear.hidden = !searchQuery;
-    render();
+    debouncedRender();
   });
   if (contenderSearchClear) {
     contenderSearchClear.addEventListener("click", () => {
