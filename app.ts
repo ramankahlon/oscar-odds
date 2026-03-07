@@ -1010,7 +1010,9 @@ function renderWeightSliders(): void {
   if (buzzDisplay)      buzzDisplay.textContent      = pct(state.weights.buzz);
 }
 
-/** Re-render the preset chips, highlighting whichever matches current weights. */
+/** Re-render the preset chips, highlighting whichever matches current weights.
+ *  No event listeners are added here — a single delegated listener on
+ *  weightPresetsEl (set up once in bindWeightPresets) handles all clicks. */
 function renderWeightPresets(): void {
   if (!weightPresetsEl) return;
   weightPresetsEl.innerHTML = "";
@@ -1024,6 +1026,7 @@ function renderWeightPresets(): void {
 
     const chip = document.createElement("span");
     chip.className = "weight-preset-chip" + (isActive ? " weight-preset-chip--active" : "");
+    chip.dataset.presetIndex = String(index);
 
     const nameBtn = document.createElement("button");
     nameBtn.type = "button";
@@ -1031,27 +1034,14 @@ function renderWeightPresets(): void {
     nameBtn.textContent = preset.name;
     nameBtn.setAttribute("aria-pressed", String(isActive));
     nameBtn.title = `Precursor ${preset.precursor}  ·  Historical ${preset.history}  ·  Buzz ${preset.buzz}`;
-    nameBtn.addEventListener("click", () => {
-      state.weights.precursor = preset.precursor;
-      state.weights.history   = preset.history;
-      state.weights.buzz      = preset.buzz;
-      saveState();
-      render();
-    });
     chip.appendChild(nameBtn);
 
     if (!isBuiltin) {
-      const userIndex = index - BUILTIN_PRESETS.length;
       const del = document.createElement("button");
       del.type = "button";
       del.className = "weight-preset-delete";
       del.textContent = "×";
       del.setAttribute("aria-label", `Delete preset "${preset.name}"`);
-      del.addEventListener("click", () => {
-        userPresets.splice(userIndex, 1);
-        saveUserPresetsToStorage(userPresets);
-        renderWeightPresets();
-      });
       chip.appendChild(del);
     }
 
@@ -1139,6 +1129,34 @@ function bindSavePresetButton(): void {
     });
     saveUserPresetsToStorage(userPresets);
     renderWeightPresets();
+  });
+}
+
+/** Single delegated listener for all preset chip clicks (apply or delete). */
+function bindWeightPresets(): void {
+  if (!weightPresetsEl) return;
+  weightPresetsEl.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const chip   = target.closest<HTMLElement>(".weight-preset-chip");
+    if (!chip) return;
+
+    const index  = Number(chip.dataset.presetIndex);
+    const allPresets = [...BUILTIN_PRESETS, ...userPresets];
+    const preset = allPresets[index];
+    if (!preset) return;
+
+    if (target.closest(".weight-preset-delete")) {
+      const userIndex = index - BUILTIN_PRESETS.length;
+      userPresets.splice(userIndex, 1);
+      saveUserPresetsToStorage(userPresets);
+      renderWeightPresets();
+    } else if (target.closest(".weight-preset-name")) {
+      state.weights.precursor = preset.precursor;
+      state.weights.history   = preset.history;
+      state.weights.buzz      = preset.buzz;
+      saveState();
+      render();
+    }
   });
 }
 
@@ -4088,6 +4106,7 @@ async function bootstrap() {
   bindBuzzSync();
   bindWeightSliders();
   bindSavePresetButton();
+  bindWeightPresets();
   bindOddsModeToggle();
   bindThemeToggle();
   bindPrintControls();
