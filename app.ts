@@ -2652,21 +2652,28 @@ function applyConsensusRanking(
   const unmatched: string[] = [];
   const usedIndices = new Set<number>();
 
+  // Pre-compute normalized keys once — O(n) — to avoid redundant calls inside the loop.
+  const filmKeys = category.films.map((f) => normalizeSignalKey(f.title));
+  // Exact-match lookup: normalizedKey → first film index with that key.
+  const exactMap = new Map<string, number>();
+  for (let i = 0; i < filmKeys.length; i++) {
+    if (!exactMap.has(filmKeys[i])) exactMap.set(filmKeys[i], i);
+  }
+
   for (const label of rankedTitles) {
     const key = normalizeSignalKey(label);
     let foundIndex = -1;
 
-    // Exact normalized match
-    for (let i = 0; i < category.films.length; i++) {
-      if (usedIndices.has(i)) continue;
-      if (normalizeSignalKey(category.films[i].title) === key) { foundIndex = i; break; }
+    // Exact normalized match — O(1) map lookup
+    const exactIdx = exactMap.get(key);
+    if (exactIdx !== undefined && !usedIndices.has(exactIdx)) {
+      foundIndex = exactIdx;
     }
     // Starts-with fallback (handles extra year / subtitle in stored title)
     if (foundIndex === -1) {
-      for (let i = 0; i < category.films.length; i++) {
+      for (let i = 0; i < filmKeys.length; i++) {
         if (usedIndices.has(i)) continue;
-        const filmKey = normalizeSignalKey(category.films[i].title);
-        if (filmKey.startsWith(key) || key.startsWith(filmKey)) { foundIndex = i; break; }
+        if (filmKeys[i].startsWith(key) || key.startsWith(filmKeys[i])) { foundIndex = i; break; }
       }
     }
 
