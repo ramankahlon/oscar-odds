@@ -595,6 +595,9 @@ type OddsMode = "both" | "nomination" | "winner";
 let oddsMode: OddsMode = "both";
 const comparePayloadCache  = new Map<string, StatePayload>();
 const compareInflightMap   = new Map<string, Promise<StatePayload | null>>();
+// Projection cache — keyed by categoryId, invalidated (version bump) on every saveState().
+const projectionsCache     = new Map<string, Projection[]>();
+let   projectionCacheVersion = 0;
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
 const movieDetailDirector = document.querySelector<HTMLElement>("#movieDetailDirector")!;
@@ -2172,6 +2175,18 @@ function renderCandidates(category: Category, projections: Projection[]): void {
   }
 }
 
+/** Returns cached projections for the default (no-override) buildProjections call.
+ *  The cache is keyed by categoryId and a version counter incremented in saveState(),
+ *  so it is always coherent with the current film/weight state. */
+function getCachedProjections(category: Category): Projection[] {
+  const key = `${category.id}::${projectionCacheVersion}`;
+  const hit = projectionsCache.get(key);
+  if (hit) return hit;
+  const result = buildProjections(category);
+  projectionsCache.set(key, result);
+  return result;
+}
+
 function renderSearchResults(query: string): void {
   if (resultsPrimaryHeader) resultsPrimaryHeader.textContent = "Film";
   if (thNomination) {
@@ -2191,7 +2206,7 @@ function renderSearchResults(query: string): void {
   const matches: SearchProjection[] = [];
 
   categories.forEach((category) => {
-    const projections = buildProjections(category);
+    const projections = getCachedProjections(category);
     const displayLimit = getDisplayLimit(category);
     projections.slice(0, displayLimit).forEach((entry) => {
       if (
@@ -2226,7 +2241,7 @@ function renderSearchResults(query: string): void {
         state.categoryId = entry.categoryId;
         const cat = categories.find((c) => c.id === entry.categoryId);
         if (cat) {
-          const catProjections = buildProjections(cat);
+          const catProjections = getCachedProjections(cat);
           const foundIdx = catProjections.findIndex((p) => p.rawTitle === entry.rawTitle);
           if (foundIdx >= 0) explainSelectionByCategory[entry.categoryId] = foundIdx;
         }
@@ -3326,6 +3341,10 @@ function saveState() {
   // Invalidate the compare cache for the current profile so a compare panel
   // viewing this profile always re-fetches rather than showing stale data.
   comparePayloadCache.delete(state.profileId);
+
+  // Invalidate projection cache — film data or weights may have changed.
+  projectionCacheVersion++;
+  projectionsCache.clear();
 
   void saveStateToApi();
 }
