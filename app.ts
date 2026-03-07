@@ -2412,8 +2412,15 @@ function renderExplanation(category: Category, entry: Projection | null, fieldEn
   const nominationAvg = (fieldEntries.reduce((sum, item) => sum + item.nomination, 0) || 0) / Math.max(fieldEntries.length, 1);
   const winnerAvg = (fieldEntries.reduce((sum, item) => sum + item.winner, 0) || 0) / Math.max(fieldEntries.length, 1);
 
-  const contributionTotal =
-    entry.precursorContribution + entry.historyContribution + entry.buzzContribution || 1;
+  const rawContributionTotal =
+    entry.precursorContribution + entry.historyContribution + entry.buzzContribution;
+  if (rawContributionTotal === 0) {
+    explainBreakdown.innerHTML = "";
+    explainNotes.textContent = "No score data yet.";
+    explainDelta.textContent = "";
+    return;
+  }
+  const contributionTotal = rawContributionTotal;
   const breakdown = [
     { label: "Precursor", value: (entry.precursorContribution / contributionTotal) * 100 },
     { label: "Historical Fit", value: (entry.historyContribution / contributionTotal) * 100 },
