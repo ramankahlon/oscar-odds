@@ -593,7 +593,8 @@ let undoToastTimer: ReturnType<typeof setTimeout> | null = null;
 let userPresets: WeightPreset[] = [];
 type OddsMode = "both" | "nomination" | "winner";
 let oddsMode: OddsMode = "both";
-const comparePayloadCache = new Map<string, StatePayload>();
+const comparePayloadCache  = new Map<string, StatePayload>();
+const compareInflightMap   = new Map<string, Promise<StatePayload | null>>();
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
 const movieDetailDirector = document.querySelector<HTMLElement>("#movieDetailDirector")!;
@@ -3461,22 +3462,31 @@ function bindPrintControls() {
 
 async function fetchComparePayload(profileId: string): Promise<StatePayload | null> {
   if (comparePayloadCache.has(profileId)) return comparePayloadCache.get(profileId) ?? null;
-  try {
-    const res = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
-    if (!res.ok) {
+  if (compareInflightMap.has(profileId)) return compareInflightMap.get(profileId)!;
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
+      if (!res.ok) {
+        setBackendOfflineMode(true);
+        return null;
+      }
+      const doc = await res.json();
+      if (!doc?.payload) return null;
+      setBackendOfflineMode(false);
+      if (comparePayloadCache.size >= 20) comparePayloadCache.delete(comparePayloadCache.keys().next().value!);
+      comparePayloadCache.set(profileId, doc.payload);
+      return doc.payload as StatePayload;
+    } catch {
       setBackendOfflineMode(true);
       return null;
+    } finally {
+      compareInflightMap.delete(profileId);
     }
-    const doc = await res.json();
-    if (!doc?.payload) return null;
-    setBackendOfflineMode(false);
-    if (comparePayloadCache.size >= 20) comparePayloadCache.delete(comparePayloadCache.keys().next().value!);
-    comparePayloadCache.set(profileId, doc.payload);
-    return doc.payload;
-  } catch {
-    setBackendOfflineMode(true);
-    return null;
-  }
+  })();
+
+  compareInflightMap.set(profileId, promise);
+  return promise;
 }
 
 function buildCompareProjectionsFrom(category: Category, payload: StatePayload | null | undefined): Projection[] | null {
