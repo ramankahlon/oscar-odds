@@ -3933,6 +3933,25 @@ function renderLeaderboard(): void {
   });
 }
 
+/** Dispatches to the correct results renderer based on the active UI mode. */
+function renderActiveView(activeCategory: Category, projections: Projection[]): void {
+  if (compareMode && compareProfileId && !searchQuery) {
+    if (comparePayloadCache.has(compareProfileId)) {
+      renderCompareResults(activeCategory, projections);
+    } else {
+      setNormalTableHeaders(activeCategory);
+      resultsBody.innerHTML = "";
+      const loadingRow = document.createElement("tr");
+      loadingRow.innerHTML = `<td class="results-empty" colspan="4">Loading comparison profile…</td>`;
+      resultsBody.appendChild(loadingRow);
+    }
+  } else if (snapshotCompareMode && !searchQuery) {
+    renderSnapshotCompareResults(activeCategory, projections);
+  } else {
+    renderResults(activeCategory, projections);
+  }
+}
+
 function render() {
   setPanelsBusy(isBootstrapping);
   const activeCategory = getActiveCategory();
@@ -3950,21 +3969,7 @@ function render() {
   renderLeaderboard();
   renderCandidates(activeCategory, projections);
   renderSnapshotCompareDatePickers(activeCategory);
-  if (compareMode && compareProfileId && !searchQuery) {
-    if (comparePayloadCache.has(compareProfileId)) {
-      renderCompareResults(activeCategory, projections);
-    } else {
-      setNormalTableHeaders(activeCategory);
-      resultsBody.innerHTML = "";
-      const loadingRow = document.createElement("tr");
-      loadingRow.innerHTML = `<td class="results-empty" colspan="4">Loading comparison profile…</td>`;
-      resultsBody.appendChild(loadingRow);
-    }
-  } else if (snapshotCompareMode && !searchQuery) {
-    renderSnapshotCompareResults(activeCategory, projections);
-  } else {
-    renderResults(activeCategory, projections);
-  }
+  renderActiveView(activeCategory, projections);
   if (capturedTrend) saveState();
 }
 
