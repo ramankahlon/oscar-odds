@@ -3369,10 +3369,14 @@ function bindProfileControls() {
 
   renameProfileButton?.addEventListener("click", async () => {
     const current = state.profileId;
-    const input = window.prompt("Rename profile to:", current);
+    const input = window.prompt("Rename profile to (letters, digits, hyphens, underscores only):", current);
     if (!input || input.trim() === current) return;
-    const newId = input.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+    const newId = input.trim().toLowerCase();
     if (!newId || newId === current) return;
+    if (!/^[a-z0-9_-]+$/.test(newId)) {
+      alert("Invalid profile name. Use only letters a–z, digits, hyphens and underscores.");
+      return;
+    }
 
     const doRename = async (): Promise<void> => {
       const res = await fetch(`${API_FORECAST_BASE_URL}/${encodeURIComponent(current)}/rename`, {
