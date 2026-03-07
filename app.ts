@@ -151,7 +151,15 @@ const schedule2026Films = [
   "Scream 7",
   "Dreams",
   "Man on the Run",
-  "The Bride!",
+  "Wild Horse Nine",
+  "Fjord",
+  "Digger",
+  "Untitled Jesse Eisenberg Musical",
+  "All of a Sudden",
+  "Josephine",
+  "Disclosure Day",
+  "Werwulf",
+  "Jack of Spades",
   "Pixar's Hoppers",
   "Andre is an Idiot",
   "Peaky Blinders: The Immortal Man",
@@ -274,65 +282,65 @@ function contender(title: string, studio: string, precursor: number, history: nu
 
 const categorySeeds: Record<string, Film[]> = {
   picture: [
-    contender("The Odyssey", "Universal", 88, 84, 92, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 86, 81, 90, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 82, 74, 87, "High"),
-    contender("The Social Reckoning", "A24", 80, 76, 83, "High"),
-    contender("The Dog Stars", "20th Century Studios", 78, 82, 74, "High"),
-    contender("The Bride!", "Warner Bros.", 77, 72, 81, "Medium"),
-    contender("Michael", "Lionsgate", 75, 66, 88, "Medium"),
-    contender("Sense and Sensibility", "Focus Features", 71, 73, 70, "Medium"),
-    contender("Narnia", "Netflix", 68, 64, 79, "Medium"),
-    contender("The Dish", "Universal", 69, 70, 72, "Medium")
+    contender("Wild Horse Nine", "Searchlight Pictures", 88, 83, 86, "High"),
+    contender("The Odyssey", "Universal", 84, 80, 88, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 80, 72, 84, "High"),
+    contender("The Social Reckoning", "A24", 78, 74, 80, "High"),
+    contender("Fjord", "Neon", 76, 71, 74, "High"),
+    contender("Digger", "Netflix", 74, 69, 76, "High"),
+    contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
+    contender("Untitled Jesse Eisenberg Musical", "A24", 71, 65, 72, "Medium"),
+    contender("All of a Sudden", "Mubi", 68, 66, 69, "Medium"),
+    contender("Josephine", "Focus Features", 65, 62, 66, "Medium")
   ],
   director: [
-    contender("Christopher Nolan", "The Odyssey", 90, 88, 94, "High"),
-    contender("Denis Villeneuve", "Dune: Part Three", 86, 84, 89, "High"),
-    contender("Maggie Gyllenhaal", "The Bride!", 79, 73, 82, "High"),
-    contender("Steven Spielberg", "The Dish", 78, 90, 72, "High"),
-    contender("Alejandro G. Inarritu", "Judy", 74, 85, 68, "Medium")
+    contender("Martin McDonagh", "Wild Horse Nine", 88, 82, 86, "High"),
+    contender("Christopher Nolan", "The Odyssey", 87, 88, 89, "High"),
+    contender("Denis Villeneuve", "Dune: Part Three", 85, 87, 84, "High"),
+    contender("Greta Gerwig", "Narnia", 76, 74, 80, "High"),
+    contender("Alejandro G. Inarritu", "Digger", 73, 80, 71, "Medium")
   ],
   actor: [
-    contender("Tom Cruise", "Judy", 84, 78, 90, "High"),
-    contender("Jaafar Jackson", "Michael", 81, 66, 92, "High"),
-    contender("Ryan Gosling", "Project Hail Mary", 79, 82, 76, "High"),
-    contender("Matt Damon", "The Odyssey", 76, 82, 74, "High"),
-    contender("Jeremy Strong", "The Social Reckoning", 73, 75, 72, "Medium")
+    contender("Sam Rockwell", "Wild Horse Nine", 85, 78, 82, "High"),
+    contender("Tom Cruise", "Digger", 82, 80, 84, "High"),
+    contender("Sebastian Stan", "Fjord", 77, 72, 74, "High"),
+    contender("Ryan Gosling", "Project Hail Mary", 74, 79, 76, "Medium"),
+    contender("Josh O'Connor", "Jack of Spades", 70, 68, 70, "Medium")
   ],
   actress: [
-    contender("Mikey Madison", "The Social Reckoning", 83, 76, 82, "High"),
-    contender("Jessie Buckley", "The Bride!", 81, 79, 77, "High"),
-    contender("Zendaya", "The Drama", 75, 73, 71, "Medium"),
-    contender("Daisy Edgar-Jones", "Sense and Sensibility", 72, 70, 69, "Medium"),
-    contender("Amy Adams", "At the Sea", 77, 86, 70, "High")
+    contender("Renate Reinsve", "Fjord", 85, 74, 82, "High"),
+    contender("Julianne Moore", "Untitled Jesse Eisenberg Musical", 79, 86, 73, "High"),
+    contender("Mikey Madison", "The Social Reckoning", 76, 72, 79, "High"),
+    contender("Virginie Efira", "All of a Sudden", 72, 68, 70, "Medium"),
+    contender("Emma Mackey", "Narnia", 68, 65, 74, "Medium")
   ],
   "supporting-actor": [
-    contender("John Magaro", "Nuremberg", 74, 80, 65, "Medium"),
-    contender("Josh Brolin", "Dune: Part Three", 74, 70, 78, "Medium"),
-    contender("John Malkovich", "Wild Horse Nine", 73, 77, 68, "Medium"),
-    contender("John Goodman", "Judy", 71, 79, 66, "Medium"),
-    contender("Will Poulter", "Saturn Return", 69, 64, 72, "Low")
+    contender("John Malkovich", "Wild Horse Nine", 85, 80, 78, "High"),
+    contender("John Goodman", "Digger", 77, 74, 72, "High"),
+    contender("Colman Domingo", "Michael", 74, 74, 76, "Medium"),
+    contender("Steve Buscemi", "Wild Horse Nine", 72, 72, 69, "Medium"),
+    contender("Channing Tatum", "Josephine", 68, 62, 72, "Medium")
   ],
   "supporting-actress": [
-    contender("Sandra Huller", "Judy", 78, 86, 70, "High"),
-    contender("Octavia Spencer", "Death of a Salesman", 76, 83, 65, "High"),
-    contender("Mariana di Girolamo", "Wild Horse Nine", 72, 69, 71, "Medium"),
-    contender("Charlize Theron", "The Odyssey", 70, 74, 73, "Medium"),
-    contender("Parker Posey", "Wild Horse Nine", 68, 66, 67, "Low")
+    contender("Tao Okamoto", "All of a Sudden", 82, 70, 78, "High"),
+    contender("Sandra Huller", "Digger", 80, 86, 72, "High"),
+    contender("Meryl Streep", "The Devil Wears Prada 2", 76, 91, 72, "High"),
+    contender("Halle Bailey", "Untitled Jesse Eisenberg Musical", 72, 68, 76, "Medium"),
+    contender("Mariana di Girolamo", "Wild Horse Nine", 68, 66, 69, "Medium")
   ],
   "original-screenplay": [
-    contender("The Social Reckoning", "A24", 82, 78, 80, "High"),
-    contender("The Bride!", "Warner Bros.", 78, 71, 76, "High"),
-    contender("The Drama", "A24", 75, 73, 72, "Medium"),
-    contender("The Dish", "Universal", 73, 77, 69, "Medium"),
-    contender("Michael", "Lionsgate", 70, 64, 78, "Medium")
+    contender("Wild Horse Nine", "Searchlight Pictures", 86, 80, 83, "High"),
+    contender("Fjord", "Neon", 78, 73, 72, "High"),
+    contender("Digger", "Netflix", 75, 70, 73, "Medium"),
+    contender("Josephine", "Focus Features", 69, 65, 67, "Medium"),
+    contender("Jack of Spades", "Netflix", 66, 64, 65, "Low")
   ],
   "adapted-screenplay": [
-    contender("The Dog Stars", "20th Century Studios", 84, 86, 73, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 80, 72, 82, "High"),
-    contender("Sense and Sensibility", "Focus Features", 77, 79, 68, "Medium"),
-    contender("Narnia", "Netflix", 71, 66, 75, "Medium"),
-    contender("Dune: Part Three", "Warner Bros.", 72, 74, 70, "Medium")
+    contender("All of a Sudden", "Mubi", 83, 78, 76, "High"),
+    contender("The Odyssey", "Universal", 79, 83, 73, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 75, 70, 79, "Medium"),
+    contender("Narnia", "Netflix", 73, 68, 76, "Medium"),
+    contender("The Social Reckoning", "A24", 71, 69, 72, "Medium")
   ],
   "animated-feature": [
     contender("Pixar's Toy Story 5", "Disney/Pixar", 86, 89, 90, "High"),
@@ -377,74 +385,74 @@ const categorySeeds: Record<string, Film[]> = {
     contender("The Pout-Pout Fish", "DreamWorks", 67, 63, 62, "Low")
   ],
   "original-score": [
-    contender("Dune: Part Three", "Warner Bros.", 87, 88, 80, "High"),
-    contender("The Odyssey", "Universal", 83, 86, 78, "High"),
-    contender("The Bride!", "Warner Bros.", 78, 76, 72, "Medium"),
-    contender("Project Hail Mary", "Amazon MGM", 76, 73, 75, "Medium"),
-    contender("Michael", "Lionsgate", 74, 68, 82, "Medium")
+    contender("The Odyssey", "Universal", 87, 83, 82, "High"),
+    contender("Wild Horse Nine", "Searchlight Pictures", 79, 75, 74, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 75, 72, 76, "Medium"),
+    contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
+    contender("Disclosure Day", "Universal", 70, 73, 68, "Medium")
   ],
   "original-song": [
-    contender("Michael", "Lionsgate", 84, 72, 91, "High"),
-    contender("Narnia", "Netflix", 79, 68, 83, "Medium"),
-    contender("Toy Story 5", "Disney/Pixar", 76, 71, 80, "Medium"),
-    contender("Moana Live-Action", "Disney", 74, 70, 85, "Medium"),
-    contender("The Bride!", "Warner Bros.", 73, 74, 88, "Medium")
+    contender("Untitled Jesse Eisenberg Musical", "A24", 80, 67, 82, "High"),
+    contender("Wuthering Heights", "Warner Bros.", 74, 70, 76, "Medium"),
+    contender("The Hunger Games: Sunrise on the Reaping", "Lionsgate", 72, 66, 79, "Medium"),
+    contender("Toy Story 5", "Disney/Pixar", 70, 68, 77, "Medium"),
+    contender("Untitled Parker/Stone/Lamar Project", "Paramount", 68, 60, 76, "Low")
   ],
   sound: [
-    contender("Dune: Part Three", "Warner Bros.", 88, 86, 78, "High"),
-    contender("The Odyssey", "Universal", 84, 80, 76, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 80, 74, 79, "Medium"),
-    contender("Avengers: Doomsday", "Marvel", 77, 68, 86, "Medium"),
-    contender("Spider-Man: Brand New Day", "Sony", 73, 64, 84, "Low")
+    contender("Disclosure Day", "Universal", 82, 70, 80, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 85, 83, 76, "High"),
+    contender("The Odyssey", "Universal", 80, 78, 74, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 76, 72, 77, "Medium"),
+    contender("Untitled Jesse Eisenberg Musical", "A24", 66, 62, 70, "Low")
   ],
   "production-design": [
-    contender("The Odyssey", "Universal", 87, 85, 78, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 85, 83, 75, "High"),
-    contender("The Bride!", "Warner Bros.", 82, 77, 73, "Medium"),
-    contender("Narnia", "Netflix", 78, 69, 79, "Medium"),
-    contender("The Dish", "Universal", 74, 72, 67, "Low")
+    contender("Narnia", "Netflix", 88, 82, 85, "High"),
+    contender("The Odyssey", "Universal", 85, 83, 78, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 82, 80, 74, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 77, 72, 79, "Medium"),
+    contender("Disclosure Day", "Universal", 70, 66, 70, "Medium")
   ],
   cinematography: [
-    contender("The Odyssey", "Universal", 89, 88, 79, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 87, 86, 77, "High"),
-    contender("The Dog Stars", "20th Century Studios", 83, 84, 71, "High"),
-    contender("The Bride!", "Warner Bros.", 79, 74, 70, "Medium"),
-    contender("Judy", "Warner Bros.", 76, 82, 68, "Medium")
+    contender("The Odyssey", "Universal", 89, 88, 82, "High"),
+    contender("Digger", "Netflix", 83, 80, 76, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 78, 73, 75, "High"),
+    contender("Wild Horse Nine", "Searchlight Pictures", 74, 71, 72, "Medium"),
+    contender("Josephine", "Focus Features", 68, 64, 70, "Medium")
   ],
   "makeup-hairstyling": [
-    contender("The Bride!", "Warner Bros.", 86, 80, 75, "High"),
-    contender("The Odyssey", "Universal", 82, 77, 73, "High"),
-    contender("Michael", "Lionsgate", 80, 70, 84, "Medium"),
-    contender("Supergirl", "DC Studios", 76, 64, 81, "Medium"),
-    contender("Clayface", "DC Studios", 73, 67, 79, "Low")
+    contender("Michael", "Lionsgate", 87, 80, 84, "High"),
+    contender("Werwulf", "A24", 82, 73, 83, "High"),
+    contender("Dune: Part Three", "Warner Bros.", 78, 75, 72, "Medium"),
+    contender("The Odyssey", "Universal", 76, 74, 70, "Medium"),
+    contender("Digger", "Netflix", 72, 68, 70, "Medium")
   ],
   "costume-design": [
-    contender("The Devil Wears Prada 2", "20th Century Studios", 86, 89, 71, "High"),
-    contender("The Bride!", "Warner Bros.", 84, 81, 74, "High"),
-    contender("Sense and Sensibility", "Focus Features", 80, 83, 68, "Medium"),
-    contender("The Odyssey", "Universal", 78, 76, 72, "Medium"),
-    contender("Narnia", "Netflix", 75, 69, 76, "Low")
+    contender("The Odyssey", "Universal", 86, 83, 78, "High"),
+    contender("Michael", "Lionsgate", 82, 75, 82, "High"),
+    contender("The Devil Wears Prada 2", "20th Century Studios", 80, 86, 68, "High"),
+    contender("Wuthering Heights", "Warner Bros.", 74, 73, 72, "Medium"),
+    contender("Narnia", "Netflix", 72, 67, 76, "Medium")
   ],
   "film-editing": [
-    contender("The Odyssey", "Universal", 85, 84, 79, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 83, 82, 76, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 80, 75, 78, "Medium"),
-    contender("The Social Reckoning", "A24", 78, 77, 73, "Medium"),
-    contender("Michael", "Lionsgate", 74, 69, 82, "Low")
+    contender("Wild Horse Nine", "Searchlight Pictures", 85, 79, 80, "High"),
+    contender("The Odyssey", "Universal", 82, 82, 76, "High"),
+    contender("Fjord", "Neon", 76, 71, 73, "Medium"),
+    contender("Digger", "Netflix", 74, 70, 71, "Medium"),
+    contender("Narnia", "Netflix", 70, 67, 74, "Medium")
   ],
   "visual-effects": [
-    contender("Dune: Part Three", "Warner Bros.", 91, 88, 82, "High"),
-    contender("The Odyssey", "Universal", 87, 83, 80, "High"),
-    contender("Avengers: Doomsday", "Marvel", 85, 73, 90, "Medium"),
-    contender("Project Hail Mary", "Amazon MGM", 82, 76, 84, "Medium"),
-    contender("Spider-Man: Brand New Day", "Sony", 79, 68, 88, "Low")
+    contender("Dune: Part Three", "Warner Bros.", 90, 87, 83, "High"),
+    contender("The Odyssey", "Universal", 86, 81, 78, "High"),
+    contender("Narnia", "Netflix", 83, 72, 86, "High"),
+    contender("Project Hail Mary", "Amazon MGM", 80, 74, 83, "Medium"),
+    contender("Disclosure Day", "Universal", 73, 66, 76, "Medium")
   ],
   casting: [
-    contender("The Social Reckoning", "A24", 82, 79, 75, "High"),
-    contender("Michael", "Lionsgate", 80, 73, 88, "High"),
-    contender("The Odyssey", "Universal", 78, 77, 74, "Medium"),
-    contender("The Bride!", "Warner Bros.", 76, 72, 73, "Medium"),
-    contender("Narnia", "Netflix", 72, 67, 78, "Low")
+    contender("Wild Horse Nine", "Searchlight Pictures", 84, 79, 80, "High"),
+    contender("Digger", "Netflix", 76, 70, 74, "Medium"),
+    contender("Fjord", "Neon", 74, 68, 72, "Medium"),
+    contender("Narnia", "Netflix", 72, 67, 78, "Medium"),
+    contender("The Social Reckoning", "A24", 70, 71, 71, "Medium")
   ]
 };
 
@@ -875,11 +883,59 @@ const movieDetails = {
     genre: "Post-Apocalyptic, Drama",
     description: "A pilot and his companion navigate a devastated world while searching for hope and connection."
   },
-  "The Bride!": {
-    director: "Maggie Gyllenhaal",
-    stars: ["Jessie Buckley", "Christian Bale"],
-    genre: "Gothic, Romance, Horror-Drama",
-    description: "A stylized reimagining of Frankenstein's Bride that blends classic horror iconography with romance."
+  "Wild Horse Nine": {
+    director: "Martin McDonagh",
+    stars: ["Sam Rockwell", "John Malkovich", "Mariana di Girolamo"],
+    genre: "Drama, Black Comedy",
+    description: "McDonagh's ensemble drama set against a fractured American landscape, featuring overdue Oscar-caliber turns from its veteran cast."
+  },
+  Fjord: {
+    director: "Cristian Mungiu",
+    stars: ["Renate Reinsve", "Sebastian Stan"],
+    genre: "Drama",
+    description: "A remote two-hander set against stark Nordic landscapes, anchored by a physically and emotionally committed lead performance from Reinsve."
+  },
+  Digger: {
+    director: "Alejandro G. Inarritu",
+    stars: ["Tom Cruise", "John Goodman", "Sandra Huller"],
+    genre: "Drama",
+    description: "Inarritu returns with an ambitious character-driven drama anchored by a transformative Cruise performance and a gifted supporting ensemble."
+  },
+  "Untitled Jesse Eisenberg Musical": {
+    director: "Jesse Eisenberg",
+    stars: ["Jesse Eisenberg", "Julianne Moore", "Halle Bailey"],
+    genre: "Musical Drama, Comedy",
+    description: "Eisenberg writes, directs, and stars in a personal musical drama that earned early festival breakout buzz."
+  },
+  "All of a Sudden": {
+    director: "Ryusuke Hamaguchi",
+    stars: ["Tao Okamoto", "Virginie Efira"],
+    genre: "Drama",
+    description: "Hamaguchi's latest contemplative drama explores chance encounter and emotional rupture across cultural borders."
+  },
+  Josephine: {
+    director: "TBD",
+    stars: ["Channing Tatum"],
+    genre: "Drama",
+    description: "A character-driven drama featuring Channing Tatum in a supporting turn that generated significant awards attention."
+  },
+  "Disclosure Day": {
+    director: "TBD",
+    stars: ["TBD"],
+    genre: "Sci-Fi, Thriller",
+    description: "A sound-forward sci-fi thriller that impressed with its immersive audio design and ambitious technical execution."
+  },
+  Werwulf: {
+    director: "TBD",
+    stars: ["TBD"],
+    genre: "Horror",
+    description: "A practical-effects-driven genre film with demanding transformative makeup work expected to compete in technical categories."
+  },
+  "Jack of Spades": {
+    director: "Joel Coen",
+    stars: ["Josh O'Connor"],
+    genre: "Drama",
+    description: "Joel Coen's solo follow-up, a tightly written original drama with a strong central performance from O'Connor."
   },
   Michael: {
     director: "Antoine Fuqua",
