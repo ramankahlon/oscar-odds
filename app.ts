@@ -4205,7 +4205,7 @@ async function loadBacktest(): Promise<void> {
     });
   } catch {
     if (backtestStatus) {
-      backtestStatus.textContent = "Could not load backtesting data.";
+      backtestStatus.textContent = "Failed to load backtest data.";
       backtestStatus.className = "app-notice error";
     }
   }
