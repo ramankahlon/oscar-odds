@@ -2960,6 +2960,15 @@ function applyStatePayload(parsed: unknown): void {
   }
 
   if (Array.isArray(p.categories)) {
+    // Reset every category to a fresh copy of its seed films before applying the
+    // payload, so categories absent from the payload don't carry over stale film
+    // data from a previous profile load.
+    categories.forEach((cat) => {
+      cat.films = categorySeeds[cat.id]
+        ? categorySeeds[cat.id].map((f) => ({ ...f }))
+        : createSeedFilms();
+    });
+
     p.categories.forEach((storedCategory) => {
       if (!storedCategory || typeof storedCategory !== "object") return;
       const sc = storedCategory as Record<string, unknown>;
