@@ -598,6 +598,10 @@ const compareInflightMap   = new Map<string, Promise<StatePayload | null>>();
 // Projection cache — keyed by categoryId, invalidated (version bump) on every saveState().
 const projectionsCache     = new Map<string, Projection[]>();
 let   projectionCacheVersion = 0;
+// Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
+const summaryCardMap        = new Map<string, HTMLElement>();
+let   activeSummaryCard: HTMLElement | null = null;
+let   summaryBarBuiltAtVersion = -1;
 const resultsPanel = document.querySelector<HTMLElement>("#resultsPanel");
 const movieDetailTitle = document.querySelector<HTMLElement>("#movieDetailTitle")!;
 const movieDetailDirector = document.querySelector<HTMLElement>("#movieDetailDirector")!;
@@ -3711,72 +3715,92 @@ function bindCompareControls() {
 
 function renderSummaryBar() {
   if (!categorySummaryBar) return;
-  categorySummaryBar.innerHTML = "";
 
-  categories.forEach((category) => {
-    const projections = buildProjections(category);
-    const top = projections[0];
-    const second = projections[1];
-    if (!top) return;
+  // Rebuild cards only when projection data has changed (saveState increments the version).
+  // On a bare tab switch, projectionCacheVersion is unchanged, so we skip the rebuild
+  // and just swap the active class using the stored reference — no querySelector needed.
+  if (summaryBarBuiltAtVersion !== projectionCacheVersion) {
+    categorySummaryBar.innerHTML = "";
+    summaryCardMap.clear();
+    activeSummaryCard = null;
+    summaryBarBuiltAtVersion = projectionCacheVersion;
 
-    const gap = second ? top.winner - second.winner : null;
-    const shortName = CATEGORY_SHORT_NAMES[category.id] || category.name;
-    const isActive = category.id === state.categoryId;
-    const displayName = top.rawTitle;
+    categories.forEach((category) => {
+      const projections = getCachedProjections(category);
+      const top = projections[0];
+      const second = projections[1];
+      if (!top) return;
 
-    let gapClass = "gap-moderate";
-    if (gap !== null) {
-      if (gap < 5) gapClass = "gap-tight";
-      else if (gap >= 15) gapClass = "gap-clear";
-    }
+      const gap = second ? top.winner - second.winner : null;
+      const shortName = CATEGORY_SHORT_NAMES[category.id] || category.name;
+      const displayName = top.rawTitle;
 
-    const completion = getCategoryCompletion(category);
-    const completionLabel = completion === "complete"
-      ? "complete"
-      : completion === "partial"
-        ? "partially filled"
-        : "not yet filled";
-
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `summary-card${isActive ? " active" : ""}`;
-    card.dataset.completion = completion;
-    card.setAttribute(
-      "aria-label",
-      `${category.name} (${completionLabel}): ${displayName}, ${top.winner.toFixed(1)}% winner odds${gap !== null ? `, +${gap.toFixed(1)}pp lead` : ""}`
-    );
-    card.setAttribute("aria-pressed", isActive ? "true" : "false");
-
-    card.innerHTML = `
-      <span class="summary-card-category">
-        ${shortName}<span class="summary-card-completion" aria-hidden="true"></span>
-      </span>
-      <span class="summary-card-title">${esc(displayName)}</span>
-      <span class="summary-card-footer">
-        <span class="summary-card-odds">${top.winner.toFixed(1)}%</span>
-        ${gap !== null ? `<span class="summary-card-gap ${gapClass}">+${gap.toFixed(1)}pp</span>` : ""}
-      </span>
-    `;
-
-    card.addEventListener("click", () => {
-      if (searchQuery) {
-        searchQuery = "";
-        if (contenderSearch) contenderSearch.value = "";
-        if (contenderSearchClear) contenderSearchClear.hidden = true;
+      let gapClass = "gap-moderate";
+      if (gap !== null) {
+        if (gap < 5) gapClass = "gap-tight";
+        else if (gap >= 15) gapClass = "gap-clear";
       }
-      state.categoryId = category.id;
-      saveState();
-      render();
+
+      const completion = getCategoryCompletion(category);
+      const completionLabel = completion === "complete"
+        ? "complete"
+        : completion === "partial"
+          ? "partially filled"
+          : "not yet filled";
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "summary-card"; // active class applied below via swap
+      card.dataset.completion = completion;
+      card.setAttribute(
+        "aria-label",
+        `${category.name} (${completionLabel}): ${displayName}, ${top.winner.toFixed(1)}% winner odds${gap !== null ? `, +${gap.toFixed(1)}pp lead` : ""}`
+      );
+      card.setAttribute("aria-pressed", "false");
+
+      card.innerHTML = `
+        <span class="summary-card-category">
+          ${shortName}<span class="summary-card-completion" aria-hidden="true"></span>
+        </span>
+        <span class="summary-card-title">${esc(displayName)}</span>
+        <span class="summary-card-footer">
+          <span class="summary-card-odds">${top.winner.toFixed(1)}%</span>
+          ${gap !== null ? `<span class="summary-card-gap ${gapClass}">+${gap.toFixed(1)}pp</span>` : ""}
+        </span>
+      `;
+
+      card.addEventListener("click", () => {
+        if (searchQuery) {
+          searchQuery = "";
+          if (contenderSearch) contenderSearch.value = "";
+          if (contenderSearchClear) contenderSearchClear.hidden = true;
+        }
+        state.categoryId = category.id;
+        saveState();
+        render();
+      });
+
+      summaryCardMap.set(category.id, card);
+      categorySummaryBar.appendChild(card);
     });
+  }
 
-    categorySummaryBar.appendChild(card);
-  });
+  // Swap active class directly — no querySelector.
+  if (activeSummaryCard) {
+    activeSummaryCard.classList.remove("active");
+    activeSummaryCard.setAttribute("aria-pressed", "false");
+  }
+  const newActive = summaryCardMap.get(state.categoryId) ?? null;
+  if (newActive) {
+    newActive.classList.add("active");
+    newActive.setAttribute("aria-pressed", "true");
+  }
+  activeSummaryCard = newActive;
 
-  // Scroll the active card into view within the bar
-  const activeCard = categorySummaryBar.querySelector<HTMLElement>(".summary-card.active");
-  if (activeCard) {
+  // Scroll the active card into view within the bar.
+  if (activeSummaryCard) {
     const bar = categorySummaryBar;
-    bar.scrollLeft = activeCard.offsetLeft - bar.clientWidth / 2 + activeCard.offsetWidth / 2;
+    bar.scrollLeft = activeSummaryCard.offsetLeft - bar.clientWidth / 2 + activeSummaryCard.offsetWidth / 2;
   }
 }
 
