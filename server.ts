@@ -458,6 +458,22 @@ function normalizePosterKey(value: string): string {
     .trim();
 }
 
+// Hardcoded poster map for confirmed 2026/2027 Oscar contenders.
+// Keys are normalizePosterKey() outputs. Avoids network fetches for known films
+// and is the primary fix for films not yet fully indexed by TMDB's search.
+const STATIC_POSTER_MAP = new Map<string, { posterUrl: string; movieUrl: string }>([
+  ["the odyssey",          { posterUrl: "https://image.tmdb.org/t/p/w780/pe5cCoX5iIb5IWKPsbPkCwjLFHt.jpg", movieUrl: "https://www.themoviedb.org/movie/1368337-the-odyssey" }],
+  ["dune part three",      { posterUrl: "https://image.tmdb.org/t/p/w780/gp1MVNsRyH76PHlJVhRk6PHylDY.jpg", movieUrl: "https://www.themoviedb.org/movie/1170608-dune-part-three" }],
+  ["project hail mary",   { posterUrl: "https://image.tmdb.org/t/p/w780/vOhW7Lbt4kZAqe0vJhVC4Ced9x2.jpg", movieUrl: "https://www.themoviedb.org/movie/687163-project-hail-mary" }],
+  ["michael",              { posterUrl: "https://image.tmdb.org/t/p/w780/3Qud19bBUrrJAzy0Ilm8gRJlJXP.jpg", movieUrl: "https://www.themoviedb.org/movie/936075-michael" }],
+  ["narnia",               { posterUrl: "https://image.tmdb.org/t/p/w780/nivfPrUAhhvgXeZgy98Ii6TrSnF.jpg", movieUrl: "https://www.themoviedb.org/movie/1147572-narnia" }],
+  ["wuthering heights",    { posterUrl: "https://image.tmdb.org/t/p/w780/3YBce6dTh1D5oCMITXk2S5QhPt.jpg", movieUrl: "https://www.themoviedb.org/movie/1316092-wuthering-heights" }],
+  ["disclosure day",       { posterUrl: "https://image.tmdb.org/t/p/w780/AnJ8IQJI23hNpYXVNaythu061Ru.jpg", movieUrl: "https://www.themoviedb.org/movie/1275779-disclosure-day" }],
+  ["sense and sensibility",{ posterUrl: "https://image.tmdb.org/t/p/w780/gadMPKXNMZKdOTDuJaVHbi8Nt1a.jpg", movieUrl: "https://www.themoviedb.org/movie/1503762-sense-and-sensibility" }],
+  ["the dog stars",        { posterUrl: "https://image.tmdb.org/t/p/w780/3KBGRPHhwSBXUixKeGhExfbBIzj.jpg", movieUrl: "https://www.themoviedb.org/movie/1384216-the-dog-stars" }],
+  ["moana live action",    { posterUrl: "https://image.tmdb.org/t/p/w780/8Kpmnbbb8Rp1wG99thlcZ9JAUqo.jpg", movieUrl: "https://www.themoviedb.org/movie/1108427-moana" }],
+]);
+
 function toAbsoluteTmdbUrl(value: string): string {
   if (!value) return "";
   if (value.startsWith("http://") || value.startsWith("https://")) return value;
@@ -656,7 +672,6 @@ async function fetchFromTmdbApi(query: string): Promise<{ posterUrl: string; mov
   searchUrl.searchParams.set("include_adult", "false");
   searchUrl.searchParams.set("language", "en-US");
   searchUrl.searchParams.set("page", "1");
-  searchUrl.searchParams.set("primary_release_year", String(TMDB_RELEASE_YEAR));
   if (TMDB_API_KEY) searchUrl.searchParams.set("api_key", TMDB_API_KEY);
 
   const searchResponse = await fetch(searchUrl, {
@@ -669,7 +684,9 @@ async function fetchFromTmdbApi(query: string): Promise<{ posterUrl: string; mov
   if (!searchResponse.ok) return null;
   const searchJson = await searchResponse.json() as { results?: Array<{ id?: number; poster_path?: string; release_date?: string }> };
   const results = Array.isArray(searchJson?.results) ? searchJson.results : [];
-  const firstMovie = results.find((item) => item?.id && isTargetReleaseYear(item?.release_date || ""));
+  // Take the first result — the API sorts by relevance, so the best title match is first.
+  // Upcoming Oscar contenders may not yet have a confirmed release date in TMDB.
+  const firstMovie = results.find((item) => item?.id);
   if (!firstMovie?.id) return null;
   const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path || ""));
 
@@ -695,9 +712,10 @@ async function fetchFromTmdbRemoteMulti(query: string): Promise<{ posterUrl: str
   if (!response.ok) return null;
   const json = await response.json() as { results?: Array<{ id?: number; media_type?: string; poster_path?: string; profile_path?: string; release_date?: string }> };
   const results = Array.isArray(json?.results) ? json.results : [];
+  // Take the first movie-type result. Upcoming contenders may have no confirmed date yet.
   const firstMovie = results.find((item) => {
     const isMovieLike = !item?.media_type || item.media_type === "movie";
-    return isMovieLike && item?.id && isTargetReleaseYear(item?.release_date || "");
+    return isMovieLike && item?.id;
   });
   if (!firstMovie?.id) return null;
   const posterUrl = await resolveValidPosterUrl(posterUrlFromPath(firstMovie.poster_path || firstMovie.profile_path || ""));
@@ -713,6 +731,11 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
   if (!query) return null;
 
   const cacheKey = normalizePosterKey(query);
+
+  // Fast path: hardcoded map for known Oscar contenders.
+  const staticEntry = STATIC_POSTER_MAP.get(cacheKey);
+  if (staticEntry) return staticEntry;
+
   const cached = posterCache.get(cacheKey);
   if (cached) {
     if (Date.now() - cached.fetchedAt < POSTER_CACHE_TTL_MS) return cached.result;
@@ -740,7 +763,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
     }
   }
 
-  const searchUrl = `https://www.themoviedb.org/search?query=${encodeURIComponent(query)}`;
+  const searchUrl = `https://www.themoviedb.org/search/movie?query=${encodeURIComponent(query)}`;
   const searchResponse = await fetch(searchUrl, {
     headers: {
       "user-agent": "oscar-odds/1.0 (+local-dev)",
@@ -757,6 +780,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
     return null;
   }
 
+  // Try each result in order until one responds successfully.
   for (const moviePath of moviePaths) {
     const movieUrl = canonicalMovieUrlFromPath(moviePath);
     const movieResponse = await fetch(movieUrl, {
@@ -769,9 +793,6 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
     if (!movieResponse.ok) continue;
 
     const movieHtml = await movieResponse.text();
-    const releaseYear = extractReleaseYearFromMovieHtml(movieHtml);
-    if (releaseYear !== TMDB_RELEASE_YEAR) continue;
-
     const posterUrl = await resolveValidPosterUrl(extractPosterUrlFromMovieHtml(movieHtml));
     const payload = { posterUrl: posterUrl || "", movieUrl };
     posterCache.set(cacheKey, { result: payload, fetchedAt: Date.now() });
