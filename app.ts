@@ -201,7 +201,6 @@ const schedule2026Films = [
   "Masters of the Universe",
   "Power Ballad",
   "Scary Movie 6",
-  "The Dish",
   "Pixar's Toy Story 5",
   "Supergirl",
   "Mega Minions",
@@ -389,7 +388,7 @@ const categorySeeds: Record<string, Film[]> = {
     contender("Wild Horse Nine", "Searchlight Pictures", 79, 75, 74, "High"),
     contender("Project Hail Mary", "Amazon MGM", 75, 72, 76, "Medium"),
     contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
-    contender("Disclosure Day", "Universal", 70, 73, 68, "Medium")
+    contender("Disclosure Day", "Amblin Entertainment", 70, 73, 68, "Medium")
   ],
   "original-song": [
     contender("Untitled Jesse Eisenberg Musical", "A24", 80, 67, 82, "High"),
@@ -399,7 +398,7 @@ const categorySeeds: Record<string, Film[]> = {
     contender("Untitled Parker/Stone/Lamar Project", "Paramount", 68, 60, 76, "Low")
   ],
   sound: [
-    contender("Disclosure Day", "Universal", 82, 70, 80, "High"),
+    contender("Disclosure Day", "Amblin Entertainment", 82, 70, 80, "High"),
     contender("Dune: Part Three", "Warner Bros.", 85, 83, 76, "High"),
     contender("The Odyssey", "Universal", 80, 78, 74, "High"),
     contender("Project Hail Mary", "Amazon MGM", 76, 72, 77, "Medium"),
@@ -410,7 +409,7 @@ const categorySeeds: Record<string, Film[]> = {
     contender("The Odyssey", "Universal", 85, 83, 78, "High"),
     contender("Dune: Part Three", "Warner Bros.", 82, 80, 74, "High"),
     contender("Project Hail Mary", "Amazon MGM", 77, 72, 79, "Medium"),
-    contender("Disclosure Day", "Universal", 70, 66, 70, "Medium")
+    contender("Disclosure Day", "Amblin Entertainment", 70, 66, 70, "Medium")
   ],
   cinematography: [
     contender("The Odyssey", "Universal", 89, 88, 82, "High"),
@@ -445,7 +444,7 @@ const categorySeeds: Record<string, Film[]> = {
     contender("The Odyssey", "Universal", 86, 81, 78, "High"),
     contender("Narnia", "Netflix", 83, 72, 86, "High"),
     contender("Project Hail Mary", "Amazon MGM", 80, 74, 83, "Medium"),
-    contender("Disclosure Day", "Universal", 73, 66, 76, "Medium")
+    contender("Disclosure Day", "Amblin Entertainment", 73, 66, 76, "Medium")
   ],
   casting: [
     contender("Wild Horse Nine", "Searchlight Pictures", 84, 79, 80, "High"),
@@ -861,9 +860,9 @@ function buildPosterFallbackDataUrl(title: string): string {
 const movieDetails = {
   "The Odyssey": {
     director: "Christopher Nolan",
-    stars: ["Matt Damon", "Charlize Theron", "Tom Holland"],
-    genre: "Epic, Action, Historical Drama",
-    description: "A large-scale adaptation of Homer's Odyssey following a long, dangerous return home after war."
+    stars: ["Matt Damon", "Zendaya", "Anne Hathaway", "Tom Holland"],
+    genre: "Epic, Adventure, Drama",
+    description: "Christopher Nolan's sweeping adaptation of Homer's epic poem, following Odysseus on his treacherous decade-long voyage home after the fall of Troy."
   },
   "Dune: Part Three": {
     director: "Denis Villeneuve",
@@ -926,10 +925,10 @@ const movieDetails = {
     description: "A character-driven drama featuring Channing Tatum in a supporting turn that generated significant awards attention."
   },
   "Disclosure Day": {
-    director: "TBD",
-    stars: ["TBD"],
+    director: "Steven Spielberg",
+    stars: ["Emily Blunt", "Josh O'Connor", "Colin Firth", "Colman Domingo", "Eve Hewson"],
     genre: "Sci-Fi, Thriller",
-    description: "A sound-forward sci-fi thriller that impressed with its immersive audio design and ambitious technical execution."
+    description: "Spielberg returns to the UFO genre with a thriller about the global reckoning that follows irrefutable proof of extraterrestrial life. Screenplay by David Koepp; score by John Williams."
   },
   Werwulf: {
     director: "TBD",
@@ -960,12 +959,6 @@ const movieDetails = {
     stars: ["Ensemble Cast"],
     genre: "Fantasy, Adventure",
     description: "A new screen take on C.S. Lewis world-building with large-scale fantasy production design."
-  },
-  "The Dish": {
-    director: "Steven Spielberg",
-    stars: ["Emily Blunt", "Colin Firth"],
-    genre: "Historical Drama",
-    description: "A prestige period drama from Spielberg expected to focus on media, politics, and institutional power."
   },
   Judy: {
     director: "Alejandro G. Inarritu",

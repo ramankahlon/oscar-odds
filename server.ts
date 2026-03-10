@@ -721,7 +721,7 @@ async function fetchTmdbPoster(title: string): Promise<{ posterUrl: string; movi
 
   const queryVariants = [query];
   if (query === "The Odyssey") queryVariants.push("The Odyssey Christopher Nolan");
-  if (query === "The Dish") queryVariants.push("The Dish Spielberg");
+  if (query === "Disclosure Day") queryVariants.push("Disclosure Day Spielberg");
   if (query === "Michael") queryVariants.push("Michael Jackson biopic");
 
   for (const candidateQuery of queryVariants) {
