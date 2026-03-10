@@ -1023,6 +1023,17 @@ app.get("/api/forecast/:profileId/history", (req: Request, res: Response) => {
   res.json({ profileId, snapshots: Array.from(snapshotMap.values()) });
 });
 
+app.get("/api/learned-weights", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "learned-weights.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Learned weights not found. Run: npm run optimize:weights");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

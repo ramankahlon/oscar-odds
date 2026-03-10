@@ -262,9 +262,34 @@ export function runBacktest(weights: NormalizedWeights): BacktestResult {
 
 let cache: BacktestResult | null = null;
 
+/**
+ * Loads ML-learned weights from data/learned-weights.json if available.
+ * Falls back to the original hand-tuned baseline (58/30/12) so the app
+ * works without having run the optimisation script first.
+ */
+function loadLearnedWeightsOrDefault(): NormalizedWeights {
+  try {
+    const raw = JSON.parse(
+      readFileSync(join(__dirname, "data", "learned-weights.json"), "utf8")
+    ) as { weights?: { precursor?: unknown; history?: unknown; buzz?: unknown } };
+    const w = raw?.weights;
+    if (
+      typeof w?.precursor === "number" &&
+      typeof w?.history   === "number" &&
+      typeof w?.buzz      === "number" &&
+      Math.abs(w.precursor + w.history + w.buzz - 1) < 0.02
+    ) {
+      return { precursor: w.precursor, history: w.history, buzz: w.buzz };
+    }
+  } catch {
+    // File not yet generated — first-run fallback.
+  }
+  return { precursor: 0.58, history: 0.30, buzz: 0.12 };
+}
+
 export function getBacktestResult(): BacktestResult {
   if (!cache) {
-    cache = runBacktest({ precursor: 0.58, history: 0.30, buzz: 0.12 });
+    cache = runBacktest(loadLearnedWeightsOrDefault());
   }
   return cache;
 }

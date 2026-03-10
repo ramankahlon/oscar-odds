@@ -19,7 +19,8 @@
     "pretest:e2e": "npm run build:client",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "optimize:weights": "tsx scripts/optimize-weights.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

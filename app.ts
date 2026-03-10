@@ -78,15 +78,24 @@ interface WeightPreset {
   name: string;
   precursor: number;
   history: number;
+  dataDriven?: true;   // marks the ML-learned preset
   buzz: number;
   builtin?: true;
 }
+
+// DATA_DRIVEN_PRESET is mutable: bootstrap() overwrites its weights after fetching
+// /api/learned-weights.  Values here are the hand-tuned fallback shown before
+// the fetch completes (or if the optimisation script hasn't been run yet).
+const DATA_DRIVEN_PRESET: WeightPreset = {
+  name: "Data-Driven", precursor: 58, history: 30, buzz: 12, builtin: true, dataDriven: true
+};
 
 const BUILTIN_PRESETS: WeightPreset[] = [
   { name: "Balanced",        precursor: 58, history: 30, buzz: 12, builtin: true },
   { name: "Precursor-heavy", precursor: 75, history: 18, buzz:  7, builtin: true },
   { name: "History-heavy",   precursor: 40, history: 48, buzz: 12, builtin: true },
   { name: "Buzz-driven",     precursor: 35, history: 25, buzz: 40, builtin: true },
+  DATA_DRIVEN_PRESET,
 ];
 
 const WEIGHT_PRESETS_KEY = "oscar-odds:weight-presets";
@@ -1091,8 +1100,17 @@ function renderWeightPresets(): void {
     nameBtn.className = "weight-preset-name";
     nameBtn.textContent = preset.name;
     nameBtn.setAttribute("aria-pressed", String(isActive));
-    nameBtn.title = `Precursor ${preset.precursor}  ·  Historical ${preset.history}  ·  Buzz ${preset.buzz}`;
+    nameBtn.title = `Precursor ${preset.precursor}  ·  Historical ${preset.history}  ·  Buzz ${preset.buzz}` +
+      (preset.dataDriven ? "  ·  Learned via logistic regression (LOYO-CV)" : "");
     chip.appendChild(nameBtn);
+
+    if (preset.dataDriven) {
+      const badge = document.createElement("span");
+      badge.className = "weight-preset-ml-badge";
+      badge.textContent = "ML";
+      badge.title = "Weights learned via logistic regression on 25 years of Oscar history";
+      chip.appendChild(badge);
+    }
 
     if (!isBuiltin) {
       const del = document.createElement("button");
@@ -4239,6 +4257,27 @@ async function bootstrap() {
   loadState();
   await loadStateFromApi();
   userPresets = loadUserPresets();
+
+  // Populate the Data-Driven preset with ML-learned weights if available.
+  // Fire-and-forget: the preset chip re-renders once the response arrives.
+  fetch("/api/learned-weights")
+    .then(r => r.ok ? r.json() : null)
+    .then((data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const w = (data as Record<string, unknown>).weights as Record<string, unknown> | undefined;
+      if (typeof w?.precursor !== "number" || typeof w?.history !== "number" || typeof w?.buzz !== "number") return;
+      const p = Math.round(w.precursor as number * 100);
+      const h = Math.round(w.history   as number * 100);
+      const b = Math.round(w.buzz      as number * 100);
+      if (p + h + b < 98 || p + h + b > 102) return;
+      DATA_DRIVEN_PRESET.precursor = p;
+      DATA_DRIVEN_PRESET.history   = h;
+      DATA_DRIVEN_PRESET.buzz      = b;
+      DATA_DRIVEN_PRESET.name = `Data-Driven (${p}/${h}/${b})`;
+      renderWeightPresets();
+    })
+    .catch(() => { /* learned-weights not generated yet — silent fallback */ });
+
   bindProfileControls();
   bindProfileLockButton();
   bindTrendControls();
