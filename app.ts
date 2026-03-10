@@ -226,7 +226,6 @@ const schedule2026Films = [
   "Resident Evil",
   "Charlie Harper",
   "Forgotten Island",
-  "Judy",
   "Verity",
   "The Legend of Aang: The Last Airbender",
   "Other Mommy",
@@ -290,7 +289,9 @@ const categorySeeds: Record<string, Film[]> = {
     contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
     contender("Untitled Jesse Eisenberg Musical", "A24", 71, 65, 72, "Medium"),
     contender("All of a Sudden", "Mubi", 68, 66, 69, "Medium"),
-    contender("Josephine", "Focus Features", 65, 62, 66, "Medium")
+    contender("Josephine", "Focus Features", 65, 62, 66, "Medium"),
+    contender("Dune: Part Three", "Warner Bros.", 74, 71, 75, "Medium"),
+    contender("Wuthering Heights", "Warner Bros.", 70, 67, 71, "Medium")
   ],
   director: [
     contender("Martin McDonagh", "Wild Horse Nine", 88, 82, 86, "High"),
@@ -959,12 +960,6 @@ const movieDetails = {
     stars: ["Ensemble Cast"],
     genre: "Fantasy, Adventure",
     description: "A new screen take on C.S. Lewis world-building with large-scale fantasy production design."
-  },
-  Judy: {
-    director: "Alejandro G. Inarritu",
-    stars: ["Tom Cruise", "Sandra Huller", "John Goodman"],
-    genre: "Drama",
-    description: "A character-driven drama built around a demanding central performance and major supporting turns."
   },
   "Wuthering Heights": {
     director: "Emerald Fennell",

@@ -86,12 +86,12 @@ describe("applySourceSignals", () => {
       id: "picture",
       films: [
         { title: "The Odyssey", studio: "Universal", precursor: 80, history: 80, buzz: 80, strength: "Medium" as Strength },
-        { title: "The Dish", studio: "Universal", precursor: 50, history: 50, buzz: 50, strength: "Low" as Strength }
+        { title: "Disclosure Day", studio: "Universal", precursor: 50, history: 50, buzz: 50, strength: "Low" as Strength }
       ]
     },
     {
       id: "director",
-      films: [{ title: "Steven Spielberg", studio: "The Dish", precursor: 70, history: 70, buzz: 70, strength: "Medium" as Strength }]
+      films: [{ title: "Steven Spielberg", studio: "Disclosure Day", precursor: 70, history: 70, buzz: 70, strength: "Medium" as Strength }]
     }
   ];
 
@@ -125,7 +125,7 @@ describe("applySourceSignals", () => {
     const categories = makeCategories();
     const snapshot = {
       generatedAt: "2026-03-01T00:00:00.000Z",
-      aggregate: [{ title: "The Dish", combinedScore: 0.6, letterboxdScore: 0.6, redditScore: 0.6, thegamerScore: 0.6 }]
+      aggregate: [{ title: "Disclosure Day", combinedScore: 0.6, letterboxdScore: 0.6, redditScore: 0.6, thegamerScore: 0.6 }]
     };
     applySourceSignals({ categories, snapshot, lastAppliedSnapshotId: null });
     expect(categories[1].films[0].precursor).toBeGreaterThan(70);
@@ -138,7 +138,7 @@ describe("applySourceSignals", () => {
     categories[0].films[1].buzz = 1;
     const snapshot = {
       generatedAt: "2026-04-01T00:00:00.000Z",
-      aggregate: [{ title: "The Dish", combinedScore: 0, letterboxdScore: 0, redditScore: 0, thegamerScore: 0 }]
+      aggregate: [{ title: "Disclosure Day", combinedScore: 0, letterboxdScore: 0, redditScore: 0, thegamerScore: 0 }]
     };
     applySourceSignals({ categories, snapshot, lastAppliedSnapshotId: null });
     expect(categories[0].films[1].precursor).toBeGreaterThanOrEqual(0);
@@ -150,6 +150,6 @@ describe("applySourceSignals", () => {
 
 describe("normalizeSignalKey", () => {
   it("normalizes punctuation and bracketed text", () => {
-    expect(normalizeSignalKey("The Dish [Spielberg Movie]")).toBe("the dish");
+    expect(normalizeSignalKey("Disclosure Day")).toBe("disclosure day");
   });
 });

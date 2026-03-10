@@ -93,7 +93,6 @@ const KNOWN_ENTITY_ALIASES = new Map<string, string>([
   ["sense and sensibility", "Sense and Sensibility"],
   ["wuthering heights", "Wuthering Heights"],
   ["the dog stars", "The Dog Stars"],
-  ["judy", "Judy"],
   ["moana live action", "Moana Live-Action"],
   ["moana", "Moana Live-Action"]
 ]);
