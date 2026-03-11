@@ -1045,6 +1045,17 @@ app.get("/api/calibration", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/bootstrap-ci", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "bootstrap-ci.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Bootstrap CI not found. Run: npm run bootstrap:ci");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

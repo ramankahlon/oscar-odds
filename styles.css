@@ -641,6 +641,16 @@ th#thDelta {
   color: var(--warn);
 }
 
+/* Bootstrap confidence interval range shown inline in the results table. */
+.ci-range {
+  font-size: 0.72rem;
+  font-weight: 400;
+  opacity: 0.55;
+  white-space: nowrap;
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+
 .mini-grid {
   margin-top: 10px;
   display: grid;

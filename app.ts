@@ -621,6 +621,14 @@ const compareInflightMap   = new Map<string, Promise<StatePayload | null>>();
 // Projection cache — keyed by categoryId, invalidated (version bump) on every saveState().
 const projectionsCache     = new Map<string, Projection[]>();
 let   projectionCacheVersion = 0;
+// Bootstrap CI — weight samples fetched once from /api/bootstrap-ci.
+// Each sample is [precursor, history, buzz] in [0,1] range (already normalised).
+let bootstrapSamples: Array<[number, number, number]> = [];
+// Per-category CI cache — maps film.title → {nomLow, nomHigh, winLow, winHigh} (percentages).
+// Cleared alongside projectionsCache whenever saveState() is called.
+const bootstrapCIByCategory = new Map<string, Map<string, {
+  nomLow: number; nomHigh: number; winLow: number; winHigh: number
+}>>();
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -2113,6 +2121,83 @@ function renderMovieDetails(category: Category, entry: Projection | null): void 
   movieDetailDescription.textContent = details.description;
 }
 
+// ── Bootstrap confidence intervals ───────────────────────────────────────────
+
+/**
+ * For each film in the category, runs the full scoring pipeline under every
+ * bootstrap weight vector and collects the resulting nomination/winner odds.
+ * Returns the 2.5th–97.5th percentile range for each film — a 95% CI that
+ * reflects parameter uncertainty in the learned model weights.
+ *
+ * Results are computed once per category and cached in bootstrapCIByCategory
+ * until saveState() invalidates the cache.
+ */
+function computeCategoryBootstrapCI(
+  category: Category
+): Map<string, { nomLow: number; nomHigh: number; winLow: number; winHigh: number }> {
+  type FilmCI = { noms: number[]; wins: number[] };
+  const perFilm = new Map<string, FilmCI>(
+    category.films.map(f => [f.title, { noms: [], wins: [] }])
+  );
+
+  for (const sample of bootstrapSamples) {
+    const [p, h, b] = sample;
+    const total = p + h + b || 1;
+    const w: NormalizedWeights = { precursor: p / total, history: h / total, buzz: b / total };
+
+    const scored = category.films.map(film => ({ film, ...scoreFilm(category.id, film, w) }));
+    const nominationTotal = scored.reduce((s, x) => s + x.nominationRaw, 0) || 1;
+    const winnerTotal     = scored.reduce((s, x) => s + x.winnerRaw, 0) || 1;
+    const nomineeScale    = category.nominees / Math.max(1, scored.length);
+
+    for (const s of scored) {
+      const nom = calculateNominationOdds({
+        nominationRaw: s.nominationRaw,
+        nominationTotal,
+        nomineeScale,
+        uplift: NOMINATION_PERCENT_UPLIFT,
+        min: 0.6,
+        max: 99
+      });
+      const win = calculateWinnerOdds({
+        winnerRaw: s.winnerRaw,
+        winnerTotal,
+        nomination: nom,
+        winnerBase: category.winnerBase,
+        uplift: WINNER_PERCENT_UPLIFT,
+        min: 0.4,
+        max: 92
+      });
+      const entry = perFilm.get(s.film.title);
+      if (entry) { entry.noms.push(nom); entry.wins.push(win); }
+    }
+  }
+
+  const result = new Map<string, { nomLow: number; nomHigh: number; winLow: number; winHigh: number }>();
+  const q = (arr: number[], frac: number) => {
+    const s = [...arr].sort((a, b) => a - b);
+    return s[Math.max(0, Math.min(s.length - 1, Math.round(frac * (s.length - 1))))] ?? 0;
+  };
+  for (const [title, { noms, wins }] of perFilm) {
+    result.set(title, {
+      nomLow:  q(noms, 0.025), nomHigh: q(noms, 0.975),
+      winLow:  q(wins, 0.025), winHigh: q(wins, 0.975)
+    });
+  }
+  return result;
+}
+
+function getCategoryBootstrapCI(
+  category: Category
+): Map<string, { nomLow: number; nomHigh: number; winLow: number; winHigh: number }> {
+  if (!bootstrapSamples.length) return new Map();
+  const cached = bootstrapCIByCategory.get(category.id);
+  if (cached) return cached;
+  const result = computeCategoryBootstrapCI(category);
+  bootstrapCIByCategory.set(category.id, result);
+  return result;
+}
+
 interface BuildProjectionsOverrides {
   films?: Film[];
   weights?: Partial<NormalizedWeights>;
@@ -2397,10 +2482,17 @@ function renderResults(category: Category, projections: Projection[]): void {
         render();
       }
     });
+    const ci = getCategoryBootstrapCI(category).get(entry.rawTitle);
+    const nomCI = ci && (ci.nomHigh - ci.nomLow) > 0.5
+      ? ` <span class="ci-range" title="95% bootstrap CI">[${ci.nomLow.toFixed(0)}–${ci.nomHigh.toFixed(0)}]</span>`
+      : "";
+    const winCI = ci && (ci.winHigh - ci.winLow) > 0.5
+      ? ` <span class="ci-range" title="95% bootstrap CI">[${ci.winLow.toFixed(0)}–${ci.winHigh.toFixed(0)}]</span>`
+      : "";
     row.innerHTML =
       `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${esc(entry.title)}</strong></td>` +
-      (oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%</td>` : "") +
-      (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%</td>`       : "");
+      (oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%${nomCI}</td>` : "") +
+      (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%${winCI}</td>`       : "");
     resultsBody.appendChild(row);
   });
 
@@ -3430,9 +3522,10 @@ function saveState() {
   // viewing this profile always re-fetches rather than showing stale data.
   comparePayloadCache.delete(state.profileId);
 
-  // Invalidate projection cache — film data or weights may have changed.
+  // Invalidate projection and bootstrap CI caches — film data or weights may have changed.
   projectionCacheVersion++;
   projectionsCache.clear();
+  bootstrapCIByCategory.clear();
 
   void saveStateToApi();
 }
@@ -4277,6 +4370,20 @@ async function bootstrap() {
       renderWeightPresets();
     })
     .catch(() => { /* learned-weights not generated yet — silent fallback */ });
+
+  // Fetch bootstrap weight samples for per-film confidence intervals.
+  // Fire-and-forget: CI bands appear after the initial render once samples arrive.
+  fetch("/api/bootstrap-ci")
+    .then(r => r.ok ? r.json() : null)
+    .then((data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const samples = (data as Record<string, unknown>).samples;
+      if (!Array.isArray(samples) || !samples.length) return;
+      bootstrapSamples = samples as Array<[number, number, number]>;
+      bootstrapCIByCategory.clear();
+      render(); // re-render so CI bands appear in the results table
+    })
+    .catch(() => { /* bootstrap-ci.json not generated yet — silent fallback */ });
 
   bindProfileControls();
   bindProfileLockButton();
