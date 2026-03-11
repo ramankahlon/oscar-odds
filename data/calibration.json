@@ -1,0 +1,79 @@
+{
+  "calibratedAt": "2026-03-11T09:43:46.758Z",
+  "method": "platt-scaling",
+  "weightsUsed": {
+    "precursor": 0.4992,
+    "history": 0.1314,
+    "buzz": 0.3694
+  },
+  "samples": {
+    "nomination": 1110,
+    "winner": 810
+  },
+  "nomination": {
+    "platt": {
+      "A": 3.561026,
+      "B": 9.073243
+    },
+    "ece": {
+      "raw": 0.617817,
+      "calibrated": 0.094084
+    },
+    "curve": [
+      {
+        "midpoint": 0.05,
+        "avgPredicted": 0.062,
+        "actualFreq": 0.2519,
+        "avgCalibrated": 0.3582,
+        "count": 401
+      },
+      {
+        "midpoint": 0.15,
+        "avgPredicted": 0.1401,
+        "actualFreq": 1,
+        "avgCalibrated": 0.9128,
+        "count": 709
+      }
+    ]
+  },
+  "winner": {
+    "platt": {
+      "A": 4.398435,
+      "B": 4.317136
+    },
+    "ece": {
+      "raw": 0.133681,
+      "calibrated": 0.032545
+    },
+    "curve": [
+      {
+        "midpoint": 0.05,
+        "avgPredicted": 0.0883,
+        "actualFreq": 0,
+        "avgCalibrated": 0.0028,
+        "count": 31
+      },
+      {
+        "midpoint": 0.15,
+        "avgPredicted": 0.1569,
+        "actualFreq": 0.0343,
+        "avgCalibrated": 0.0543,
+        "count": 437
+      },
+      {
+        "midpoint": 0.25,
+        "avgPredicted": 0.241,
+        "actualFreq": 0.3784,
+        "avgCalibrated": 0.3343,
+        "count": 333
+      },
+      {
+        "midpoint": 0.35,
+        "avgPredicted": 0.3076,
+        "actualFreq": 1,
+        "avgCalibrated": 0.6787,
+        "count": 9
+      }
+    ]
+  }
+}

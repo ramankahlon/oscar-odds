@@ -1034,6 +1034,17 @@ app.get("/api/learned-weights", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/calibration", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "calibration.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Calibration not found. Run: npm run calibrate");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

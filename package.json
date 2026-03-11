@@ -20,7 +20,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "optimize:weights": "tsx scripts/optimize-weights.ts"
+    "optimize:weights": "tsx scripts/optimize-weights.ts",
+    "calibrate": "tsx scripts/calibrate.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
