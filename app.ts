@@ -718,6 +718,39 @@ interface PrRocData {
   byCategory:  Record<string, PrRocCurveSet>;
 }
 let prRocData: PrRocData | null = null;
+// Rolling Forecast Error data fetched from /api/rolling-error.
+interface RollingYearRow {
+  year:                  number;
+  ceremony:              number;
+  winnerBrierAvg:        number;
+  nominationBrierAvg:    number;
+  winnerAccuracyPct:     number;
+  nominationAccuracyAvg: number;
+  roll3WinnerBrier:      number;
+  roll5WinnerBrier:      number;
+  roll3WinnerAccuracy:   number;
+  roll5WinnerAccuracy:   number;
+  trendWinnerBrier:      number;
+  trendWinnerAccuracy:   number;
+}
+interface RollingCatRow {
+  year:          number;
+  winnerCorrect: boolean;
+  winnerBrier:   number;
+  nomBrier:      number;
+}
+interface RollingErrorData {
+  generatedAt: string;
+  weights:     { precursor: number; history: number; buzz: number };
+  yearRange:   { from: number; to: number };
+  trend: {
+    winnerBrier:    { slope: number; intercept: number; r2: number; unit: string };
+    winnerAccuracy: { slope: number; intercept: number; r2: number; unit: string };
+  };
+  years:       RollingYearRow[];
+  byCategory:  Record<string, RollingCatRow[]>;
+}
+let rollingErrorData: RollingErrorData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -5077,6 +5110,194 @@ function renderPrRoc(): void {
   section.hidden = false;
 }
 
+// ── Rolling Error charts ───────────────────────────────────────────────────────
+
+const RE_W = 420, RE_H = 240;
+const RE_PAD = { top: 14, right: 20, bottom: 46, left: 54 };
+const RE_IW = RE_W - RE_PAD.left - RE_PAD.right;
+const RE_IH = RE_H - RE_PAD.top  - RE_PAD.bottom;
+
+function reXScale(yearIndex: number, n: number): number {
+  return RE_PAD.left + (yearIndex / Math.max(1, n - 1)) * RE_IW;
+}
+
+function reYScale(v: number, lo: number, hi: number): number {
+  const range = hi - lo || 1e-6;
+  return RE_PAD.top + RE_IH - ((v - lo) / range) * RE_IH;
+}
+
+function reSvgAxes(years: number[], yLo: number, yHi: number, yFmt: (v: number) => string): string {
+  const ox = RE_PAD.left, oy = RE_PAD.top;
+  const bx = ox + RE_IW,  by = oy + RE_IH;
+  let s = `<line class="pr-axis" x1="${ox}" y1="${oy}" x2="${ox}" y2="${by}"/>`;
+  s    += `<line class="pr-axis" x1="${ox}" y1="${by}" x2="${bx}" y2="${by}"/>`;
+
+  // X ticks: every 5 years
+  for (let i = 0; i < years.length; i++) {
+    if (years[i] % 5 !== 0 && i !== 0 && i !== years.length - 1) continue;
+    const px = reXScale(i, years.length).toFixed(1);
+    s += `<line class="pr-tick" x1="${px}" y1="${by}" x2="${px}" y2="${(+by + 4).toFixed(1)}"/>`;
+    s += `<text class="pr-tick-lbl re-year-lbl" x="${px}" y="${(+by + 16).toFixed(1)}" text-anchor="middle" transform="rotate(-45,${px},${+by + 16})">${years[i]}</text>`;
+  }
+
+  // Y ticks: 5 evenly spaced
+  for (let k = 0; k <= 4; k++) {
+    const v = yLo + (k / 4) * (yHi - yLo);
+    const py = reYScale(v, yLo, yHi).toFixed(1);
+    s += `<line class="pr-tick" x1="${ox}" y1="${py}" x2="${(ox - 4).toFixed(1)}" y2="${py}"/>`;
+    s += `<text class="pr-tick-lbl" x="${(ox - 7).toFixed(1)}" y="${(+py + 3.5).toFixed(1)}" text-anchor="end">${yFmt(v)}</text>`;
+  }
+  return s;
+}
+
+function reSvgPolyline(
+  vals: number[], years: number[], yLo: number, yHi: number, cls: string
+): string {
+  const pts = vals
+    .map((v, i) => `${reXScale(i, years.length).toFixed(1)},${reYScale(v, yLo, yHi).toFixed(1)}`)
+    .join(" ");
+  return `<polyline class="${cls}" points="${pts}" fill="none"/>`;
+}
+
+function reSvgDots(
+  vals: number[], years: number[], yLo: number, yHi: number, colorFn: ((v: number, i: number) => string) | null
+): string {
+  return vals.map((v, i) => {
+    const cx = reXScale(i, years.length).toFixed(1);
+    const cy = reYScale(v, yLo, yHi).toFixed(1);
+    const cls = colorFn ? colorFn(v, i) : "re-dot";
+    return `<circle class="${cls}" cx="${cx}" cy="${cy}" r="3"><title>${years[i]}: ${v.toFixed(5)}</title></circle>`;
+  }).join("");
+}
+
+function renderRollingChart(
+  svgId: string,
+  rawVals: number[],
+  rollVals: number[],
+  trendVals: number[],
+  years: number[],
+  yFmt: (v: number) => string,
+  dotColorFn: ((v: number, i: number) => string) | null,
+): void {
+  const el = document.getElementById(svgId);
+  if (!el) return;
+  const allVals = [...rawVals, ...rollVals, ...trendVals];
+  const margin = (Math.max(...allVals) - Math.min(...allVals)) * 0.12 || 0.005;
+  const yLo = Math.min(...allVals) - margin;
+  const yHi = Math.max(...allVals) + margin;
+
+  el.innerHTML =
+    reSvgAxes(years, yLo, yHi, yFmt) +
+    reSvgPolyline(trendVals, years, yLo, yHi, "re-trend") +
+    reSvgPolyline(rollVals,  years, yLo, yHi, "re-roll") +
+    reDots(rawVals, rollVals, years, yLo, yHi, dotColorFn);
+}
+
+function reDots(
+  rawVals: number[],
+  _rollVals: number[],
+  years: number[],
+  yLo: number,
+  yHi: number,
+  colorFn: ((v: number, i: number) => string) | null,
+): string {
+  return reSvgDots(rawVals, years, yLo, yHi, colorFn);
+}
+
+function renderRollingError(): void {
+  const section  = document.getElementById("rollingErrorSection");
+  const statRow  = document.getElementById("reStatRow");
+  const heatmap  = document.getElementById("reHeatmap");
+  if (!section || !statRow || !heatmap || !rollingErrorData) return;
+
+  const { years, trend, byCategory } = rollingErrorData;
+  const yearNums = years.map(r => r.year);
+
+  // Stat badges
+  const wbSlope = trend.winnerBrier.slope;
+  const wbR2    = trend.winnerBrier.r2;
+  const waSlope = trend.winnerAccuracy.slope;
+  const slopeDir = (s: number) => s < 0 ? "▼" : "▲";
+  const slopeClass = (s: number, lowerIsBetter: boolean) =>
+    (s < 0) === lowerIsBetter ? "re-stat--good" : "re-stat--bad";
+
+  statRow.innerHTML =
+    `<div class="re-stat-badge ${slopeClass(wbSlope, true)}">
+       <div class="re-stat-label">Brier Score Trend</div>
+       <div class="re-stat-value">${slopeDir(wbSlope)} ${Math.abs(wbSlope * 1000).toFixed(3)}<span class="re-stat-unit">×10⁻³/yr</span></div>
+       <div class="re-stat-sub">R² = ${wbR2.toFixed(3)}</div>
+     </div>` +
+    `<div class="re-stat-badge ${slopeClass(waSlope, false)}">
+       <div class="re-stat-label">Accuracy Trend</div>
+       <div class="re-stat-value">${slopeDir(waSlope)} ${Math.abs(waSlope).toFixed(3)}<span class="re-stat-unit">pp/yr</span></div>
+       <div class="re-stat-sub">R² = ${trend.winnerAccuracy.r2.toFixed(3)}</div>
+     </div>` +
+    `<div class="re-stat-badge">
+       <div class="re-stat-label">Mean Win Brier</div>
+       <div class="re-stat-value">${(years.reduce((s, r) => s + r.winnerBrierAvg, 0) / years.length).toFixed(5)}</div>
+       <div class="re-stat-sub">${years.length} ceremonies</div>
+     </div>`;
+
+  // Brier chart
+  renderRollingChart(
+    "reBrierSvg",
+    years.map(r => r.winnerBrierAvg),
+    years.map(r => r.roll3WinnerBrier),
+    years.map(r => r.trendWinnerBrier),
+    yearNums,
+    v => v.toFixed(4),
+    null,
+  );
+
+  // Accuracy chart
+  renderRollingChart(
+    "reAccSvg",
+    years.map(r => r.winnerAccuracyPct),
+    years.map(r => r.roll3WinnerAccuracy),
+    years.map(r => r.trendWinnerAccuracy),
+    yearNums,
+    v => `${v.toFixed(0)}%`,
+    (v) => v >= 100 ? "re-dot re-dot--correct" : v >= 83 ? "re-dot re-dot--near" : "re-dot re-dot--miss",
+  );
+
+  // Heatmap: year columns × category rows
+  const CAT_LABELS: Record<string, string> = {
+    picture: "Best Picture", director: "Director", actor: "Actor", actress: "Actress",
+    "supporting-actor": "Supp. Actor", "supporting-actress": "Supp. Actress",
+  };
+  const catIds = ["picture", "director", "actor", "actress", "supporting-actor", "supporting-actress"];
+
+  const colW = Math.max(20, Math.floor(560 / yearNums.length));
+  let html = `<div class="re-heatmap">`;
+  // Year header
+  html += `<div class="re-hm-header">`;
+  html += `<div class="re-hm-cat-label"></div>`;
+  for (const y of yearNums) {
+    html += `<div class="re-hm-year" style="width:${colW}px">${String(y).slice(2)}</div>`;
+  }
+  html += `</div>`;
+  // Category rows
+  for (const catId of catIds) {
+    const catRows = byCategory[catId] ?? [];
+    const rowByYear = new Map(catRows.map(r => [r.year, r]));
+    html += `<div class="re-hm-row">`;
+    html += `<div class="re-hm-cat-label">${CAT_LABELS[catId] ?? catId}</div>`;
+    for (const y of yearNums) {
+      const r = rowByYear.get(y);
+      const cls = !r ? "re-hm-cell re-hm-cell--na"
+        : r.winnerCorrect ? "re-hm-cell re-hm-cell--correct"
+        : "re-hm-cell re-hm-cell--miss";
+      const tip = r ? `${y}: ${r.winnerCorrect ? "✓" : "✗"} BS=${r.winnerBrier.toFixed(4)}` : y.toString();
+      html += `<div class="${cls}" style="width:${colW}px" title="${tip}"></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  heatmap.innerHTML = html;
+
+  section.hidden = false;
+}
+
 async function loadBacktest(): Promise<void> {
   if (backtestStatus) {
     backtestStatus.textContent = "Loading accuracy data…";
@@ -5139,6 +5360,17 @@ async function loadBacktest(): Promise<void> {
         renderPrRoc();
       })
       .catch(() => { /* pr-roc.json not generated yet */ });
+    // Load rolling error data alongside backtest.
+    fetch("/api/rolling-error")
+      .then(r => r.ok ? r.json() : null)
+      .then((re: unknown) => {
+        if (!re || typeof re !== "object") return;
+        const d = re as Record<string, unknown>;
+        if (!Array.isArray(d.years) || typeof d.trend !== "object") return;
+        rollingErrorData = re as RollingErrorData;
+        renderRollingError();
+      })
+      .catch(() => { /* rolling-error.json not generated yet */ });
   } catch {
     if (backtestStatus) {
       backtestStatus.textContent = "Failed to load backtest data.";

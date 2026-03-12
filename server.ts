@@ -1089,6 +1089,17 @@ app.get("/api/brier-decomposition", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/rolling-error", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "rolling-error.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Rolling error data not found. Run: npm run rolling-error");
+  }
+});
+
 app.get("/api/pr-roc", (_: Request, res: Response) => {
   try {
     const raw = JSON.parse(

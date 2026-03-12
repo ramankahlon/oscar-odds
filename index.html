@@ -352,6 +352,24 @@
               </table>
             </div>
           </div>
+
+          <h3 class="backtest-section-heading">Rolling Forecast Error</h3>
+          <div id="rollingErrorSection" hidden>
+            <p class="panel-copy re-copy">Year-by-year winner Brier Score and accuracy across 25 Oscar ceremonies, with 3-year rolling averages and an OLS trend line. Lower Brier = better calibration.</p>
+            <div class="re-stat-row" id="reStatRow"></div>
+            <div class="re-charts-grid">
+              <div>
+                <h4 class="pr-chart-title">Winner Brier Score by Year</h4>
+                <svg id="reBrierSvg" class="re-svg" viewBox="0 0 420 240" role="img" aria-label="Winner Brier score over years"></svg>
+              </div>
+              <div>
+                <h4 class="pr-chart-title">Winner Accuracy % by Year</h4>
+                <svg id="reAccSvg"   class="re-svg" viewBox="0 0 420 240" role="img" aria-label="Winner accuracy over years"></svg>
+              </div>
+            </div>
+            <h4 class="backtest-section-heading" style="margin-top:16px">Correct Winner Prediction — Heatmap</h4>
+            <div id="reHeatmap" class="re-heatmap-wrap"></div>
+          </div>
         </div>
       </section>
 
