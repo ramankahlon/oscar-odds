@@ -1412,19 +1412,33 @@ app.get("/api/scraper-events", sseLimiter, sseConnectionGuard, (req: Request, re
   res.write(": connected\n\n");
   scraperEventClients.add(res);
 
-  // Send a keepalive comment every 30 s to prevent proxy/load-balancer timeouts
+  // Idempotent cleanup — safe to call from both req.close and the keepalive.
+  let closed = false;
+  const cleanup = (): void => {
+    if (closed) return;
+    closed = true;
+    clearInterval(keepalive);
+    scraperEventClients.delete(res);
+  };
+
+  // Send a keepalive comment every 30 s to prevent proxy/load-balancer timeouts.
+  // Also acts as a liveness probe: HTTP/2 multiplexed streams and some proxies
+  // silently drop connections without ever emitting req.close, so we check
+  // res.destroyed / res.writableEnded proactively and clean up immediately on
+  // any write failure rather than waiting indefinitely.
   const keepalive = setInterval(() => {
+    if (res.destroyed || res.writableEnded) {
+      cleanup();
+      return;
+    }
     try {
       res.write(": keepalive\n\n");
     } catch {
-      clearInterval(keepalive);
+      cleanup();
     }
   }, 30_000);
 
-  req.on("close", () => {
-    clearInterval(keepalive);
-    scraperEventClients.delete(res);
-  });
+  req.on("close", cleanup);
 });
 
 app.post("/api/client-errors", clientErrorLimiter, (req: Request, res: Response) => {
