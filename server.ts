@@ -1251,7 +1251,7 @@ app.get("/api/contenders", (_: Request, res: Response) => {
   }
 });
 
-app.get("/api/tmdb-poster", tmdbLimiter, async (req: Request, res: Response) => {
+app.get("/api/tmdb-poster", tmdbLimiter, asyncHandler(async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;
   const title = query.title;
@@ -1262,7 +1262,7 @@ app.get("/api/tmdb-poster", tmdbLimiter, async (req: Request, res: Response) => 
   } catch (error) {
     sendError(res, 502, String((error as Error)?.message || error));
   }
-});
+}));
 
 app.get("/api/profiles/:profileId/auth-status", (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
@@ -1295,7 +1295,7 @@ app.get("/api/profiles/:profileId/auth-status", (req: Request, res: Response) =>
   res.json({ profileId, hasPassphrase, authenticated });
 });
 
-app.post("/api/profiles/:profileId/login", authLimiter, async (req: Request, res: Response) => {
+app.post("/api/profiles/:profileId/login", authLimiter, asyncHandler(async (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
 
@@ -1336,7 +1336,7 @@ app.post("/api/profiles/:profileId/login", authLimiter, async (req: Request, res
   });
 
   res.json({ ok: true });
-});
+}));
 
 app.post("/api/profiles/:profileId/logout", (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
@@ -1351,7 +1351,7 @@ app.post("/api/profiles/:profileId/logout", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth, async (req: Request, res: Response) => {
+app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth, asyncHandler(async (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
 
@@ -1370,7 +1370,7 @@ app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth,
   res.clearCookie(SESSION_COOKIE, { path: "/" });
 
   res.json({ ok: true });
-});
+}));
 
 app.delete("/api/profiles/:profileId/passphrase", requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
