@@ -1716,6 +1716,97 @@ function pointsForEntryTrend(category: Category, entry: Projection): TrendPoint[
     .slice(-pointLimit);
 }
 
+// ── Momentum: OLS regression on winner/nomination odds time series ────────────
+
+interface MomentumResult {
+  /** OLS slope in percentage-points per day (winner odds). */
+  winSlope:  number;
+  /** OLS slope in pp/day for nomination odds. */
+  nomSlope:  number;
+  /** Coefficient of determination (0–1) — reliability of the trend line. */
+  r2:        number;
+  /** Number of snapshot data points used. */
+  snapshots: number;
+}
+
+const MOMENTUM_STABLE_THRESHOLD = 0.30;  // pp/day — below this = "stable"
+const MOMENTUM_STRONG_THRESHOLD = 1.50;  // pp/day — above this = "strong" move
+
+/**
+ * Fit OLS regression y = a + b·t to (time, odds) pairs.
+ * Returns { slope, r2 } where slope is in units of odds-unit per day.
+ * Returns null when fewer than 2 distinct timestamps exist.
+ */
+function olsSlope(pairs: Array<{ t: number; y: number }>): { slope: number; r2: number } | null {
+  if (pairs.length < 2) return null;
+  const n  = pairs.length;
+  const tBar = pairs.reduce((s, p) => s + p.t, 0) / n;
+  const yBar = pairs.reduce((s, p) => s + p.y, 0) / n;
+  let stt = 0, sty = 0, syy = 0;
+  for (const { t, y } of pairs) {
+    stt += (t - tBar) ** 2;
+    sty += (t - tBar) * (y - yBar);
+    syy += (y - yBar) ** 2;
+  }
+  if (stt < 1e-9) return null;
+  const slope = sty / stt;
+  const r2    = syy > 1e-9 ? (sty ** 2) / (stt * syy) : 0;
+  return { slope, r2 };
+}
+
+/**
+ * Compute momentum for a single film from its trend points.
+ * Returns null if there are fewer than 2 snapshots with distinct timestamps.
+ */
+function computeMomentum(points: TrendPoint[]): MomentumResult | null {
+  if (points.length < 2) return null;
+
+  const t0 = new Date(points[0].capturedAt).getTime();
+  const winPairs  = points.map(p => ({ t: (new Date(p.capturedAt).getTime() - t0) / 86_400_000, y: p.winner }));
+  const nomPairs  = points.map(p => ({ t: (new Date(p.capturedAt).getTime() - t0) / 86_400_000, y: p.nomination }));
+
+  const winFit = olsSlope(winPairs);
+  const nomFit = olsSlope(nomPairs);
+  if (!winFit) return null;
+
+  return {
+    winSlope:  winFit.slope,
+    nomSlope:  nomFit?.slope ?? 0,
+    r2:        winFit.r2,
+    snapshots: points.length,
+  };
+}
+
+/**
+ * Compute momentum for every film in the current category using the active
+ * trend window.  Returns a Map keyed by trendKeyForEntry.
+ * Result is NOT cached — it is recomputed on each render (cheap: pure array math).
+ */
+function computeCategoryMomentum(
+  category:    Category,
+  projections: Projection[]
+): Map<string, MomentumResult | null> {
+  const out = new Map<string, MomentumResult | null>();
+  for (const entry of projections) {
+    const points = pointsForEntryTrend(category, entry);
+    out.set(trendKeyForEntry(category.id, entry), computeMomentum(points));
+  }
+  return out;
+}
+
+/** Format a momentum slope as a compact badge HTML string. */
+function momentumBadgeHtml(m: MomentumResult | null): string {
+  if (!m || m.snapshots < 3) return "";
+  const s = m.winSlope;
+  const abs = Math.abs(s);
+  if (abs < MOMENTUM_STABLE_THRESHOLD) return `<span class="momentum-badge momentum--stable" title="Stable (${s >= 0 ? "+" : ""}${s.toFixed(2)} pp/day, R²=${(m.r2*100).toFixed(0)}%)">→</span>`;
+  const strong = abs >= MOMENTUM_STRONG_THRESHOLD;
+  const dir    = s > 0 ? "up" : "dn";
+  const arrow  = s > 0 ? (strong ? "↑↑" : "↑") : (strong ? "↓↓" : "↓");
+  const label  = `${s >= 0 ? "+" : ""}${s.toFixed(2)} pp/day, R²=${(m.r2*100).toFixed(0)}%`;
+  return `<span class="momentum-badge momentum--${dir}" title="${label}">${arrow}</span>`;
+}
+
 function getSnapshotDays(categoryId: string): string[] {
   const daySet = new Set<string>();
   trendHistory.snapshots
@@ -2041,33 +2132,125 @@ function renderSourceMovement(points: TrendPoint[]): void {
   });
 }
 
+const momentumStatsEl  = document.querySelector<HTMLElement>("#momentumStats");
+const momentumMoversEl = document.querySelector<HTMLElement>("#momentumMovers");
+const momentumMoversBody = document.querySelector<HTMLElement>("#momentumMoversBody");
+
 function renderTrendAnalytics(category: Category, entry: Projection | null): void {
+  const projections = buildProjections(category);
+  const displayProjections = projections.slice(0, getDisplayLimit(category));
+
   if (!entry) {
     trendChart?.setAttribute("aria-label", "Nomination and winner trend chart — no contender selected");
     trendTitle.textContent = "Trend Analytics";
     trendMeta.textContent = "Select a contender to view movement over time.";
     renderTrendChart([]);
     renderSourceMovement([]);
+    if (momentumStatsEl)  momentumStatsEl.hidden = true;
+    renderMomentumMovers(category, displayProjections, null);
     return;
   }
 
   trendChart?.setAttribute("aria-label", `Trend for ${entry.title} in ${category.name}`);
   const points = pointsForEntryTrend(category, entry);
+  const mom    = computeMomentum(points);
   trendTitle.textContent = `Trend Analytics: ${entry.title}`;
+
   if (points.length < 2) {
     trendMeta.textContent = "Need at least two snapshots to show movement.";
+    if (momentumStatsEl) momentumStatsEl.hidden = true;
   } else {
-    const first = points[0];
-    const last = points[points.length - 1];
+    const first    = points[0];
+    const last     = points[points.length - 1];
     const nomDelta = last.nomination - first.nomination;
-    const winDelta = last.winner - first.winner;
-    trendMeta.textContent = `Last ${points.length} updates: Nomination ${nomDelta >= 0 ? "+" : ""}${nomDelta.toFixed(
-      1
-    )}pp, Winner ${winDelta >= 0 ? "+" : ""}${winDelta.toFixed(1)}pp.`;
+    const winDelta = last.winner    - first.winner;
+    trendMeta.textContent =
+      `Last ${points.length} updates: Nomination ${nomDelta >= 0 ? "+" : ""}${nomDelta.toFixed(1)}pp,` +
+      ` Winner ${winDelta >= 0 ? "+" : ""}${winDelta.toFixed(1)}pp.`;
+
+    if (momentumStatsEl && mom) {
+      const winSign   = mom.winSlope >= 0 ? "+" : "";
+      const nomSign   = mom.nomSlope >= 0 ? "+" : "";
+      const direction =
+        Math.abs(mom.winSlope) < MOMENTUM_STABLE_THRESHOLD ? "Stable"
+        : mom.winSlope > 0 ? (mom.winSlope >= MOMENTUM_STRONG_THRESHOLD ? "Rising fast" : "Rising")
+        : (mom.winSlope <= -MOMENTUM_STRONG_THRESHOLD ? "Falling fast" : "Falling");
+      momentumStatsEl.innerHTML =
+        `<div class="momentum-stat-row">` +
+          `<span class="momentum-stat-label">Momentum</span>` +
+          `<span class="momentum-stat-value momentum-stat-value--${mom.winSlope >= 0 ? "pos" : "neg"}">${direction}</span>` +
+        `</div>` +
+        `<div class="momentum-stat-row">` +
+          `<span class="momentum-stat-label">Win slope</span>` +
+          `<span class="momentum-stat-value">${winSign}${mom.winSlope.toFixed(2)} pp/day</span>` +
+        `</div>` +
+        `<div class="momentum-stat-row">` +
+          `<span class="momentum-stat-label">Nom slope</span>` +
+          `<span class="momentum-stat-value">${nomSign}${mom.nomSlope.toFixed(2)} pp/day</span>` +
+        `</div>` +
+        `<div class="momentum-stat-row">` +
+          `<span class="momentum-stat-label">R² (trend fit)</span>` +
+          `<span class="momentum-stat-value">${(mom.r2 * 100).toFixed(0)}%</span>` +
+        `</div>` +
+        `<div class="momentum-stat-row">` +
+          `<span class="momentum-stat-label">Data points</span>` +
+          `<span class="momentum-stat-value">${mom.snapshots} snapshots</span>` +
+        `</div>`;
+      momentumStatsEl.hidden = false;
+    } else if (momentumStatsEl) {
+      momentumStatsEl.hidden = true;
+    }
   }
 
   renderTrendChart(points);
   renderSourceMovement(points);
+  renderMomentumMovers(category, displayProjections, entry);
+}
+
+/**
+ * Show the top 3 risers and top 3 fallers in this category by OLS win-slope.
+ * Only films with ≥ 3 snapshots and |slope| ≥ STABLE_THRESHOLD are included.
+ */
+function renderMomentumMovers(
+  category:     Category,
+  projections:  Projection[],
+  _selected:    Projection | null,
+): void {
+  if (!momentumMoversEl || !momentumMoversBody) return;
+
+  type Entry = { title: string; slope: number; r2: number; winner: number };
+  const entries: Entry[] = [];
+
+  for (const proj of projections) {
+    const pts = pointsForEntryTrend(category, proj);
+    const m   = computeMomentum(pts);
+    if (!m || m.snapshots < 3 || Math.abs(m.winSlope) < MOMENTUM_STABLE_THRESHOLD) continue;
+    entries.push({ title: proj.title, slope: m.winSlope, r2: m.r2, winner: proj.winner });
+  }
+
+  if (entries.length === 0) { momentumMoversEl.hidden = true; return; }
+
+  entries.sort((a, b) => b.slope - a.slope);
+  const top3    = entries.slice(0, 3);
+  const bottom3 = [...entries].sort((a, b) => a.slope - b.slope).slice(0, 3);
+  // Deduplicate (can overlap when few films)
+  const shown   = new Set<string>();
+  const movers  = [...top3, ...bottom3].filter(e => { if (shown.has(e.title)) return false; shown.add(e.title); return true; });
+
+  momentumMoversBody.innerHTML = movers.map(e => {
+    const dir  = e.slope >= 0 ? "up" : "dn";
+    const sign = e.slope >= 0 ? "+" : "";
+    return (
+      `<div class="mover-row">` +
+        `<span class="mover-badge momentum--${dir}">${e.slope >= 0 ? "↑" : "↓"}</span>` +
+        `<span class="mover-title">${esc(e.title)}</span>` +
+        `<span class="mover-val">${sign}${e.slope.toFixed(2)} pp/d</span>` +
+        `<span class="mover-winner">${e.winner.toFixed(1)}% win</span>` +
+      `</div>`
+    );
+  }).join("");
+
+  momentumMoversEl.hidden = false;
 }
 
 function showPosterSkeleton(): void {
@@ -2492,6 +2675,8 @@ function renderResults(category: Category, projections: Projection[]): void {
   const boundedIndex = clamp(selectedIndex, 0, Math.max(0, displayProjections.length - 1));
   explainSelectionByCategory[category.id] = boundedIndex;
 
+  const momentum = computeCategoryMomentum(category, displayProjections);
+
   displayProjections.forEach((entry, index) => {
     const row = document.createElement("tr");
     row.className = `results-row${index === boundedIndex ? " active" : ""}`;
@@ -2528,10 +2713,12 @@ function renderResults(category: Category, projections: Projection[]): void {
     const winCI = ci && (ci.winHigh - ci.winLow) > 0.5
       ? ` <span class="ci-range" title="95% bootstrap CI">[${ci.winLow.toFixed(0)}–${ci.winHigh.toFixed(0)}]</span>`
       : "";
+    const mKey   = trendKeyForEntry(category.id, entry);
+    const mBadge = momentumBadgeHtml(momentum.get(mKey) ?? null);
     row.innerHTML =
       `<td data-label="${getPrimaryColumnLabel(category.id)}"><strong>${esc(entry.title)}</strong></td>` +
       (oddsMode !== "winner"     ? `<td data-label="Nomination %">${entry.nomination.toFixed(1)}%${nomCI}</td>` : "") +
-      (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%${winCI}</td>`       : "");
+      (oddsMode !== "nomination" ? `<td data-label="Winner %">${entry.winner.toFixed(1)}%${winCI}${mBadge}</td>` : "");
     resultsBody.appendChild(row);
   });
 

@@ -641,6 +641,64 @@ th#thDelta {
   color: var(--warn);
 }
 
+/* ── Momentum badges (inline in results table winner % cell) ─────────────── */
+.momentum-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: default;
+  letter-spacing: 0;
+}
+.momentum--up     { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.momentum--dn     { color: var(--warn);   background: color-mix(in srgb, var(--warn)   12%, transparent); }
+.momentum--stable { color: var(--muted);  background: color-mix(in srgb, var(--muted)  12%, transparent); }
+
+/* ── Momentum stats panel (below trend chart) ────────────────────────────── */
+.momentum-stats {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  font-size: 0.83rem;
+}
+.momentum-stat-row { display: contents; }
+.momentum-stat-label { color: var(--muted); }
+.momentum-stat-value { font-weight: 600; }
+.momentum-stat-value--pos { color: var(--accent); }
+.momentum-stat-value--neg { color: var(--warn);   }
+
+/* ── Top movers list ─────────────────────────────────────────────────────── */
+.momentum-movers { margin-top: 12px; }
+.momentum-movers-heading {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.mover-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.mover-row:last-child { border-bottom: none; }
+.mover-badge { font-size: 1rem; font-weight: 700; text-align: center; }
+.mover-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mover-val   { font-weight: 700; white-space: nowrap; }
+.mover-winner { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+
 /* Bootstrap confidence interval range shown inline in the results table. */
 .ci-range {
   font-size: 0.72rem;
