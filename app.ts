@@ -701,6 +701,23 @@ interface AbTestData {
   pairwise:    AbTestPair[];
 }
 let abTestData: AbTestData | null = null;
+// Precision-Recall / ROC data fetched from /api/pr-roc.
+interface PrRocCurveSet {
+  n:          number;
+  positives:  number;
+  prevalence: number;
+  aucRoc:     number;
+  aucPr:      number;
+  roc:        Array<{ fpr: number; tpr: number }>;
+  pr:         Array<{ recall: number; precision: number }>;
+}
+interface PrRocData {
+  generatedAt: string;
+  weights:     { precursor: number; history: number; buzz: number };
+  overall:     PrRocCurveSet;
+  byCategory:  Record<string, PrRocCurveSet>;
+}
+let prRocData: PrRocData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -4942,6 +4959,124 @@ function renderAbTest(): void {
   section.hidden = false;
 }
 
+// ── SVG helpers for PR/ROC charts ─────────────────────────────────────────────
+
+const PR_W = 300, PR_H = 280;
+const PR_PAD = { top: 10, right: 16, bottom: 44, left: 44 };
+const PR_IW = PR_W - PR_PAD.left - PR_PAD.right;
+const PR_IH = PR_H - PR_PAD.top  - PR_PAD.bottom;
+
+function svgLine(
+  points: Array<[number, number]>,
+  xScale: (v: number) => number,
+  yScale: (v: number) => number,
+  cls: string
+): string {
+  if (points.length < 2) return "";
+  const d = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${xScale(x).toFixed(1)},${yScale(y).toFixed(1)}`)
+    .join(" ");
+  return `<path class="${cls}" d="${d}" fill="none"/>`;
+}
+
+function svgAxes(xLabel: string, yLabel: string): string {
+  const ox = PR_PAD.left, oy = PR_PAD.top;
+  const bx = ox + PR_IW,  by = oy + PR_IH;
+  // Ticks at 0, 0.2, 0.4, 0.6, 0.8, 1.0
+  const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+  let s = `<line class="pr-axis" x1="${ox}" y1="${oy}" x2="${ox}" y2="${by}"/>`;
+  s    += `<line class="pr-axis" x1="${ox}" y1="${by}" x2="${bx}" y2="${by}"/>`;
+  for (const t of ticks) {
+    const px = (ox + t * PR_IW).toFixed(1);
+    const py = (oy + (1 - t) * PR_IH).toFixed(1);
+    s += `<line class="pr-tick" x1="${px}" y1="${by}" x2="${px}" y2="${(+by + 4).toFixed(1)}"/>`;
+    s += `<line class="pr-tick" x1="${ox}" y1="${py}" x2="${(+ox - 4).toFixed(1)}" y2="${py}"/>`;
+    s += `<text class="pr-tick-lbl" x="${px}" y="${(+by + 14).toFixed(1)}" text-anchor="middle">${t === 0 ? "0" : t === 1 ? "1" : t.toFixed(1)}</text>`;
+    s += `<text class="pr-tick-lbl" x="${(+ox - 8).toFixed(1)}" y="${(+py + 4).toFixed(1)}" text-anchor="end">${t === 0 ? "0" : t === 1 ? "1" : t.toFixed(1)}</text>`;
+  }
+  const midX = (ox + bx) / 2, midY = (oy + by) / 2;
+  s += `<text class="pr-axis-lbl" x="${midX.toFixed(1)}" y="${(+by + 34).toFixed(1)}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="pr-axis-lbl" x="${(-midY).toFixed(1)}" y="${(ox - 28).toFixed(1)}" text-anchor="middle" transform="rotate(-90)">${yLabel}</text>`;
+  return s;
+}
+
+function renderPrRocSvg(
+  svgId: string,
+  overallPoints: Array<[number, number]>,
+  baselinePoints: Array<[number, number]>,
+  xLabel: string,
+  yLabel: string,
+  aucLabel: string,
+  aucValue: number,
+): void {
+  const el = document.getElementById(svgId);
+  if (!el) return;
+  const ox = PR_PAD.left, oy = PR_PAD.top;
+  const xS = (v: number) => ox + v * PR_IW;
+  const yS = (v: number) => oy + (1 - v) * PR_IH;
+
+  el.innerHTML =
+    svgAxes(xLabel, yLabel) +
+    svgLine(baselinePoints, xS, yS, "pr-baseline") +
+    svgLine(overallPoints,  xS, yS, "pr-curve") +
+    `<text class="pr-auc-lbl" x="${(ox + PR_IW - 4).toFixed(1)}" y="${(oy + 18).toFixed(1)}" text-anchor="end">${aucLabel} = ${aucValue.toFixed(4)}</text>`;
+}
+
+function renderPrRoc(): void {
+  const section  = document.getElementById("prRocSection");
+  const aucRow   = document.getElementById("prAucRow");
+  const catBody  = document.getElementById("prRocCatBody");
+  if (!section || !aucRow || !catBody || !prRocData) return;
+
+  const { overall, byCategory } = prRocData;
+
+  // AUC badges
+  aucRow.innerHTML =
+    `<div class="pr-auc-badge">
+      <div class="pr-auc-label">AUC-ROC</div>
+      <div class="pr-auc-value">${overall.aucRoc.toFixed(4)}</div>
+      <div class="pr-auc-sub">vs 0.5 baseline</div>
+    </div>` +
+    `<div class="pr-auc-badge">
+      <div class="pr-auc-label">AUC-PR</div>
+      <div class="pr-auc-value">${overall.aucPr.toFixed(4)}</div>
+      <div class="pr-auc-sub">vs ${(overall.prevalence * 100).toFixed(1)}% baseline</div>
+    </div>` +
+    `<div class="pr-auc-badge">
+      <div class="pr-auc-label">Samples</div>
+      <div class="pr-auc-value">${overall.n.toLocaleString()}</div>
+      <div class="pr-auc-sub">${overall.positives} positives (${(overall.prevalence * 100).toFixed(1)}%)</div>
+    </div>`;
+
+  // ROC curve SVG
+  const rocPts = overall.roc.map(p => [p.fpr, p.tpr] as [number, number]);
+  renderPrRocSvg("rocSvg", rocPts, [[0, 0], [1, 1]], "FPR", "TPR", "AUC-ROC", overall.aucRoc);
+
+  // PR curve SVG
+  const prPts = overall.pr.map(p => [p.recall, p.precision] as [number, number]);
+  renderPrRocSvg("prSvg", prPts, [[0, overall.prevalence], [1, overall.prevalence]], "Recall", "Precision", "AUC-PR", overall.aucPr);
+
+  // Category table
+  const CAT_LABELS: Record<string, string> = {
+    picture: "Best Picture", director: "Director", actor: "Actor", actress: "Actress",
+    "supporting-actor": "Supporting Actor", "supporting-actress": "Supporting Actress",
+  };
+  catBody.innerHTML = Object.entries(byCategory).map(([catId, c]) => {
+    const rocClass = c.aucRoc >= 0.99 ? "backtest-correct" : c.aucRoc >= 0.9 ? "" : "backtest-miss";
+    const prClass  = c.aucPr  >= 0.99 ? "backtest-correct" : c.aucPr  >= 0.9 ? "" : "backtest-miss";
+    return `<tr>
+      <td class="backtest-str">${CAT_LABELS[catId] ?? catId}</td>
+      <td class="backtest-num">${c.n}</td>
+      <td class="backtest-num">${c.positives}</td>
+      <td class="backtest-num">${(c.prevalence * 100).toFixed(1)}%</td>
+      <td class="backtest-num ${rocClass}">${c.aucRoc.toFixed(4)}</td>
+      <td class="backtest-num ${prClass}">${c.aucPr.toFixed(4)}</td>
+    </tr>`;
+  }).join("");
+
+  section.hidden = false;
+}
+
 async function loadBacktest(): Promise<void> {
   if (backtestStatus) {
     backtestStatus.textContent = "Loading accuracy data…";
@@ -4993,6 +5128,17 @@ async function loadBacktest(): Promise<void> {
         renderAbTest();
       })
       .catch(() => { /* ab-test.json not generated yet */ });
+    // Load PR/ROC data alongside backtest.
+    fetch("/api/pr-roc")
+      .then(r => r.ok ? r.json() : null)
+      .then((pr: unknown) => {
+        if (!pr || typeof pr !== "object") return;
+        const d = pr as Record<string, unknown>;
+        if (typeof d.overall !== "object" || typeof d.byCategory !== "object") return;
+        prRocData = pr as PrRocData;
+        renderPrRoc();
+      })
+      .catch(() => { /* pr-roc.json not generated yet */ });
   } catch {
     if (backtestStatus) {
       backtestStatus.textContent = "Failed to load backtest data.";

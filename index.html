@@ -321,6 +321,37 @@
             </div>
             <div id="abTestResult"></div>
           </div>
+
+          <h3 class="backtest-section-heading">Precision-Recall &amp; ROC Curves</h3>
+          <div id="prRocSection" hidden>
+            <p class="panel-copy pr-copy">Nomination model evaluated on all 1 110 (year, category, film) triples from 25 Oscar ceremonies. Curves are computed globally and per-category. AUC-ROC baseline (random classifier) = 0.5; AUC-PR baseline = prevalence.</p>
+            <div class="pr-auc-row" id="prAucRow"></div>
+            <div class="pr-curves-grid">
+              <div>
+                <h4 class="pr-chart-title">ROC Curve</h4>
+                <svg id="rocSvg" class="pr-svg" viewBox="0 0 300 280" role="img" aria-label="ROC curve"></svg>
+              </div>
+              <div>
+                <h4 class="pr-chart-title">Precision-Recall Curve</h4>
+                <svg id="prSvg"  class="pr-svg" viewBox="0 0 300 280" role="img" aria-label="Precision-Recall curve"></svg>
+              </div>
+            </div>
+            <h4 class="backtest-section-heading" style="margin-top:16px">By Category</h4>
+            <div class="backtest-table-wrap">
+              <table class="backtest-table" id="prRocCatTable">
+                <caption class="sr-only">PR and ROC AUC by Oscar category</caption>
+                <thead><tr>
+                  <th scope="col" class="backtest-str">Category</th>
+                  <th scope="col" class="backtest-num">n</th>
+                  <th scope="col" class="backtest-num">Positives</th>
+                  <th scope="col" class="backtest-num">Prevalence</th>
+                  <th scope="col" class="backtest-num">AUC-ROC</th>
+                  <th scope="col" class="backtest-num">AUC-PR</th>
+                </tr></thead>
+                <tbody id="prRocCatBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 

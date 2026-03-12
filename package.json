@@ -26,7 +26,8 @@
     "joint-probability": "tsx scripts/joint-probability.ts",
     "feature-importance": "tsx scripts/feature-importance.ts",
     "brier:decomposition": "tsx scripts/brier-decomposition.ts",
-    "ab-test": "tsx scripts/ab-test-presets.ts"
+    "ab-test": "tsx scripts/ab-test-presets.ts",
+    "pr-roc": "tsx scripts/pr-roc.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

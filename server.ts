@@ -1089,6 +1089,17 @@ app.get("/api/brier-decomposition", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/pr-roc", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "pr-roc.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "PR/ROC data not found. Run: npm run pr-roc");
+  }
+});
+
 app.get("/api/ab-test", (_: Request, res: Response) => {
   try {
     const raw = JSON.parse(
