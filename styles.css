@@ -1934,6 +1934,45 @@ a:focus-visible {
   .fi-row { grid-template-columns: 1fr; gap: 4px; }
 }
 
+/* ── A/B Test of Weight Presets ────────────────────────────────────────────── */
+.ab-copy { margin-bottom: 14px; }
+.ab-selectors {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 18px;
+}
+.ab-label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.ab-select { font-size: 0.9rem; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); min-width: 150px; }
+.ab-vs { font-weight: 700; color: var(--muted); font-size: 1rem; margin-top: 14px; }
+.ab-same { color: var(--muted); font-size: 0.9rem; }
+.ab-scorecard {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;
+}
+.ab-metric {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px;
+}
+.ab-metric-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 6px; }
+.ab-metric-values { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.ab-metric-a { font-size: 1.2rem; font-weight: 700; color: var(--gold); }
+.ab-metric-b { font-size: 1.2rem; font-weight: 700; color: var(--accent-secondary, #60a5fa); }
+.ab-metric-sep { font-size: 0.8rem; color: var(--muted); }
+.ab-metric-delta { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+.ab-delta--pos { color: var(--correct); }
+.ab-delta--neg { color: var(--wrong); }
+.ab-metric-test { font-size: 0.78rem; color: var(--muted); }
+.ab-sig { color: var(--correct); font-weight: 700; }
+.ab-ns  { color: var(--muted); }
+.ab-verdict {
+  padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 500; margin-bottom: 8px;
+}
+.ab-verdict--tie { background: color-mix(in srgb, var(--muted) 12%, transparent); }
+.ab-verdict--a   { background: color-mix(in srgb, var(--gold) 15%, transparent); border-left: 3px solid var(--gold); }
+.ab-verdict--b   { background: color-mix(in srgb, var(--accent-secondary, #60a5fa) 15%, transparent); border-left: 3px solid var(--accent-secondary, #60a5fa); }
+.ab-meta { font-size: 0.75rem; color: var(--muted); margin: 0; }
+@media (max-width: 560px) {
+  .ab-scorecard { grid-template-columns: 1fr; }
+}
+
 /* ── Sweep analysis panel ──────────────────────────────────────────────────── */
 .sweep-table-wrap { overflow-x: auto; margin-bottom: 16px; }
 .sweep-table { width: 100%; border-collapse: collapse; }

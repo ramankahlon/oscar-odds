@@ -668,6 +668,39 @@ interface BrierDecompData {
   byCategory: Record<string, { winner: BrierDecompCategory }>;
 }
 let brierDecompData: BrierDecompData | null = null;
+// A/B Test data fetched from /api/ab-test.
+interface AbTestPreset {
+  name:    string;
+  weights: { precursor: number; history: number; buzz: number };
+  overall: { winnerAccuracyPct: number; winnerBrierAvg: number; nominationBrierAvg: number };
+}
+interface AbTestPair {
+  a: string;
+  b: string;
+  n: number;
+  winnerAccuracy: {
+    aPct: number; bPct: number; delta: number;
+    aWins: number; bWins: number; ties: number;
+    mcnemar: { chiSq: number; pValue: number };
+  };
+  winnerBrier: {
+    aMean: number; bMean: number; delta: number;
+    pairedT:  { t: number; df: number; pValue: number; cohenD: number };
+    wilcoxon: { W: number; Z: number; pValue: number };
+  };
+  nomBrier: {
+    aMean: number; bMean: number; delta: number;
+    pairedT: { t: number; df: number; pValue: number; cohenD: number };
+  };
+}
+interface AbTestData {
+  generatedAt: string;
+  alpha:       number;
+  totalPairs:  number;
+  presets:     AbTestPreset[];
+  pairwise:    AbTestPair[];
+}
+let abTestData: AbTestData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -4798,6 +4831,117 @@ function renderFeatureImportance(): void {
   section.hidden = false;
 }
 
+function renderAbTest(): void {
+  const section  = document.getElementById("abTestSection");
+  const resultEl = document.getElementById("abTestResult");
+  const selA     = document.getElementById("abPresetA") as HTMLSelectElement | null;
+  const selB     = document.getElementById("abPresetB") as HTMLSelectElement | null;
+  if (!section || !resultEl || !selA || !selB || !abTestData) return;
+
+  // Populate selectors once (idempotent — clear + refill)
+  const names = abTestData.presets.map(p => p.name);
+  if (selA.options.length !== names.length) {
+    selA.innerHTML = names.map(n => `<option>${n}</option>`).join("");
+    selB.innerHTML = names.map(n => `<option>${n}</option>`).join("");
+    // Default: first two presets
+    selB.selectedIndex = Math.min(1, names.length - 1);
+    selA.addEventListener("change", renderAbTest);
+    selB.addEventListener("change", renderAbTest);
+  }
+
+  const nameA = selA.value;
+  const nameB = selB.value;
+
+  if (nameA === nameB) {
+    resultEl.innerHTML = `<p class="ab-same">Select two different presets to compare.</p>`;
+    section.hidden = false;
+    return;
+  }
+
+  // Find pair — may be stored as A vs B or B vs A
+  let pair = abTestData.pairwise.find(p => p.a === nameA && p.b === nameB);
+  let flipped = false;
+  if (!pair) {
+    pair = abTestData.pairwise.find(p => p.a === nameB && p.b === nameA);
+    flipped = true;
+  }
+  if (!pair) {
+    resultEl.innerHTML = `<p class="ab-same">Pair not found.</p>`;
+    section.hidden = false;
+    return;
+  }
+
+  // Normalise so "A" always refers to the left selector's preset
+  const wa = flipped ? pair.winnerAccuracy.bPct   : pair.winnerAccuracy.aPct;
+  const wb = flipped ? pair.winnerAccuracy.aPct   : pair.winnerAccuracy.bPct;
+  const bsA = flipped ? pair.winnerBrier.bMean     : pair.winnerBrier.aMean;
+  const bsB = flipped ? pair.winnerBrier.aMean     : pair.winnerBrier.bMean;
+  const bsDelta = bsB - bsA;   // positive → B worse Brier
+
+  const mcP  = pair.winnerAccuracy.mcnemar.pValue;
+  const tP   = pair.winnerBrier.pairedT.pValue;
+  const wP   = pair.winnerBrier.wilcoxon.pValue;
+  const cohenD = flipped
+    ? -pair.winnerBrier.pairedT.cohenD
+    : pair.winnerBrier.pairedT.cohenD;
+
+  const sig = (p: number) => p < 0.05;
+
+  // Determine verdict
+  let verdict = "No statistically significant difference between these presets.";
+  let verdictClass = "ab-verdict--tie";
+  if (sig(tP) || sig(wP)) {
+    if (bsDelta > 0) {
+      verdict = `<strong>${nameA}</strong> has significantly lower (better) Brier Score.`;
+      verdictClass = "ab-verdict--a";
+    } else {
+      verdict = `<strong>${nameB}</strong> has significantly lower (better) Brier Score.`;
+      verdictClass = "ab-verdict--b";
+    }
+  }
+
+  const pFmt = (p: number) => p < 0.001 ? "<0.001" : p.toFixed(3);
+  const sigBadge = (p: number) => sig(p)
+    ? `<span class="ab-sig">✓ sig</span>`
+    : `<span class="ab-ns">ns</span>`;
+
+  resultEl.innerHTML = `
+    <div class="ab-scorecard">
+      <div class="ab-metric">
+        <div class="ab-metric-label">Winner Accuracy</div>
+        <div class="ab-metric-values">
+          <span class="ab-metric-a">${wa.toFixed(1)}%</span>
+          <span class="ab-metric-sep">vs</span>
+          <span class="ab-metric-b">${wb.toFixed(1)}%</span>
+        </div>
+        <div class="ab-metric-delta ${(wb - wa) >= 0 ? "ab-delta--pos" : "ab-delta--neg"}">
+          Δ ${(wb - wa) >= 0 ? "+" : ""}${(wb - wa).toFixed(1)}pp
+        </div>
+        <div class="ab-metric-test">McNemar p = ${pFmt(mcP)} ${sigBadge(mcP)}</div>
+      </div>
+      <div class="ab-metric">
+        <div class="ab-metric-label">Winner Brier Score</div>
+        <div class="ab-metric-values">
+          <span class="ab-metric-a">${bsA.toFixed(5)}</span>
+          <span class="ab-metric-sep">vs</span>
+          <span class="ab-metric-b">${bsB.toFixed(5)}</span>
+        </div>
+        <div class="ab-metric-delta ${bsDelta <= 0 ? "ab-delta--pos" : "ab-delta--neg"}">
+          Δ ${bsDelta >= 0 ? "+" : ""}${bsDelta.toFixed(5)}
+        </div>
+        <div class="ab-metric-test">
+          t-test p = ${pFmt(tP)} ${sigBadge(tP)} &nbsp;
+          Wilcoxon p = ${pFmt(wP)} ${sigBadge(wP)} &nbsp;
+          Cohen's d = ${Math.abs(cohenD).toFixed(2)}
+        </div>
+      </div>
+    </div>
+    <div class="ab-verdict ${verdictClass}">${verdict}</div>
+    <p class="ab-meta">n = ${pair.n} (year, category) pairs · α = ${abTestData.alpha}</p>
+  `;
+  section.hidden = false;
+}
+
 async function loadBacktest(): Promise<void> {
   if (backtestStatus) {
     backtestStatus.textContent = "Loading accuracy data…";
@@ -4838,6 +4982,17 @@ async function loadBacktest(): Promise<void> {
         renderBrierDecomposition();
       })
       .catch(() => { /* brier-decomposition.json not generated yet */ });
+    // Load A/B test data alongside backtest.
+    fetch("/api/ab-test")
+      .then(r => r.ok ? r.json() : null)
+      .then((ab: unknown) => {
+        if (!ab || typeof ab !== "object") return;
+        const d = ab as Record<string, unknown>;
+        if (!Array.isArray(d.presets) || !Array.isArray(d.pairwise)) return;
+        abTestData = ab as AbTestData;
+        renderAbTest();
+      })
+      .catch(() => { /* ab-test.json not generated yet */ });
   } catch {
     if (backtestStatus) {
       backtestStatus.textContent = "Failed to load backtest data.";

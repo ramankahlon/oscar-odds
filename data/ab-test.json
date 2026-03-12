@@ -1,0 +1,519 @@
+{
+  "generatedAt": "2026-03-12T01:28:00.123Z",
+  "alpha": 0.05,
+  "totalPairs": 150,
+  "presets": [
+    {
+      "name": "Balanced",
+      "weights": {
+        "precursor": 0.58,
+        "history": 0.3,
+        "buzz": 0.12
+      },
+      "overall": {
+        "nominationAccuracyAvg": 0.997925925925926,
+        "winnerAccuracyPct": 98,
+        "nominationBrierAvg": 0.5457165234272326,
+        "winnerBrierAvg": 0.0970668062704111
+      }
+    },
+    {
+      "name": "Precursor-heavy",
+      "weights": {
+        "precursor": 0.75,
+        "history": 0.18,
+        "buzz": 0.07
+      },
+      "overall": {
+        "nominationAccuracyAvg": 0.997925925925926,
+        "winnerAccuracyPct": 98,
+        "nominationBrierAvg": 0.5416606486536399,
+        "winnerBrierAvg": 0.09518450014149403
+      }
+    },
+    {
+      "name": "History-heavy",
+      "weights": {
+        "precursor": 0.4,
+        "history": 0.48,
+        "buzz": 0.12
+      },
+      "overall": {
+        "nominationAccuracyAvg": 0.9965925925925926,
+        "winnerAccuracyPct": 97.33333333333334,
+        "nominationBrierAvg": 0.5513545845207896,
+        "winnerBrierAvg": 0.09975724227475798
+      }
+    },
+    {
+      "name": "Buzz-driven",
+      "weights": {
+        "precursor": 0.35,
+        "history": 0.25,
+        "buzz": 0.4
+      },
+      "overall": {
+        "nominationAccuracyAvg": 0.997925925925926,
+        "winnerAccuracyPct": 98,
+        "nominationBrierAvg": 0.5463133127105219,
+        "winnerBrierAvg": 0.0970430466628867
+      }
+    },
+    {
+      "name": "Data-Driven",
+      "weights": {
+        "precursor": 0.4992,
+        "history": 0.1314,
+        "buzz": 0.3694
+      },
+      "overall": {
+        "nominationAccuracyAvg": 0.997925925925926,
+        "winnerAccuracyPct": 98,
+        "nominationBrierAvg": 0.5424374012978916,
+        "winnerBrierAvg": 0.09517904019672473
+      }
+    }
+  ],
+  "pairwise": [
+    {
+      "a": "Balanced",
+      "b": "Precursor-heavy",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.0970668062704111,
+        "bMean": 0.09518450014149403,
+        "delta": -0.0018823061289170717,
+        "pairedT": {
+          "t": 39.68957146944661,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 3.240639940328978
+        },
+        "wilcoxon": {
+          "W": 11325,
+          "Z": 10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5457165234272326,
+        "bMean": 0.5416606486536399,
+        "delta": -0.004055874773592705,
+        "pairedT": {
+          "t": 58.95222499119866,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 4.813429014339575
+        }
+      }
+    },
+    {
+      "a": "Balanced",
+      "b": "History-heavy",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 97.33333333333334,
+        "delta": -0.6666666666666572,
+        "aWins": 1,
+        "bWins": 0,
+        "ties": 149,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.0970668062704111,
+        "bMean": 0.09975724227475798,
+        "delta": 0.0026904360043468745,
+        "pairedT": {
+          "t": -40.51090527272193,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -3.307701564546445
+        },
+        "wilcoxon": {
+          "W": 0,
+          "Z": -10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5457165234272326,
+        "bMean": 0.5513545845207896,
+        "delta": 0.005638061093556912,
+        "pairedT": {
+          "t": -60.22770621419774,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -4.917571620101201
+        }
+      }
+    },
+    {
+      "a": "Balanced",
+      "b": "Buzz-driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.0970668062704111,
+        "bMean": 0.0970430466628867,
+        "delta": -0.00002375960752440398,
+        "pairedT": {
+          "t": 0.87835709562772,
+          "df": 149,
+          "pValue": 0.3797498858837358,
+          "cohenD": 0.07171755654136411
+        },
+        "wilcoxon": {
+          "W": 6542,
+          "Z": 1.6501526215131117,
+          "pValue": 0.09891169345144979
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5457165234272326,
+        "bMean": 0.5463133127105219,
+        "delta": 0.0005967892832892119,
+        "pairedT": {
+          "t": -9.357547605786264,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -0.7640405625992913
+        }
+      }
+    },
+    {
+      "a": "Balanced",
+      "b": "Data-Driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.0970668062704111,
+        "bMean": 0.09517904019672473,
+        "delta": -0.0018877660736863755,
+        "pairedT": {
+          "t": 32.6297449509365,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 2.6642075188983387
+        },
+        "wilcoxon": {
+          "W": 11325,
+          "Z": 10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5457165234272326,
+        "bMean": 0.5424374012978916,
+        "delta": -0.0032791221293410056,
+        "pairedT": {
+          "t": 39.5748156107647,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 3.2312701637034578
+        }
+      }
+    },
+    {
+      "a": "Precursor-heavy",
+      "b": "History-heavy",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 97.33333333333334,
+        "delta": -0.6666666666666572,
+        "aWins": 1,
+        "bWins": 0,
+        "ties": 149,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.09518450014149403,
+        "bMean": 0.09975724227475798,
+        "delta": 0.004572742133263946,
+        "pairedT": {
+          "t": -40.31724091957141,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -3.2918889363269463
+        },
+        "wilcoxon": {
+          "W": 0,
+          "Z": -10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5416606486536399,
+        "bMean": 0.5513545845207896,
+        "delta": 0.009693935867149617,
+        "pairedT": {
+          "t": -60.43899200488263,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -4.934823032670484
+        }
+      }
+    },
+    {
+      "a": "Precursor-heavy",
+      "b": "Buzz-driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.09518450014149403,
+        "bMean": 0.0970430466628867,
+        "delta": 0.0018585465213926677,
+        "pairedT": {
+          "t": -35.75438391583903,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -2.9193332220459847
+        },
+        "wilcoxon": {
+          "W": 0,
+          "Z": -10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5416606486536399,
+        "bMean": 0.5463133127105219,
+        "delta": 0.004652664056881917,
+        "pairedT": {
+          "t": -44.613707525151156,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -3.6426939656795483
+        }
+      }
+    },
+    {
+      "a": "Precursor-heavy",
+      "b": "Data-Driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.09518450014149403,
+        "bMean": 0.09517904019672473,
+        "delta": -0.000005459944769303782,
+        "pairedT": {
+          "t": 0.18666843388219514,
+          "df": 149,
+          "pValue": 0.8519206358907949,
+          "cohenD": 0.015241413803194563
+        },
+        "wilcoxon": {
+          "W": 6166,
+          "Z": 0.9446865775234243,
+          "pValue": 0.34481888777313596
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5416606486536399,
+        "bMean": 0.5424374012978916,
+        "delta": 0.0007767526442516992,
+        "pairedT": {
+          "t": -11.47274187448994,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": -0.9367454514387387
+        }
+      }
+    },
+    {
+      "a": "History-heavy",
+      "b": "Buzz-driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 97.33333333333334,
+        "bPct": 98,
+        "delta": 0.6666666666666572,
+        "aWins": 0,
+        "bWins": 1,
+        "ties": 149,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.09975724227475798,
+        "bMean": 0.0970430466628867,
+        "delta": -0.0027141956118712784,
+        "pairedT": {
+          "t": 35.034217475075366,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 2.860531878387743
+        },
+        "wilcoxon": {
+          "W": 11325,
+          "Z": 10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5513545845207896,
+        "bMean": 0.5463133127105219,
+        "delta": -0.0050412718102677,
+        "pairedT": {
+          "t": 44.021429244247976,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 3.5943346465480284
+        }
+      }
+    },
+    {
+      "a": "History-heavy",
+      "b": "Data-Driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 97.33333333333334,
+        "bPct": 98,
+        "delta": 0.6666666666666572,
+        "aWins": 0,
+        "bWins": 1,
+        "ties": 149,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.09975724227475798,
+        "bMean": 0.09517904019672473,
+        "delta": -0.00457820207803325,
+        "pairedT": {
+          "t": 37.6277945272193,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 3.0722965579325563
+        },
+        "wilcoxon": {
+          "W": 11325,
+          "Z": 10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5513545845207896,
+        "bMean": 0.5424374012978916,
+        "delta": -0.008917183222897918,
+        "pairedT": {
+          "t": 53.45317152283459,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 4.364433178813773
+        }
+      }
+    },
+    {
+      "a": "Buzz-driven",
+      "b": "Data-Driven",
+      "n": 150,
+      "winnerAccuracy": {
+        "aPct": 98,
+        "bPct": 98,
+        "delta": 0,
+        "aWins": 0,
+        "bWins": 0,
+        "ties": 150,
+        "mcnemar": {
+          "chiSq": 0,
+          "pValue": 1
+        }
+      },
+      "winnerBrier": {
+        "aMean": 0.0970430466628867,
+        "bMean": 0.09517904019672473,
+        "delta": -0.0018640064661619715,
+        "pairedT": {
+          "t": 39.54659749755801,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 3.2289661644081082
+        },
+        "wilcoxon": {
+          "W": 11325,
+          "Z": 10.624206048115969,
+          "pValue": 0
+        }
+      },
+      "nomBrier": {
+        "aMean": 0.5463133127105219,
+        "bMean": 0.5424374012978916,
+        "delta": -0.0038759114126302174,
+        "pairedT": {
+          "t": 58.53525586702714,
+          "df": 149,
+          "pValue": 0,
+          "cohenD": 4.779383627915728
+        }
+      }
+    }
+  ]
+}

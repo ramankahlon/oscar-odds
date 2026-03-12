@@ -1089,6 +1089,17 @@ app.get("/api/brier-decomposition", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/ab-test", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "ab-test.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "A/B test data not found. Run: npm run ab-test");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

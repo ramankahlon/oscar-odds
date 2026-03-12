@@ -306,6 +306,21 @@
             <p class="panel-copy fi-copy">Permutation Feature Importance: how much winner accuracy drops when each feature's values are randomly shuffled within each category (N=200 replicates). A larger drop means the feature is more critical to the model's predictions.</p>
             <div id="featureImportanceBars"></div>
           </div>
+
+          <h3 class="backtest-section-heading">Weight Preset A/B Test</h3>
+          <div id="abTestSection" hidden>
+            <p class="panel-copy ab-copy">Paired statistical comparison of any two weight presets over 25 years of Oscar history. Tests use McNemar (winner accuracy), paired t-test and Wilcoxon signed-rank (Brier score), all at α&nbsp;=&nbsp;0.05.</p>
+            <div class="ab-selectors">
+              <label class="ab-label">Preset A
+                <select id="abPresetA" class="ab-select"></select>
+              </label>
+              <span class="ab-vs">vs</span>
+              <label class="ab-label">Preset B
+                <select id="abPresetB" class="ab-select"></select>
+              </label>
+            </div>
+            <div id="abTestResult"></div>
+          </div>
         </div>
       </section>
 
