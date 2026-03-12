@@ -100,409 +100,30 @@ const BUILTIN_PRESETS: WeightPreset[] = [
 
 const WEIGHT_PRESETS_KEY = "oscar-odds:weight-presets";
 
-const schedule2026Films = [
-  "The Mother and the Bear",
-  "We Bury the Dead",
-  "Greenland 2: Migration",
-  "Primate",
-  "Soulm8te",
-  "Dead Man's Wire",
-  "I Was A Stranger",
-  "Magellan",
-  "OBEX",
-  "People We Meet on Vacation",
-  "Starbright",
-  "Young Mothers",
-  "28 Years Later: The Bone Temple",
-  "Charlie the Wonderdog",
-  "All You Need Is Kill",
-  "Night Patrol",
-  "A Private Life",
-  "The RIP",
-  "Sound of Falling",
-  "A Useful Ghost",
-  "Clika",
-  "H is for Hawk",
-  "Mercy",
-  "Return to Silent Hill",
-  "In Cold Light",
-  "Send Help",
-  "Shelter",
-  "Islands",
-  "The Love That Remains",
-  "The Moment",
-  "A Poet",
-  "Dracula: A Love Tale",
-  "Scarlet",
-  "Solo Mio",
-  "The Strangers: Chapter 3",
-  "Whistle",
-  "Buffalo Kids",
-  "Calle Malaga",
-  "Jimpa",
-  "My Father's Shadow",
-  "The President's Cake",
-  "Cold Storage",
-  "Broken Bird",
-  "Crime 101",
-  "GOAT",
-  "Good Luck, Have Fun, Don't Die",
-  "Wuthering Heights",
-  "The Mortuary Assistant",
-  "Nirvanna the Band the Show the Movie",
-  "How to Make a Killing",
-  "I Can Only Imagine 2",
-  "Psycho Killer",
-  "Midwinter Break",
-  "Protector",
-  "This Is Not a Test",
-  "EPiC: Elvis Presley in Concert",
-  "Scream 7",
-  "Dreams",
-  "Man on the Run",
-  "Wild Horse Nine",
-  "Fjord",
-  "Digger",
-  "Untitled Jesse Eisenberg Musical",
-  "All of a Sudden",
-  "Josephine",
-  "Disclosure Day",
-  "Werwulf",
-  "Jack of Spades",
-  "Pixar's Hoppers",
-  "Andre is an Idiot",
-  "Peaky Blinders: The Immortal Man",
-  "Youngblood",
-  "The Breadwinner",
-  "Reminders of Him",
-  "The Undertone",
-  "Slanted",
-  "Billie Eilish - Hit Me Hard and Soft: The Tour (Live in 3D)",
-  "Project Hail Mary",
-  "The Pout-Pout Fish",
-  "Whitney Springs",
-  "The Dog Stars",
-  "They Will Kill You",
-  "Alpha",
-  "Kontinental '25",
-  "Yes",
-  "The Drama",
-  "The Super Mario Galaxy Movie",
-  "A Great Awakening",
-  "The Third Parent",
-  "Ready or Not 2: Here I Come",
-  "You, Me & Tuscany",
-  "Normal",
-  "The Resurrected",
-  "Michael",
-  "Omaha",
-  "The Devil Wears Prada 2",
-  "Hokum",
-  "Mortal Kombat II",
-  "The Sheep Detectives",
-  "Is God Is",
-  "Obsession",
-  "Poetic License",
-  "I Love Boosters",
-  "The Mandalorian and Grogu",
-  "Stop! That! Train!",
-  "Animal Friends",
-  "Masters of the Universe",
-  "Power Ballad",
-  "Scary Movie 6",
-  "Pixar's Toy Story 5",
-  "Supergirl",
-  "Mega Minions",
-  "Shiver",
-  "Young Washington",
-  "Moana Live-Action",
-  "Cut Off",
-  "The Odyssey",
-  "Evil Dead Burn",
-  "Spider-Man: Brand New Day",
-  "Once Upon A Time in A Cinema",
-  "Super Troopers 3",
-  "Flowervale Street",
-  "PAW Patrol 3: The Dino Movie",
-  "Mutiny",
-  "Thread: An Insidious Tale",
-  "Cliffhanger",
-  "Coyote vs. Acme",
-  "How to Rob a Bank",
-  "Clayface",
-  "Sense and Sensibility",
-  "Practical Magic 2",
-  "Resident Evil",
-  "Charlie Harper",
-  "Forgotten Island",
-  "Verity",
-  "The Legend of Aang: The Last Airbender",
-  "Other Mommy",
-  "The Social Reckoning",
-  "Street Fighter",
-  "Whalefall",
-  "Remain",
-  "Shaun the Sheep: The Beast of Mossy Bottom",
-  "Archangel",
-  "Dr. Seuss' The Cat in the Hat",
-  "Ebenezer: A Christmas Carol",
-  "The Hunger Games: Sunrise on the Reaping",
-  "Hexed",
-  "Meet the Parents 4: Focker In-Law",
-  "Narnia",
-  "Violent Night 2",
-  "Jumanji 3",
-  "Avengers: Doomsday",
-  "Dune: Part Three"
-];
-
-const categoryDefinitions = [
-  { id: "picture", name: "Best Picture", nominees: 10, winnerBase: 0.16 },
-  { id: "director", name: "Best Director", nominees: 5, winnerBase: 0.24 },
-  { id: "actor", name: "Best Actor", nominees: 5, winnerBase: 0.25 },
-  { id: "actress", name: "Best Actress", nominees: 5, winnerBase: 0.24 },
-  { id: "supporting-actor", name: "Best Supporting Actor", nominees: 5, winnerBase: 0.23 },
-  { id: "supporting-actress", name: "Best Supporting Actress", nominees: 5, winnerBase: 0.23 },
-  { id: "original-screenplay", name: "Best Original Screenplay", nominees: 5, winnerBase: 0.22 },
-  { id: "adapted-screenplay", name: "Best Adapted Screenplay", nominees: 5, winnerBase: 0.22 },
-  { id: "animated-feature", name: "Best Animated Feature Film", nominees: 5, winnerBase: 0.2 },
-  { id: "international-feature", name: "Best International Feature Film", nominees: 5, winnerBase: 0.2 },
-  { id: "documentary-feature", name: "Best Documentary Feature Film", nominees: 5, winnerBase: 0.2 },
-  { id: "documentary-short", name: "Best Documentary Short Film", nominees: 5, winnerBase: 0.18 },
-  { id: "live-action-short", name: "Best Live Action Short Film", nominees: 5, winnerBase: 0.18 },
-  { id: "animated-short", name: "Best Animated Short Film", nominees: 5, winnerBase: 0.18 },
-  { id: "original-score", name: "Best Original Score", nominees: 5, winnerBase: 0.21 },
-  { id: "original-song", name: "Best Original Song", nominees: 5, winnerBase: 0.2 },
-  { id: "sound", name: "Best Sound", nominees: 5, winnerBase: 0.2 },
-  { id: "production-design", name: "Best Production Design", nominees: 5, winnerBase: 0.2 },
-  { id: "cinematography", name: "Best Cinematography", nominees: 5, winnerBase: 0.2 },
-  { id: "makeup-hairstyling", name: "Best Makeup and Hairstyling", nominees: 5, winnerBase: 0.19 },
-  { id: "costume-design", name: "Best Costume Design", nominees: 5, winnerBase: 0.19 },
-  { id: "film-editing", name: "Best Film Editing", nominees: 5, winnerBase: 0.21 },
-  { id: "visual-effects", name: "Best Visual Effects", nominees: 5, winnerBase: 0.2 },
-  { id: "casting", name: "Best Casting", nominees: 5, winnerBase: 0.19 }
-];
-
-function contender(title: string, studio: string, precursor: number, history: number, buzz: number, strength: Strength): Film {
-  return { title, studio, precursor, history, buzz, strength };
+interface ContendersData {
+  ceremony: number;
+  year: number;
+  categoryDefinitions: Array<{ id: string; name: string; nominees: number; winnerBase: number }>;
+  categorySeeds: Record<string, Film[]>;
+  scheduledFilms: string[];
+  experienceConfig: {
+    priorCategoryWins: Record<string, Record<string, number>>;
+    recentWinnerPenalty: Record<string, Record<string, number>>;
+    overdueNarrativeBoost: Record<string, Record<string, number>>;
+  };
 }
 
-const categorySeeds: Record<string, Film[]> = {
-  picture: [
-    contender("Wild Horse Nine", "Searchlight Pictures", 88, 83, 86, "High"),
-    contender("The Odyssey", "Universal", 84, 80, 88, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 80, 72, 84, "High"),
-    contender("The Social Reckoning", "A24", 78, 74, 80, "High"),
-    contender("Fjord", "Neon", 76, 71, 74, "High"),
-    contender("Digger", "Netflix", 74, 69, 76, "High"),
-    contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
-    contender("Untitled Jesse Eisenberg Musical", "A24", 71, 65, 72, "Medium"),
-    contender("All of a Sudden", "Mubi", 68, 66, 69, "Medium"),
-    contender("Josephine", "Focus Features", 65, 62, 66, "Medium"),
-    contender("Dune: Part Three", "Warner Bros.", 74, 71, 75, "Medium"),
-    contender("Wuthering Heights", "Warner Bros.", 70, 67, 71, "Medium")
-  ],
-  director: [
-    contender("Martin McDonagh", "Wild Horse Nine", 88, 82, 86, "High"),
-    contender("Christopher Nolan", "The Odyssey", 87, 88, 89, "High"),
-    contender("Denis Villeneuve", "Dune: Part Three", 85, 87, 84, "High"),
-    contender("Greta Gerwig", "Narnia", 76, 74, 80, "High"),
-    contender("Alejandro G. Inarritu", "Digger", 73, 80, 71, "Medium")
-  ],
-  actor: [
-    contender("Sam Rockwell", "Wild Horse Nine", 85, 78, 82, "High"),
-    contender("Tom Cruise", "Digger", 82, 80, 84, "High"),
-    contender("Sebastian Stan", "Fjord", 77, 72, 74, "High"),
-    contender("Ryan Gosling", "Project Hail Mary", 74, 79, 76, "Medium"),
-    contender("Josh O'Connor", "Jack of Spades", 70, 68, 70, "Medium")
-  ],
-  actress: [
-    contender("Renate Reinsve", "Fjord", 85, 74, 82, "High"),
-    contender("Julianne Moore", "Untitled Jesse Eisenberg Musical", 79, 86, 73, "High"),
-    contender("Mikey Madison", "The Social Reckoning", 76, 72, 79, "High"),
-    contender("Virginie Efira", "All of a Sudden", 72, 68, 70, "Medium"),
-    contender("Emma Mackey", "Narnia", 68, 65, 74, "Medium")
-  ],
-  "supporting-actor": [
-    contender("John Malkovich", "Wild Horse Nine", 85, 80, 78, "High"),
-    contender("John Goodman", "Digger", 77, 74, 72, "High"),
-    contender("Colman Domingo", "Michael", 74, 74, 76, "Medium"),
-    contender("Steve Buscemi", "Wild Horse Nine", 72, 72, 69, "Medium"),
-    contender("Channing Tatum", "Josephine", 68, 62, 72, "Medium")
-  ],
-  "supporting-actress": [
-    contender("Tao Okamoto", "All of a Sudden", 82, 70, 78, "High"),
-    contender("Sandra Huller", "Digger", 80, 86, 72, "High"),
-    contender("Meryl Streep", "The Devil Wears Prada 2", 76, 91, 72, "High"),
-    contender("Halle Bailey", "Untitled Jesse Eisenberg Musical", 72, 68, 76, "Medium"),
-    contender("Mariana di Girolamo", "Wild Horse Nine", 68, 66, 69, "Medium")
-  ],
-  "original-screenplay": [
-    contender("Wild Horse Nine", "Searchlight Pictures", 86, 80, 83, "High"),
-    contender("Fjord", "Neon", 78, 73, 72, "High"),
-    contender("Digger", "Netflix", 75, 70, 73, "Medium"),
-    contender("Josephine", "Focus Features", 69, 65, 67, "Medium"),
-    contender("Jack of Spades", "Netflix", 66, 64, 65, "Low")
-  ],
-  "adapted-screenplay": [
-    contender("All of a Sudden", "Mubi", 83, 78, 76, "High"),
-    contender("The Odyssey", "Universal", 79, 83, 73, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 75, 70, 79, "Medium"),
-    contender("Narnia", "Netflix", 73, 68, 76, "Medium"),
-    contender("The Social Reckoning", "A24", 71, 69, 72, "Medium")
-  ],
-  "animated-feature": [
-    contender("Pixar's Toy Story 5", "Disney/Pixar", 86, 89, 90, "High"),
-    contender("Pixar's Hoppers", "Disney/Pixar", 82, 75, 84, "High"),
-    contender("The Super Mario Galaxy Movie", "Universal/Illumination", 78, 67, 88, "Medium"),
-    contender("Dr. Seuss' The Cat in the Hat", "Warner Bros.", 74, 69, 76, "Medium"),
-    contender("PAW Patrol 3: The Dino Movie", "Paramount", 68, 60, 71, "Low")
-  ],
-  "international-feature": [
-    contender("The Love That Remains", "Nordisk", 81, 83, 69, "High"),
-    contender("A Poet", "Mubi", 78, 80, 65, "High"),
-    contender("Calle Malaga", "Sony Pictures Classics", 74, 76, 63, "Medium"),
-    contender("Islands", "Neon", 71, 72, 62, "Medium"),
-    contender("The Mother and the Bear", "Janus Films", 69, 74, 60, "Low")
-  ],
-  "documentary-feature": [
-    contender("Andre is an Idiot", "A24", 79, 76, 74, "High"),
-    contender("EPiC: Elvis Presley in Concert", "Sony", 75, 70, 82, "Medium"),
-    contender("Man on the Run", "Neon", 73, 71, 68, "Medium"),
-    contender("Whalefall", "Participant", 70, 69, 65, "Medium"),
-    contender("Archangel", "Netflix", 68, 66, 63, "Low")
-  ],
-  "documentary-short": [
-    contender("The President's Cake", "ShortsTV", 74, 73, 67, "High"),
-    contender("Stop! That! Train!", "ShortsTV", 72, 68, 64, "Medium"),
-    contender("Other Mommy", "ShortsTV", 70, 65, 63, "Medium"),
-    contender("Broken Bird", "ShortsTV", 68, 64, 60, "Low"),
-    contender("Charlie Harper", "ShortsTV", 66, 62, 58, "Low")
-  ],
-  "live-action-short": [
-    contender("The Third Parent", "ShortsTV", 75, 72, 66, "High"),
-    contender("A Great Awakening", "ShortsTV", 73, 70, 64, "Medium"),
-    contender("This Is Not a Test", "ShortsTV", 71, 66, 61, "Medium"),
-    contender("Thread: An Insidious Tale", "ShortsTV", 69, 63, 65, "Low"),
-    contender("The Resurrected", "ShortsTV", 67, 62, 60, "Low")
-  ],
-  "animated-short": [
-    contender("Buffalo Kids", "ShortsTV", 74, 73, 68, "High"),
-    contender("The Sheep Detectives", "ShortsTV", 72, 69, 66, "Medium"),
-    contender("Shaun the Sheep: The Beast of Mossy Bottom", "Aardman", 70, 71, 69, "Medium"),
-    contender("Whistle", "ShortsTV", 68, 64, 61, "Low"),
-    contender("The Pout-Pout Fish", "DreamWorks", 67, 63, 62, "Low")
-  ],
-  "original-score": [
-    contender("The Odyssey", "Universal", 87, 83, 82, "High"),
-    contender("Wild Horse Nine", "Searchlight Pictures", 79, 75, 74, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 75, 72, 76, "Medium"),
-    contender("Narnia", "Netflix", 72, 66, 78, "Medium"),
-    contender("Disclosure Day", "Amblin Entertainment", 70, 73, 68, "Medium")
-  ],
-  "original-song": [
-    contender("Untitled Jesse Eisenberg Musical", "A24", 80, 67, 82, "High"),
-    contender("Wuthering Heights", "Warner Bros.", 74, 70, 76, "Medium"),
-    contender("The Hunger Games: Sunrise on the Reaping", "Lionsgate", 72, 66, 79, "Medium"),
-    contender("Toy Story 5", "Disney/Pixar", 70, 68, 77, "Medium"),
-    contender("Untitled Parker/Stone/Lamar Project", "Paramount", 68, 60, 76, "Low")
-  ],
-  sound: [
-    contender("Disclosure Day", "Amblin Entertainment", 82, 70, 80, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 85, 83, 76, "High"),
-    contender("The Odyssey", "Universal", 80, 78, 74, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 76, 72, 77, "Medium"),
-    contender("Untitled Jesse Eisenberg Musical", "A24", 66, 62, 70, "Low")
-  ],
-  "production-design": [
-    contender("Narnia", "Netflix", 88, 82, 85, "High"),
-    contender("The Odyssey", "Universal", 85, 83, 78, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 82, 80, 74, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 77, 72, 79, "Medium"),
-    contender("Disclosure Day", "Amblin Entertainment", 70, 66, 70, "Medium")
-  ],
-  cinematography: [
-    contender("The Odyssey", "Universal", 89, 88, 82, "High"),
-    contender("Digger", "Netflix", 83, 80, 76, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 78, 73, 75, "High"),
-    contender("Wild Horse Nine", "Searchlight Pictures", 74, 71, 72, "Medium"),
-    contender("Josephine", "Focus Features", 68, 64, 70, "Medium")
-  ],
-  "makeup-hairstyling": [
-    contender("Michael", "Lionsgate", 87, 80, 84, "High"),
-    contender("Werwulf", "A24", 82, 73, 83, "High"),
-    contender("Dune: Part Three", "Warner Bros.", 78, 75, 72, "Medium"),
-    contender("The Odyssey", "Universal", 76, 74, 70, "Medium"),
-    contender("Digger", "Netflix", 72, 68, 70, "Medium")
-  ],
-  "costume-design": [
-    contender("The Odyssey", "Universal", 86, 83, 78, "High"),
-    contender("Michael", "Lionsgate", 82, 75, 82, "High"),
-    contender("The Devil Wears Prada 2", "20th Century Studios", 80, 86, 68, "High"),
-    contender("Wuthering Heights", "Warner Bros.", 74, 73, 72, "Medium"),
-    contender("Narnia", "Netflix", 72, 67, 76, "Medium")
-  ],
-  "film-editing": [
-    contender("Wild Horse Nine", "Searchlight Pictures", 85, 79, 80, "High"),
-    contender("The Odyssey", "Universal", 82, 82, 76, "High"),
-    contender("Fjord", "Neon", 76, 71, 73, "Medium"),
-    contender("Digger", "Netflix", 74, 70, 71, "Medium"),
-    contender("Narnia", "Netflix", 70, 67, 74, "Medium")
-  ],
-  "visual-effects": [
-    contender("Dune: Part Three", "Warner Bros.", 90, 87, 83, "High"),
-    contender("The Odyssey", "Universal", 86, 81, 78, "High"),
-    contender("Narnia", "Netflix", 83, 72, 86, "High"),
-    contender("Project Hail Mary", "Amazon MGM", 80, 74, 83, "Medium"),
-    contender("Disclosure Day", "Amblin Entertainment", 73, 66, 76, "Medium")
-  ],
-  casting: [
-    contender("Wild Horse Nine", "Searchlight Pictures", 84, 79, 80, "High"),
-    contender("Digger", "Netflix", 76, 70, 74, "Medium"),
-    contender("Fjord", "Neon", 74, 68, 72, "Medium"),
-    contender("Narnia", "Netflix", 72, 67, 78, "Medium"),
-    contender("The Social Reckoning", "A24", 70, 71, 71, "Medium")
-  ]
-};
+// Contender data and experience config — populated by loadContenders() in bootstrap()
+let categories: Category[] = [];
+let categorySeeds: Record<string, Film[]> = {};
+let scheduledFilms: string[] = [];
+let priorCategoryWins: Record<string, Record<string, number>> = {};
+let recentWinnerPenalty: Record<string, Record<string, number>> = {};
+let overdueNarrativeBoost: Record<string, Record<string, number>> = {};
 
 function createSeedFilms(): Film[] {
-  return schedule2026Films.map((title) => contender(title, "TBD", 55, 50, 52, "Medium"));
+  return scheduledFilms.map((title) => ({ title, studio: "TBD", precursor: 55, history: 50, buzz: 52, strength: "Medium" as Strength }));
 }
-
-const categories: Category[] = categoryDefinitions.map((category) => ({
-  ...category,
-  films: categorySeeds[category.id] ? [...categorySeeds[category.id]] : createSeedFilms()
-}));
-
-const priorCategoryWins: Record<string, Record<string, number>> = {
-  director: {
-    "Christopher Nolan": 1,
-    "Steven Spielberg": 2,
-    "Alejandro G. Inarritu": 2
-  },
-  actor: {},
-  actress: {
-    "Mikey Madison": 1,
-    "Jessie Buckley": 1
-  },
-  "supporting-actor": {},
-  "supporting-actress": {
-    "Octavia Spencer": 1
-  }
-};
-
-const recentWinnerPenalty: Record<string, Record<string, number>> = {
-  actress: {
-    "Mikey Madison": 2,
-    "Jessie Buckley": 2
-  }
-};
-
-const overdueNarrativeBoost: Record<string, Record<string, number>> = {
-  actress: {
-    "Amy Adams": 1
-  }
-};
 
 const CATEGORY_SHORT_NAMES: Record<string, string> = {
   "picture": "Picture",
@@ -550,7 +171,7 @@ const WINNER_TO_NOMINATION_CAP = 0.5;
 
 const state: AppState = {
   profileId: "default",
-  categoryId: categories[0].id,
+  categoryId: "",  // set by loadContenders() in bootstrap()
   weights: {
     precursor: 58,
     history: 30,
@@ -5379,10 +5000,37 @@ async function loadBacktest(): Promise<void> {
   }
 }
 
+async function loadContenders(): Promise<void> {
+  const res = await fetch("/api/contenders");
+  if (!res.ok) throw new Error(`Failed to load contenders: ${res.status}`);
+  const data = await res.json() as ContendersData;
+
+  scheduledFilms = data.scheduledFilms;
+  categorySeeds = Object.fromEntries(
+    Object.entries(data.categorySeeds).map(([id, films]) => [
+      id,
+      films.map((f) => ({ ...f, strength: f.strength as Strength })),
+    ])
+  );
+  categories = data.categoryDefinitions.map((cat) => ({
+    ...cat,
+    films: categorySeeds[cat.id] ? [...categorySeeds[cat.id]] : createSeedFilms(),
+  }));
+  priorCategoryWins    = data.experienceConfig.priorCategoryWins;
+  recentWinnerPenalty  = data.experienceConfig.recentWinnerPenalty;
+  overdueNarrativeBoost = data.experienceConfig.overdueNarrativeBoost;
+
+  if (!state.categoryId && categories.length > 0) {
+    state.categoryId = categories[0].id;
+  }
+}
+
 async function bootstrap() {
   initTheme();
   setPanelsBusy(true);
   setAppNotice("Loading forecast workspace...", "loading");
+
+  await loadContenders();
 
   // Kick off WASM load in parallel with profile/state fetching.
   // Non-fatal: the JS fallback in scoreFilm() remains active until the module

@@ -1122,6 +1122,17 @@ app.get("/api/ab-test", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/contenders", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "contenders-2026.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Contenders data not found.");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

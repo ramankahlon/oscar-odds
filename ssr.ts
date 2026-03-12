@@ -36,15 +36,21 @@
  */
 
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { clamp } from "./forecast-utils.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
 import { scoreFilm } from "./scoring-utils.js";
 import { calculateNominationOdds, calculateWinnerOdds, rebalanceCategory } from "./app-logic.js";
 import type { Film, NormalizedWeights } from "./types.js";
 import type Database from "better-sqlite3";
 
 // ── Category metadata ─────────────────────────────────────────────────────────
-// Mirrors the categories array in app.ts.  nominees and winnerBase are needed to
-// compute projection odds; the film arrays come from the saved profile payload.
+// Loaded from contenders-2026.json so there's a single source of truth.
+// nominees and winnerBase are needed to compute projection odds; the film arrays
+// come from the saved profile payload.
 
 interface CategoryMeta {
   id: string;
@@ -52,32 +58,16 @@ interface CategoryMeta {
   winnerBase: number;
 }
 
-const CATEGORY_META: CategoryMeta[] = [
-  { id: "picture",               nominees: 10, winnerBase: 0.16 },
-  { id: "director",              nominees: 5,  winnerBase: 0.24 },
-  { id: "actor",                 nominees: 5,  winnerBase: 0.25 },
-  { id: "actress",               nominees: 5,  winnerBase: 0.24 },
-  { id: "supporting-actor",      nominees: 5,  winnerBase: 0.23 },
-  { id: "supporting-actress",    nominees: 5,  winnerBase: 0.23 },
-  { id: "original-screenplay",   nominees: 5,  winnerBase: 0.22 },
-  { id: "adapted-screenplay",    nominees: 5,  winnerBase: 0.22 },
-  { id: "animated-feature",      nominees: 5,  winnerBase: 0.20 },
-  { id: "international-feature", nominees: 5,  winnerBase: 0.20 },
-  { id: "documentary-feature",   nominees: 5,  winnerBase: 0.20 },
-  { id: "documentary-short",     nominees: 5,  winnerBase: 0.18 },
-  { id: "live-action-short",     nominees: 5,  winnerBase: 0.18 },
-  { id: "animated-short",        nominees: 5,  winnerBase: 0.18 },
-  { id: "original-score",        nominees: 5,  winnerBase: 0.21 },
-  { id: "original-song",         nominees: 5,  winnerBase: 0.20 },
-  { id: "sound",                 nominees: 5,  winnerBase: 0.20 },
-  { id: "production-design",     nominees: 5,  winnerBase: 0.20 },
-  { id: "cinematography",        nominees: 5,  winnerBase: 0.20 },
-  { id: "makeup-hairstyling",    nominees: 5,  winnerBase: 0.19 },
-  { id: "costume-design",        nominees: 5,  winnerBase: 0.19 },
-  { id: "film-editing",          nominees: 5,  winnerBase: 0.21 },
-  { id: "visual-effects",        nominees: 5,  winnerBase: 0.20 },
-  { id: "casting",               nominees: 5,  winnerBase: 0.19 },
-];
+const CATEGORY_META: CategoryMeta[] = (() => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "contenders-2026.json"), "utf8")
+    ) as { categoryDefinitions: Array<{ id: string; nominees: number; winnerBase: number }> };
+    return raw.categoryDefinitions.map(({ id, nominees, winnerBase }) => ({ id, nominees, winnerBase }));
+  } catch {
+    return [];
+  }
+})();
 
 // For person categories, rawStudio holds the film title (the person's film).
 // This mirrors renderLeaderboard() in app.ts.

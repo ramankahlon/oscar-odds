@@ -1,0 +1,278 @@
+{
+  "ceremony": 98,
+  "year": 2026,
+  "categoryDefinitions": [
+    { "id": "picture",               "name": "Best Picture",                    "nominees": 10, "winnerBase": 0.16 },
+    { "id": "director",              "name": "Best Director",                   "nominees": 5,  "winnerBase": 0.24 },
+    { "id": "actor",                 "name": "Best Actor",                      "nominees": 5,  "winnerBase": 0.25 },
+    { "id": "actress",               "name": "Best Actress",                    "nominees": 5,  "winnerBase": 0.24 },
+    { "id": "supporting-actor",      "name": "Best Supporting Actor",           "nominees": 5,  "winnerBase": 0.23 },
+    { "id": "supporting-actress",    "name": "Best Supporting Actress",         "nominees": 5,  "winnerBase": 0.23 },
+    { "id": "original-screenplay",   "name": "Best Original Screenplay",        "nominees": 5,  "winnerBase": 0.22 },
+    { "id": "adapted-screenplay",    "name": "Best Adapted Screenplay",         "nominees": 5,  "winnerBase": 0.22 },
+    { "id": "animated-feature",      "name": "Best Animated Feature Film",      "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "international-feature", "name": "Best International Feature Film", "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "documentary-feature",   "name": "Best Documentary Feature Film",   "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "documentary-short",     "name": "Best Documentary Short Film",     "nominees": 5,  "winnerBase": 0.18 },
+    { "id": "live-action-short",     "name": "Best Live Action Short Film",     "nominees": 5,  "winnerBase": 0.18 },
+    { "id": "animated-short",        "name": "Best Animated Short Film",        "nominees": 5,  "winnerBase": 0.18 },
+    { "id": "original-score",        "name": "Best Original Score",             "nominees": 5,  "winnerBase": 0.21 },
+    { "id": "original-song",         "name": "Best Original Song",              "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "sound",                 "name": "Best Sound",                      "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "production-design",     "name": "Best Production Design",          "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "cinematography",        "name": "Best Cinematography",             "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "makeup-hairstyling",    "name": "Best Makeup and Hairstyling",     "nominees": 5,  "winnerBase": 0.19 },
+    { "id": "costume-design",        "name": "Best Costume Design",             "nominees": 5,  "winnerBase": 0.19 },
+    { "id": "film-editing",          "name": "Best Film Editing",               "nominees": 5,  "winnerBase": 0.21 },
+    { "id": "visual-effects",        "name": "Best Visual Effects",             "nominees": 5,  "winnerBase": 0.20 },
+    { "id": "casting",               "name": "Best Casting",                    "nominees": 5,  "winnerBase": 0.19 }
+  ],
+  "categorySeeds": {
+    "picture": [
+      { "title": "Wild Horse Nine",                    "studio": "Searchlight Pictures",   "precursor": 88, "history": 83, "buzz": 86, "strength": "High"   },
+      { "title": "The Odyssey",                        "studio": "Universal",              "precursor": 84, "history": 80, "buzz": 88, "strength": "High"   },
+      { "title": "Project Hail Mary",                  "studio": "Amazon MGM",             "precursor": 80, "history": 72, "buzz": 84, "strength": "High"   },
+      { "title": "The Social Reckoning",               "studio": "A24",                    "precursor": 78, "history": 74, "buzz": 80, "strength": "High"   },
+      { "title": "Fjord",                              "studio": "Neon",                   "precursor": 76, "history": 71, "buzz": 74, "strength": "High"   },
+      { "title": "Digger",                             "studio": "Netflix",                "precursor": 74, "history": 69, "buzz": 76, "strength": "High"   },
+      { "title": "Narnia",                             "studio": "Netflix",                "precursor": 72, "history": 66, "buzz": 78, "strength": "Medium" },
+      { "title": "Untitled Jesse Eisenberg Musical",   "studio": "A24",                    "precursor": 71, "history": 65, "buzz": 72, "strength": "Medium" },
+      { "title": "All of a Sudden",                    "studio": "Mubi",                   "precursor": 68, "history": 66, "buzz": 69, "strength": "Medium" },
+      { "title": "Josephine",                          "studio": "Focus Features",         "precursor": 65, "history": 62, "buzz": 66, "strength": "Medium" },
+      { "title": "Dune: Part Three",                   "studio": "Warner Bros.",           "precursor": 74, "history": 71, "buzz": 75, "strength": "Medium" },
+      { "title": "Wuthering Heights",                  "studio": "Warner Bros.",           "precursor": 70, "history": 67, "buzz": 71, "strength": "Medium" }
+    ],
+    "director": [
+      { "title": "Martin McDonagh",         "studio": "Wild Horse Nine",   "precursor": 88, "history": 82, "buzz": 86, "strength": "High"   },
+      { "title": "Christopher Nolan",       "studio": "The Odyssey",       "precursor": 87, "history": 88, "buzz": 89, "strength": "High"   },
+      { "title": "Denis Villeneuve",        "studio": "Dune: Part Three",  "precursor": 85, "history": 87, "buzz": 84, "strength": "High"   },
+      { "title": "Greta Gerwig",            "studio": "Narnia",            "precursor": 76, "history": 74, "buzz": 80, "strength": "High"   },
+      { "title": "Alejandro G. Inarritu",   "studio": "Digger",            "precursor": 73, "history": 80, "buzz": 71, "strength": "Medium" }
+    ],
+    "actor": [
+      { "title": "Sam Rockwell",    "studio": "Wild Horse Nine",    "precursor": 85, "history": 78, "buzz": 82, "strength": "High"   },
+      { "title": "Tom Cruise",      "studio": "Digger",             "precursor": 82, "history": 80, "buzz": 84, "strength": "High"   },
+      { "title": "Sebastian Stan",  "studio": "Fjord",              "precursor": 77, "history": 72, "buzz": 74, "strength": "High"   },
+      { "title": "Ryan Gosling",    "studio": "Project Hail Mary",  "precursor": 74, "history": 79, "buzz": 76, "strength": "Medium" },
+      { "title": "Josh O'Connor",   "studio": "Jack of Spades",     "precursor": 70, "history": 68, "buzz": 70, "strength": "Medium" }
+    ],
+    "actress": [
+      { "title": "Renate Reinsve",  "studio": "Fjord",                              "precursor": 85, "history": 74, "buzz": 82, "strength": "High"   },
+      { "title": "Julianne Moore",  "studio": "Untitled Jesse Eisenberg Musical",   "precursor": 79, "history": 86, "buzz": 73, "strength": "High"   },
+      { "title": "Mikey Madison",   "studio": "The Social Reckoning",               "precursor": 76, "history": 72, "buzz": 79, "strength": "High"   },
+      { "title": "Virginie Efira",  "studio": "All of a Sudden",                    "precursor": 72, "history": 68, "buzz": 70, "strength": "Medium" },
+      { "title": "Emma Mackey",     "studio": "Narnia",                             "precursor": 68, "history": 65, "buzz": 74, "strength": "Medium" }
+    ],
+    "supporting-actor": [
+      { "title": "John Malkovich",  "studio": "Wild Horse Nine",  "precursor": 85, "history": 80, "buzz": 78, "strength": "High"   },
+      { "title": "John Goodman",    "studio": "Digger",           "precursor": 77, "history": 74, "buzz": 72, "strength": "High"   },
+      { "title": "Colman Domingo",  "studio": "Michael",          "precursor": 74, "history": 74, "buzz": 76, "strength": "Medium" },
+      { "title": "Steve Buscemi",   "studio": "Wild Horse Nine",  "precursor": 72, "history": 72, "buzz": 69, "strength": "Medium" },
+      { "title": "Channing Tatum",  "studio": "Josephine",        "precursor": 68, "history": 62, "buzz": 72, "strength": "Medium" }
+    ],
+    "supporting-actress": [
+      { "title": "Tao Okamoto",          "studio": "All of a Sudden",                  "precursor": 82, "history": 70, "buzz": 78, "strength": "High"   },
+      { "title": "Sandra Huller",        "studio": "Digger",                           "precursor": 80, "history": 86, "buzz": 72, "strength": "High"   },
+      { "title": "Meryl Streep",         "studio": "The Devil Wears Prada 2",          "precursor": 76, "history": 91, "buzz": 72, "strength": "High"   },
+      { "title": "Halle Bailey",         "studio": "Untitled Jesse Eisenberg Musical", "precursor": 72, "history": 68, "buzz": 76, "strength": "Medium" },
+      { "title": "Mariana di Girolamo",  "studio": "Wild Horse Nine",                  "precursor": 68, "history": 66, "buzz": 69, "strength": "Medium" }
+    ],
+    "original-screenplay": [
+      { "title": "Wild Horse Nine",  "studio": "Searchlight Pictures",  "precursor": 86, "history": 80, "buzz": 83, "strength": "High"   },
+      { "title": "Fjord",            "studio": "Neon",                  "precursor": 78, "history": 73, "buzz": 72, "strength": "High"   },
+      { "title": "Digger",           "studio": "Netflix",               "precursor": 75, "history": 70, "buzz": 73, "strength": "Medium" },
+      { "title": "Josephine",        "studio": "Focus Features",        "precursor": 69, "history": 65, "buzz": 67, "strength": "Medium" },
+      { "title": "Jack of Spades",   "studio": "Netflix",               "precursor": 66, "history": 64, "buzz": 65, "strength": "Low"    }
+    ],
+    "adapted-screenplay": [
+      { "title": "All of a Sudden",     "studio": "Mubi",        "precursor": 83, "history": 78, "buzz": 76, "strength": "High"   },
+      { "title": "The Odyssey",         "studio": "Universal",   "precursor": 79, "history": 83, "buzz": 73, "strength": "High"   },
+      { "title": "Project Hail Mary",   "studio": "Amazon MGM",  "precursor": 75, "history": 70, "buzz": 79, "strength": "Medium" },
+      { "title": "Narnia",              "studio": "Netflix",     "precursor": 73, "history": 68, "buzz": 76, "strength": "Medium" },
+      { "title": "The Social Reckoning","studio": "A24",         "precursor": 71, "history": 69, "buzz": 72, "strength": "Medium" }
+    ],
+    "animated-feature": [
+      { "title": "Pixar's Toy Story 5",                    "studio": "Disney/Pixar",            "precursor": 86, "history": 89, "buzz": 90, "strength": "High"   },
+      { "title": "Pixar's Hoppers",                        "studio": "Disney/Pixar",            "precursor": 82, "history": 75, "buzz": 84, "strength": "High"   },
+      { "title": "The Super Mario Galaxy Movie",           "studio": "Universal/Illumination",  "precursor": 78, "history": 67, "buzz": 88, "strength": "Medium" },
+      { "title": "Dr. Seuss' The Cat in the Hat",          "studio": "Warner Bros.",            "precursor": 74, "history": 69, "buzz": 76, "strength": "Medium" },
+      { "title": "PAW Patrol 3: The Dino Movie",           "studio": "Paramount",               "precursor": 68, "history": 60, "buzz": 71, "strength": "Low"    }
+    ],
+    "international-feature": [
+      { "title": "The Love That Remains",  "studio": "Nordisk",                   "precursor": 81, "history": 83, "buzz": 69, "strength": "High"   },
+      { "title": "A Poet",                 "studio": "Mubi",                      "precursor": 78, "history": 80, "buzz": 65, "strength": "High"   },
+      { "title": "Calle Malaga",           "studio": "Sony Pictures Classics",    "precursor": 74, "history": 76, "buzz": 63, "strength": "Medium" },
+      { "title": "Islands",               "studio": "Neon",                      "precursor": 71, "history": 72, "buzz": 62, "strength": "Medium" },
+      { "title": "The Mother and the Bear","studio": "Janus Films",               "precursor": 69, "history": 74, "buzz": 60, "strength": "Low"    }
+    ],
+    "documentary-feature": [
+      { "title": "Andre is an Idiot",           "studio": "A24",         "precursor": 79, "history": 76, "buzz": 74, "strength": "High"   },
+      { "title": "EPiC: Elvis Presley in Concert","studio": "Sony",      "precursor": 75, "history": 70, "buzz": 82, "strength": "Medium" },
+      { "title": "Man on the Run",               "studio": "Neon",       "precursor": 73, "history": 71, "buzz": 68, "strength": "Medium" },
+      { "title": "Whalefall",                    "studio": "Participant", "precursor": 70, "history": 69, "buzz": 65, "strength": "Medium" },
+      { "title": "Archangel",                    "studio": "Netflix",    "precursor": 68, "history": 66, "buzz": 63, "strength": "Low"    }
+    ],
+    "documentary-short": [
+      { "title": "The President's Cake",  "studio": "ShortsTV",  "precursor": 74, "history": 73, "buzz": 67, "strength": "High"   },
+      { "title": "Stop! That! Train!",    "studio": "ShortsTV",  "precursor": 72, "history": 68, "buzz": 64, "strength": "Medium" },
+      { "title": "Other Mommy",           "studio": "ShortsTV",  "precursor": 70, "history": 65, "buzz": 63, "strength": "Medium" },
+      { "title": "Broken Bird",           "studio": "ShortsTV",  "precursor": 68, "history": 64, "buzz": 60, "strength": "Low"    },
+      { "title": "Charlie Harper",        "studio": "ShortsTV",  "precursor": 66, "history": 62, "buzz": 58, "strength": "Low"    }
+    ],
+    "live-action-short": [
+      { "title": "The Third Parent",          "studio": "ShortsTV",  "precursor": 75, "history": 72, "buzz": 66, "strength": "High"   },
+      { "title": "A Great Awakening",         "studio": "ShortsTV",  "precursor": 73, "history": 70, "buzz": 64, "strength": "Medium" },
+      { "title": "This Is Not a Test",        "studio": "ShortsTV",  "precursor": 71, "history": 66, "buzz": 61, "strength": "Medium" },
+      { "title": "Thread: An Insidious Tale", "studio": "ShortsTV",  "precursor": 69, "history": 63, "buzz": 65, "strength": "Low"    },
+      { "title": "The Resurrected",           "studio": "ShortsTV",  "precursor": 67, "history": 62, "buzz": 60, "strength": "Low"    }
+    ],
+    "animated-short": [
+      { "title": "Buffalo Kids",                                "studio": "ShortsTV",   "precursor": 74, "history": 73, "buzz": 68, "strength": "High"   },
+      { "title": "The Sheep Detectives",                        "studio": "ShortsTV",   "precursor": 72, "history": 69, "buzz": 66, "strength": "Medium" },
+      { "title": "Shaun the Sheep: The Beast of Mossy Bottom",  "studio": "Aardman",    "precursor": 70, "history": 71, "buzz": 69, "strength": "Medium" },
+      { "title": "Whistle",                                     "studio": "ShortsTV",   "precursor": 68, "history": 64, "buzz": 61, "strength": "Low"    },
+      { "title": "The Pout-Pout Fish",                          "studio": "DreamWorks", "precursor": 67, "history": 63, "buzz": 62, "strength": "Low"    }
+    ],
+    "original-score": [
+      { "title": "The Odyssey",        "studio": "Universal",              "precursor": 87, "history": 83, "buzz": 82, "strength": "High"   },
+      { "title": "Wild Horse Nine",    "studio": "Searchlight Pictures",   "precursor": 79, "history": 75, "buzz": 74, "strength": "High"   },
+      { "title": "Project Hail Mary",  "studio": "Amazon MGM",             "precursor": 75, "history": 72, "buzz": 76, "strength": "Medium" },
+      { "title": "Narnia",             "studio": "Netflix",                "precursor": 72, "history": 66, "buzz": 78, "strength": "Medium" },
+      { "title": "Disclosure Day",     "studio": "Amblin Entertainment",   "precursor": 70, "history": 73, "buzz": 68, "strength": "Medium" }
+    ],
+    "original-song": [
+      { "title": "Untitled Jesse Eisenberg Musical",    "studio": "A24",         "precursor": 80, "history": 67, "buzz": 82, "strength": "High"   },
+      { "title": "Wuthering Heights",                   "studio": "Warner Bros.","precursor": 74, "history": 70, "buzz": 76, "strength": "Medium" },
+      { "title": "The Hunger Games: Sunrise on the Reaping", "studio": "Lionsgate", "precursor": 72, "history": 66, "buzz": 79, "strength": "Medium" },
+      { "title": "Toy Story 5",                         "studio": "Disney/Pixar","precursor": 70, "history": 68, "buzz": 77, "strength": "Medium" },
+      { "title": "Untitled Parker/Stone/Lamar Project", "studio": "Paramount",   "precursor": 68, "history": 60, "buzz": 76, "strength": "Low"    }
+    ],
+    "sound": [
+      { "title": "Disclosure Day",                  "studio": "Amblin Entertainment", "precursor": 82, "history": 70, "buzz": 80, "strength": "High"   },
+      { "title": "Dune: Part Three",                "studio": "Warner Bros.",         "precursor": 85, "history": 83, "buzz": 76, "strength": "High"   },
+      { "title": "The Odyssey",                     "studio": "Universal",            "precursor": 80, "history": 78, "buzz": 74, "strength": "High"   },
+      { "title": "Project Hail Mary",               "studio": "Amazon MGM",           "precursor": 76, "history": 72, "buzz": 77, "strength": "Medium" },
+      { "title": "Untitled Jesse Eisenberg Musical","studio": "A24",                  "precursor": 66, "history": 62, "buzz": 70, "strength": "Low"    }
+    ],
+    "production-design": [
+      { "title": "Narnia",            "studio": "Netflix",              "precursor": 88, "history": 82, "buzz": 85, "strength": "High"   },
+      { "title": "The Odyssey",       "studio": "Universal",            "precursor": 85, "history": 83, "buzz": 78, "strength": "High"   },
+      { "title": "Dune: Part Three",  "studio": "Warner Bros.",         "precursor": 82, "history": 80, "buzz": 74, "strength": "High"   },
+      { "title": "Project Hail Mary", "studio": "Amazon MGM",           "precursor": 77, "history": 72, "buzz": 79, "strength": "Medium" },
+      { "title": "Disclosure Day",    "studio": "Amblin Entertainment", "precursor": 70, "history": 66, "buzz": 70, "strength": "Medium" }
+    ],
+    "cinematography": [
+      { "title": "The Odyssey",        "studio": "Universal",            "precursor": 89, "history": 88, "buzz": 82, "strength": "High"   },
+      { "title": "Digger",             "studio": "Netflix",              "precursor": 83, "history": 80, "buzz": 76, "strength": "High"   },
+      { "title": "Project Hail Mary",  "studio": "Amazon MGM",           "precursor": 78, "history": 73, "buzz": 75, "strength": "High"   },
+      { "title": "Wild Horse Nine",    "studio": "Searchlight Pictures", "precursor": 74, "history": 71, "buzz": 72, "strength": "Medium" },
+      { "title": "Josephine",          "studio": "Focus Features",       "precursor": 68, "history": 64, "buzz": 70, "strength": "Medium" }
+    ],
+    "makeup-hairstyling": [
+      { "title": "Michael",        "studio": "Lionsgate",    "precursor": 87, "history": 80, "buzz": 84, "strength": "High"   },
+      { "title": "Werwulf",        "studio": "A24",          "precursor": 82, "history": 73, "buzz": 83, "strength": "High"   },
+      { "title": "Dune: Part Three","studio": "Warner Bros.","precursor": 78, "history": 75, "buzz": 72, "strength": "Medium" },
+      { "title": "The Odyssey",    "studio": "Universal",   "precursor": 76, "history": 74, "buzz": 70, "strength": "Medium" },
+      { "title": "Digger",         "studio": "Netflix",     "precursor": 72, "history": 68, "buzz": 70, "strength": "Medium" }
+    ],
+    "costume-design": [
+      { "title": "The Odyssey",             "studio": "Universal",              "precursor": 86, "history": 83, "buzz": 78, "strength": "High"   },
+      { "title": "Michael",                 "studio": "Lionsgate",              "precursor": 82, "history": 75, "buzz": 82, "strength": "High"   },
+      { "title": "The Devil Wears Prada 2", "studio": "20th Century Studios",   "precursor": 80, "history": 86, "buzz": 68, "strength": "High"   },
+      { "title": "Wuthering Heights",       "studio": "Warner Bros.",           "precursor": 74, "history": 73, "buzz": 72, "strength": "Medium" },
+      { "title": "Narnia",                  "studio": "Netflix",                "precursor": 72, "history": 67, "buzz": 76, "strength": "Medium" }
+    ],
+    "film-editing": [
+      { "title": "Wild Horse Nine",  "studio": "Searchlight Pictures",  "precursor": 85, "history": 79, "buzz": 80, "strength": "High"   },
+      { "title": "The Odyssey",      "studio": "Universal",             "precursor": 82, "history": 82, "buzz": 76, "strength": "High"   },
+      { "title": "Fjord",            "studio": "Neon",                  "precursor": 76, "history": 71, "buzz": 73, "strength": "Medium" },
+      { "title": "Digger",           "studio": "Netflix",               "precursor": 74, "history": 70, "buzz": 71, "strength": "Medium" },
+      { "title": "Narnia",           "studio": "Netflix",               "precursor": 70, "history": 67, "buzz": 74, "strength": "Medium" }
+    ],
+    "visual-effects": [
+      { "title": "Dune: Part Three",  "studio": "Warner Bros.",         "precursor": 90, "history": 87, "buzz": 83, "strength": "High"   },
+      { "title": "The Odyssey",       "studio": "Universal",            "precursor": 86, "history": 81, "buzz": 78, "strength": "High"   },
+      { "title": "Narnia",            "studio": "Netflix",              "precursor": 83, "history": 72, "buzz": 86, "strength": "High"   },
+      { "title": "Project Hail Mary", "studio": "Amazon MGM",           "precursor": 80, "history": 74, "buzz": 83, "strength": "Medium" },
+      { "title": "Disclosure Day",    "studio": "Amblin Entertainment", "precursor": 73, "history": 66, "buzz": 76, "strength": "Medium" }
+    ],
+    "casting": [
+      { "title": "Wild Horse Nine",    "studio": "Searchlight Pictures",  "precursor": 84, "history": 79, "buzz": 80, "strength": "High"   },
+      { "title": "Digger",             "studio": "Netflix",               "precursor": 76, "history": 70, "buzz": 74, "strength": "Medium" },
+      { "title": "Fjord",              "studio": "Neon",                  "precursor": 74, "history": 68, "buzz": 72, "strength": "Medium" },
+      { "title": "Narnia",             "studio": "Netflix",               "precursor": 72, "history": 67, "buzz": 78, "strength": "Medium" },
+      { "title": "The Social Reckoning","studio": "A24",                  "precursor": 70, "history": 71, "buzz": 71, "strength": "Medium" }
+    ]
+  },
+  "scheduledFilms": [
+    "The Mother and the Bear", "We Bury the Dead", "Greenland 2: Migration", "Primate",
+    "Soulm8te", "Dead Man's Wire", "I Was A Stranger", "Magellan", "OBEX",
+    "People We Meet on Vacation", "Starbright", "Young Mothers",
+    "28 Years Later: The Bone Temple", "Charlie the Wonderdog", "All You Need Is Kill",
+    "Night Patrol", "A Private Life", "The RIP", "Sound of Falling", "A Useful Ghost",
+    "Clika", "H is for Hawk", "Mercy", "Return to Silent Hill", "In Cold Light",
+    "Send Help", "Shelter", "Islands", "The Love That Remains", "The Moment", "A Poet",
+    "Dracula: A Love Tale", "Scarlet", "Solo Mio", "The Strangers: Chapter 3", "Whistle",
+    "Buffalo Kids", "Calle Malaga", "Jimpa", "My Father's Shadow", "The President's Cake",
+    "Cold Storage", "Broken Bird", "Crime 101", "GOAT", "Good Luck, Have Fun, Don't Die",
+    "Wuthering Heights", "The Mortuary Assistant", "Nirvanna the Band the Show the Movie",
+    "How to Make a Killing", "I Can Only Imagine 2", "Psycho Killer", "Midwinter Break",
+    "Protector", "This Is Not a Test", "EPiC: Elvis Presley in Concert", "Scream 7",
+    "Dreams", "Man on the Run", "Wild Horse Nine", "Fjord", "Digger",
+    "Untitled Jesse Eisenberg Musical", "All of a Sudden", "Josephine", "Disclosure Day",
+    "Werwulf", "Jack of Spades", "Pixar's Hoppers", "Andre is an Idiot",
+    "Peaky Blinders: The Immortal Man", "Youngblood", "The Breadwinner", "Reminders of Him",
+    "The Undertone", "Slanted",
+    "Billie Eilish - Hit Me Hard and Soft: The Tour (Live in 3D)",
+    "Project Hail Mary", "The Pout-Pout Fish", "Whitney Springs", "The Dog Stars",
+    "They Will Kill You", "Alpha", "Kontinental '25", "Yes", "The Drama",
+    "The Super Mario Galaxy Movie", "A Great Awakening", "The Third Parent",
+    "Ready or Not 2: Here I Come", "You, Me & Tuscany", "Normal", "The Resurrected",
+    "Michael", "Omaha", "The Devil Wears Prada 2", "Hokum", "Mortal Kombat II",
+    "The Sheep Detectives", "Is God Is", "Obsession", "Poetic License", "I Love Boosters",
+    "The Mandalorian and Grogu", "Stop! That! Train!", "Animal Friends",
+    "Masters of the Universe", "Power Ballad", "Scary Movie 6", "Pixar's Toy Story 5",
+    "Supergirl", "Mega Minions", "Shiver", "Young Washington", "Moana Live-Action",
+    "Cut Off", "The Odyssey", "Evil Dead Burn", "Spider-Man: Brand New Day",
+    "Once Upon A Time in A Cinema", "Super Troopers 3", "Flowervale Street",
+    "PAW Patrol 3: The Dino Movie", "Mutiny", "Thread: An Insidious Tale", "Cliffhanger",
+    "Coyote vs. Acme", "How to Rob a Bank", "Clayface", "Sense and Sensibility",
+    "Practical Magic 2", "Resident Evil", "Charlie Harper", "Forgotten Island", "Verity",
+    "The Legend of Aang: The Last Airbender", "Other Mommy", "The Social Reckoning",
+    "Street Fighter", "Whalefall", "Remain",
+    "Shaun the Sheep: The Beast of Mossy Bottom", "Archangel",
+    "Dr. Seuss' The Cat in the Hat", "Ebenezer: A Christmas Carol",
+    "The Hunger Games: Sunrise on the Reaping", "Hexed",
+    "Meet the Parents 4: Focker In-Law", "Narnia", "Violent Night 2", "Jumanji 3",
+    "Avengers: Doomsday", "Dune: Part Three"
+  ],
+  "experienceConfig": {
+    "priorCategoryWins": {
+      "director": {
+        "Christopher Nolan":     1,
+        "Steven Spielberg":      2,
+        "Alejandro G. Inarritu": 2
+      },
+      "actor": {},
+      "actress": {
+        "Mikey Madison":  1,
+        "Jessie Buckley": 1
+      },
+      "supporting-actor": {},
+      "supporting-actress": {
+        "Octavia Spencer": 1
+      }
+    },
+    "recentWinnerPenalty": {
+      "actress": {
+        "Mikey Madison":  2,
+        "Jessie Buckley": 2
+      }
+    },
+    "overdueNarrativeBoost": {
+      "actress": {
+        "Amy Adams": 1
+      }
+    }
+  }
+}
