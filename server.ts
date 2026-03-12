@@ -1078,6 +1078,17 @@ app.get("/api/feature-importance", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/brier-decomposition", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "brier-decomposition.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Brier decomposition not found. Run: npm run brier:decomposition");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

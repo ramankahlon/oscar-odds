@@ -654,6 +654,20 @@ interface FeatureImportanceData {
   }>;
 }
 let featureImportanceData: FeatureImportanceData | null = null;
+// Brier Score Decomposition data fetched from /api/brier-decomposition.
+interface BrierDecompCategory {
+  brierScore:  number;
+  reliability: number;
+  resolution:  number;
+  uncertainty: number;
+  bss:         number;
+  baseRate:    number;
+}
+interface BrierDecompData {
+  winner: BrierDecompCategory & { bins: Array<{ meanForecast: number; observedFreq: number; count: number }> };
+  byCategory: Record<string, { winner: BrierDecompCategory }>;
+}
+let brierDecompData: BrierDecompData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -4472,6 +4486,87 @@ function populateBacktestFilter(categories: BacktestCategorySummary[]): void {
       .join("");
 }
 
+const BACKTEST_CAT_LABELS: Record<string, string> = {
+  "picture":           "Best Picture",
+  "director":          "Best Director",
+  "actor":             "Best Actor",
+  "actress":           "Best Actress",
+  "supporting-actor":  "Best Supporting Actor",
+  "supporting-actress":"Best Supporting Actress",
+};
+
+function renderBrierDecomposition(): void {
+  const section  = document.getElementById("brierDecompSection");
+  const vizDiv   = document.getElementById("brierDecompViz");
+  const catBody  = document.getElementById("brierDecompCatBody");
+  if (!section || !vizDiv || !catBody || !brierDecompData) return;
+
+  const w = brierDecompData.winner;
+  const unc = w.uncertainty;
+
+  // ── Component bar: each piece shown as % of Uncertainty (the "budget") ──────
+  // BS = Unc − Res + Rel, so the bar decomposes as:
+  //   Skill portion  = Resolution / Unc
+  //   Wasted portion = Reliability / Unc
+  //   Base portion   = 1 − skill + wasted  (= BS / Unc)
+  const resPct = unc > 0 ? Math.min(100, (w.resolution  / unc) * 100) : 0;
+  const relPct = unc > 0 ? Math.min(100, (w.reliability / unc) * 100) : 0;
+  const bssPct = Math.max(0, w.bss * 100);
+
+  vizDiv.innerHTML =
+    `<div class="bd-headline">` +
+      `<span class="bd-bss" title="Brier Skill Score: fraction of climatological uncertainty removed by the model">` +
+        `BSS&nbsp;${bssPct.toFixed(1)}%` +
+      `</span>` +
+      `<span class="bd-bss-sub">skill vs climatology</span>` +
+    `</div>` +
+    `<div class="bd-bar-section">` +
+      `<div class="bd-row">` +
+        `<span class="bd-label bd-label--res">Resolution</span>` +
+        `<div class="bd-track"><div class="bd-fill bd-fill--res" style="width:${resPct.toFixed(1)}%"></div></div>` +
+        `<span class="bd-value">${w.resolution.toFixed(4)} <span class="bd-hint">(↑ better)</span></span>` +
+      `</div>` +
+      `<div class="bd-row">` +
+        `<span class="bd-label bd-label--rel">Reliability</span>` +
+        `<div class="bd-track"><div class="bd-fill bd-fill--rel" style="width:${relPct.toFixed(1)}%"></div></div>` +
+        `<span class="bd-value">${w.reliability.toFixed(4)} <span class="bd-hint">(↓ better)</span></span>` +
+      `</div>` +
+      `<div class="bd-row">` +
+        `<span class="bd-label">Uncertainty</span>` +
+        `<div class="bd-track"><div class="bd-fill bd-fill--unc" style="width:100%"></div></div>` +
+        `<span class="bd-value">${w.uncertainty.toFixed(4)} <span class="bd-hint">(fixed)</span></span>` +
+      `</div>` +
+      `<div class="bd-row">` +
+        `<span class="bd-label">Brier Score</span>` +
+        `<div class="bd-track"><div class="bd-fill bd-fill--bs" style="width:${Math.min(100, (w.brierScore / unc) * 100).toFixed(1)}%"></div></div>` +
+        `<span class="bd-value">${w.brierScore.toFixed(4)}</span>` +
+      `</div>` +
+    `</div>` +
+    `<p class="bd-formula">BS&nbsp;=&nbsp;Reliability&nbsp;−&nbsp;Resolution&nbsp;+&nbsp;Uncertainty` +
+      `&nbsp;&nbsp;≡&nbsp;&nbsp;${w.reliability.toFixed(4)}&nbsp;−&nbsp;${w.resolution.toFixed(4)}&nbsp;+&nbsp;${w.uncertainty.toFixed(4)}` +
+      `&nbsp;&nbsp;=&nbsp;&nbsp;${w.brierScore.toFixed(4)}</p>`;
+
+  // ── Per-category table ─────────────────────────────────────────────────────
+  const catIds = ["picture","director","actor","actress","supporting-actor","supporting-actress"];
+  catBody.innerHTML = catIds.map((catId) => {
+    const d = brierDecompData!.byCategory[catId]?.winner;
+    if (!d) return "";
+    const bssClass = d.bss > 0 ? "backtest-correct" : "backtest-miss";
+    return (
+      `<tr>` +
+        `<td>${esc(BACKTEST_CAT_LABELS[catId] ?? catId)}</td>` +
+        `<td class="backtest-num">${d.brierScore.toFixed(4)}</td>` +
+        `<td class="backtest-num">${d.reliability.toFixed(4)}</td>` +
+        `<td class="backtest-num">${d.resolution.toFixed(4)}</td>` +
+        `<td class="backtest-num">${d.uncertainty.toFixed(4)}</td>` +
+        `<td class="backtest-num ${bssClass}">${(d.bss * 100).toFixed(1)}%</td>` +
+      `</tr>`
+    );
+  }).join("");
+
+  section.hidden = false;
+}
+
 function renderFeatureImportance(): void {
   const section = document.getElementById("featureImportanceSection");
   const barsDiv = document.getElementById("featureImportanceBars");
@@ -4545,6 +4640,17 @@ async function loadBacktest(): Promise<void> {
         renderFeatureImportance();
       })
       .catch(() => { /* feature-importance.json not generated yet */ });
+    // Load Brier decomposition alongside backtest.
+    fetch("/api/brier-decomposition")
+      .then(r => r.ok ? r.json() : null)
+      .then((bd: unknown) => {
+        if (!bd || typeof bd !== "object") return;
+        const d = bd as Record<string, unknown>;
+        if (typeof d.winner !== "object" || typeof d.byCategory !== "object") return;
+        brierDecompData = bd as BrierDecompData;
+        renderBrierDecomposition();
+      })
+      .catch(() => { /* brier-decomposition.json not generated yet */ });
   } catch {
     if (backtestStatus) {
       backtestStatus.textContent = "Failed to load backtest data.";

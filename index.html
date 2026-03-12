@@ -275,6 +275,27 @@
             </table>
           </div>
 
+          <h3 class="backtest-section-heading">Brier Score Decomposition</h3>
+          <div id="brierDecompSection" hidden>
+            <p class="panel-copy bd-copy">Murphy (1973) decomposition of the winner-prediction Brier Score into three interpretable components: <strong>Reliability</strong> (calibration error — lower is better), <strong>Resolution</strong> (discrimination power — higher is better), and <strong>Uncertainty</strong> (irreducible base-rate variance). BS&nbsp;=&nbsp;Reliability&nbsp;−&nbsp;Resolution&nbsp;+&nbsp;Uncertainty.</p>
+            <div id="brierDecompViz"></div>
+            <h4 class="backtest-section-heading" style="margin-top:16px">By Category (Winner Model)</h4>
+            <div class="backtest-table-wrap">
+              <table class="backtest-table" id="brierDecompCatTable">
+                <caption class="sr-only">Brier score decomposition by Oscar category</caption>
+                <thead><tr>
+                  <th scope="col">Category</th>
+                  <th scope="col" class="backtest-num" title="Mean-squared error on winner probability">Brier Score</th>
+                  <th scope="col" class="backtest-num" title="Calibration error — lower is better">Reliability</th>
+                  <th scope="col" class="backtest-num" title="Discriminative power — higher is better">Resolution</th>
+                  <th scope="col" class="backtest-num" title="Irreducible base-rate variance">Uncertainty</th>
+                  <th scope="col" class="backtest-num" title="Skill vs naive climatological forecast (BSS > 0 is better than chance)">Skill Score</th>
+                </tr></thead>
+                <tbody id="brierDecompCatBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <h3 class="backtest-section-heading">Feature Importance</h3>
           <div id="featureImportanceSection" hidden>
             <p class="panel-copy fi-copy">Permutation Feature Importance: how much winner accuracy drops when each feature's values are randomly shuffled within each category (N=200 replicates). A larger drop means the feature is more critical to the model's predictions.</p>

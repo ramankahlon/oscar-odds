@@ -1,0 +1,1171 @@
+{
+  "generatedAt": "2026-03-12T01:12:20.164Z",
+  "method": "Murphy (1973) decomposition, 10 equal-width bins",
+  "weights": {
+    "precursor": 0.4992,
+    "history": 0.1314,
+    "buzz": 0.3694
+  },
+  "nomination": {
+    "n": 1110,
+    "brierScore": 0.5494114868894793,
+    "reliability": 0.48527673467785437,
+    "resolution": 0.12915119068654152,
+    "uncertainty": 0.19722425127830534,
+    "withinBinVar": -0.003938308380138922,
+    "bss": -1.7857197242655447,
+    "baseRate": 0.7297297297297297,
+    "bins": [
+      {
+        "lowerBound": 0,
+        "upperBound": 0.1,
+        "count": 401,
+        "meanForecast": 0.06199806583254678,
+        "observedFreq": 0.2518703241895262
+      },
+      {
+        "lowerBound": 0.1,
+        "upperBound": 0.2,
+        "count": 709,
+        "meanForecast": 0.1401442258400974,
+        "observedFreq": 1
+      },
+      {
+        "lowerBound": 0.2,
+        "upperBound": 0.3,
+        "count": 0,
+        "meanForecast": 0.25,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.3,
+        "upperBound": 0.4,
+        "count": 0,
+        "meanForecast": 0.35,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.4,
+        "upperBound": 0.5,
+        "count": 0,
+        "meanForecast": 0.45,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.5,
+        "upperBound": 0.6,
+        "count": 0,
+        "meanForecast": 0.55,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.6,
+        "upperBound": 0.7,
+        "count": 0,
+        "meanForecast": 0.65,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.7,
+        "upperBound": 0.8,
+        "count": 0,
+        "meanForecast": 0.75,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.8,
+        "upperBound": 0.9,
+        "count": 0,
+        "meanForecast": 0.85,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.9,
+        "upperBound": 1,
+        "count": 0,
+        "meanForecast": 0.95,
+        "observedFreq": 0
+      }
+    ]
+  },
+  "winner": {
+    "n": 1110,
+    "brierScore": 0.09404229061157307,
+    "reliability": 0.016861826608224672,
+    "resolution": 0.03325523070505073,
+    "uncertainty": 0.11687363038714392,
+    "withinBinVar": -0.006437935678744802,
+    "bss": 0.19535065095472814,
+    "baseRate": 0.13513513513513514,
+    "bins": [
+      {
+        "lowerBound": 0,
+        "upperBound": 0.1,
+        "count": 325,
+        "meanForecast": 0.06743381188955125,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.1,
+        "upperBound": 0.2,
+        "count": 443,
+        "meanForecast": 0.15627407415397687,
+        "observedFreq": 0.033860045146726865
+      },
+      {
+        "lowerBound": 0.2,
+        "upperBound": 0.3,
+        "count": 333,
+        "meanForecast": 0.24098471395805912,
+        "observedFreq": 0.3783783783783784
+      },
+      {
+        "lowerBound": 0.3,
+        "upperBound": 0.4,
+        "count": 9,
+        "meanForecast": 0.3076400769375762,
+        "observedFreq": 1
+      },
+      {
+        "lowerBound": 0.4,
+        "upperBound": 0.5,
+        "count": 0,
+        "meanForecast": 0.45,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.5,
+        "upperBound": 0.6,
+        "count": 0,
+        "meanForecast": 0.55,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.6,
+        "upperBound": 0.7,
+        "count": 0,
+        "meanForecast": 0.65,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.7,
+        "upperBound": 0.8,
+        "count": 0,
+        "meanForecast": 0.75,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.8,
+        "upperBound": 0.9,
+        "count": 0,
+        "meanForecast": 0.85,
+        "observedFreq": 0
+      },
+      {
+        "lowerBound": 0.9,
+        "upperBound": 1,
+        "count": 0,
+        "meanForecast": 0.95,
+        "observedFreq": 0
+      }
+    ]
+  },
+  "byCategory": {
+    "picture": {
+      "nomination": {
+        "n": 235,
+        "brierScore": 0.6285412773601174,
+        "reliability": 0.5086355606367369,
+        "resolution": 0.03983703033046628,
+        "uncertainty": 0.16749660479855136,
+        "withinBinVar": -0.007753857744704495,
+        "bss": -2.75256130186081,
+        "baseRate": 0.7872340425531915,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 125,
+            "meanForecast": 0.07102880329675444,
+            "observedFreq": 0.6
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 110,
+            "meanForecast": 0.12326514383338118,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 235,
+        "brierScore": 0.08301764292523851,
+        "reliability": 0.006091781280433983,
+        "resolution": 0.014437434354965403,
+        "uncertainty": 0.09506564056133997,
+        "withinBinVar": -0.0037023445615700368,
+        "bss": 0.12673346084832438,
+        "baseRate": 0.10638297872340426,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 80,
+            "meanForecast": 0.07085232528111991,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 132,
+            "meanForecast": 0.1400924790744387,
+            "observedFreq": 0.11363636363636363
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 23,
+            "meanForecast": 0.23288140564293947,
+            "observedFreq": 0.43478260869565216
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    },
+    "director": {
+      "nomination": {
+        "n": 175,
+        "brierScore": 0.5314012314811691,
+        "reliability": 0.5207959882257575,
+        "resolution": 0.19309262166405025,
+        "uncertainty": 0.20408163265306123,
+        "withinBinVar": -0.0003837677335992995,
+        "bss": -1.6038660342577287,
+        "baseRate": 0.7142857142857143,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 52,
+            "meanForecast": 0.0618937642477776,
+            "observedFreq": 0.038461538461538464
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 123,
+            "meanForecast": 0.1393387570427514,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 175,
+        "brierScore": 0.10053704241118061,
+        "reliability": 0.01736713560952849,
+        "resolution": 0.03211284513805523,
+        "uncertainty": 0.12244897959183673,
+        "withinBinVar": -0.0071662276521293755,
+        "bss": 0.17894748697535828,
+        "baseRate": 0.14285714285714285,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 47,
+            "meanForecast": 0.07353456561451087,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 60,
+            "meanForecast": 0.16062356216752927,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 68,
+            "meanForecast": 0.2327664804741374,
+            "observedFreq": 0.36764705882352944
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    },
+    "actor": {
+      "nomination": {
+        "n": 175,
+        "brierScore": 0.5287603680822341,
+        "reliability": 0.4880944796238484,
+        "resolution": 0.16049809754410238,
+        "uncertainty": 0.20408163265306123,
+        "withinBinVar": -0.0029176466505730914,
+        "bss": -1.5909258036029472,
+        "baseRate": 0.7142857142857143,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 59,
+            "meanForecast": 0.06119302699788909,
+            "observedFreq": 0.15254237288135594
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 116,
+            "meanForecast": 0.14436857124368443,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 175,
+        "brierScore": 0.09840402481185197,
+        "reliability": 0.016997628838295715,
+        "resolution": 0.033704390847247995,
+        "uncertainty": 0.12244897959183673,
+        "withinBinVar": -0.007338192771032481,
+        "bss": 0.19636713070320888,
+        "baseRate": 0.14285714285714285,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 50,
+            "meanForecast": 0.06847220498544168,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 59,
+            "meanForecast": 0.16024346365686465,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 66,
+            "meanForecast": 0.24254151031344223,
+            "observedFreq": 0.3787878787878788
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    },
+    "actress": {
+      "nomination": {
+        "n": 175,
+        "brierScore": 0.5282436683492691,
+        "reliability": 0.4913338911553792,
+        "resolution": 0.16467276565798736,
+        "uncertainty": 0.20408163265306123,
+        "withinBinVar": -0.00249908980118399,
+        "bss": -1.5883939749114184,
+        "baseRate": 0.7142857142857143,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 58,
+            "meanForecast": 0.05945615378917171,
+            "observedFreq": 0.13793103448275862
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 117,
+            "meanForecast": 0.14451868322539238,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 175,
+        "brierScore": 0.09752447828328063,
+        "reliability": 0.017823886661453122,
+        "resolution": 0.03453689167974883,
+        "uncertainty": 0.12244897959183673,
+        "withinBinVar": -0.008211496290260398,
+        "bss": 0.20355009401987484,
+        "baseRate": 0.14285714285714285,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 50,
+            "meanForecast": 0.06726423913195047,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 60,
+            "meanForecast": 0.1627415955429742,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 65,
+            "meanForecast": 0.24298386610767908,
+            "observedFreq": 0.38461538461538464
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    },
+    "supporting-actor": {
+      "nomination": {
+        "n": 175,
+        "brierScore": 0.5262598446780057,
+        "reliability": 0.5064791870218831,
+        "resolution": 0.18291761148904007,
+        "uncertainty": 0.20408163265306123,
+        "withinBinVar": -0.0013833635078985829,
+        "bss": -1.5786732389222278,
+        "baseRate": 0.7142857142857143,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 54,
+            "meanForecast": 0.053782682339871844,
+            "observedFreq": 0.07407407407407407
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 121,
+            "meanForecast": 0.14423866124619641,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 175,
+        "brierScore": 0.09371910029623054,
+        "reliability": 0.03377652944819572,
+        "resolution": 0.05519623233908949,
+        "uncertainty": 0.12244897959183673,
+        "withinBinVar": -0.007310176404712432,
+        "bss": 0.23462734758078396,
+        "baseRate": 0.14285714285714285,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 49,
+            "meanForecast": 0.06137460492684632,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 67,
+            "meanForecast": 0.16531864002005595,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 52,
+            "meanForecast": 0.24469543579452013,
+            "observedFreq": 0.34615384615384615
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 7,
+            "meanForecast": 0.3071887098908344,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    },
+    "supporting-actress": {
+      "nomination": {
+        "n": 175,
+        "brierScore": 0.5261323175104334,
+        "reliability": 0.5109423105992116,
+        "resolution": 0.18790912591451672,
+        "uncertainty": 0.20408163265306123,
+        "withinBinVar": -0.0009824998273226526,
+        "bss": -1.5780483558011238,
+        "baseRate": 0.7142857142857143,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 53,
+            "meanForecast": 0.05284977145041589,
+            "observedFreq": 0.05660377358490566
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 122,
+            "meanForecast": 0.14390249975631816,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 0,
+            "meanForecast": 0.25,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 0,
+            "meanForecast": 0.35,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      },
+      "winner": {
+        "n": 175,
+        "brierScore": 0.09483133414839989,
+        "reliability": 0.023699746397574356,
+        "resolution": 0.042255274991352475,
+        "uncertainty": 0.12244897959183673,
+        "withinBinVar": -0.009062116849658713,
+        "bss": 0.22554410445473413,
+        "baseRate": 0.14285714285714285,
+        "bins": [
+          {
+            "lowerBound": 0,
+            "upperBound": 0.1,
+            "count": 49,
+            "meanForecast": 0.061173477764234076,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.1,
+            "upperBound": 0.2,
+            "count": 65,
+            "meanForecast": 0.16622438327164513,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.2,
+            "upperBound": 0.3,
+            "count": 59,
+            "meanForecast": 0.24640106961022637,
+            "observedFreq": 0.3898305084745763
+          },
+          {
+            "lowerBound": 0.3,
+            "upperBound": 0.4,
+            "count": 2,
+            "meanForecast": 0.3092198616011727,
+            "observedFreq": 1
+          },
+          {
+            "lowerBound": 0.4,
+            "upperBound": 0.5,
+            "count": 0,
+            "meanForecast": 0.45,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.5,
+            "upperBound": 0.6,
+            "count": 0,
+            "meanForecast": 0.55,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.6,
+            "upperBound": 0.7,
+            "count": 0,
+            "meanForecast": 0.65,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.7,
+            "upperBound": 0.8,
+            "count": 0,
+            "meanForecast": 0.75,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.8,
+            "upperBound": 0.9,
+            "count": 0,
+            "meanForecast": 0.85,
+            "observedFreq": 0
+          },
+          {
+            "lowerBound": 0.9,
+            "upperBound": 1,
+            "count": 0,
+            "meanForecast": 0.95,
+            "observedFreq": 0
+          }
+        ]
+      }
+    }
+  }
+}
