@@ -294,6 +294,62 @@ const clientErrorLimiter = rateLimit({
   message: { error: "Too many error reports." }
 });
 
+// Broad guard for all /api/ routes not covered by a stricter per-route limiter.
+const generalApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests." }
+});
+
+// TMDB poster lookups hit an external service — keep the rate low.
+const tmdbLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many poster requests." }
+});
+
+// Backtest re-runs the full scoring pipeline across 25 years — CPU-bound.
+const backtestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests." }
+});
+
+// SSE: new-connection rate guard (10 connects/min per IP).
+const sseLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many event stream connections." }
+});
+
+// SSE: concurrent-connection guard (≤5 open streams per IP at any time).
+const sseConnectionsPerIp = new Map<string, number>();
+const SSE_MAX_CONNECTIONS_PER_IP = 5;
+
+function sseConnectionGuard(req: Request, res: Response, next: NextFunction): void {
+  const ip = req.ip ?? "unknown";
+  const current = sseConnectionsPerIp.get(ip) ?? 0;
+  if (current >= SSE_MAX_CONNECTIONS_PER_IP) {
+    res.status(429).json({ error: "Too many concurrent event stream connections." } satisfies ApiError);
+    return;
+  }
+  sseConnectionsPerIp.set(ip, current + 1);
+  req.on("close", () => {
+    const n = (sseConnectionsPerIp.get(ip) ?? 1) - 1;
+    if (n <= 0) sseConnectionsPerIp.delete(ip);
+    else sseConnectionsPerIp.set(ip, n);
+  });
+  next();
+}
+
 /**
  * Wraps an async route handler so that any rejected promise is forwarded to
  * Express's error-handling middleware via `next(err)` rather than becoming an
@@ -311,6 +367,7 @@ function asyncHandler(
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.set("trust proxy", 1);
+app.use("/api/", generalApiLimiter);
 
 // ── Request logging ───────────────────────────────────────────────────────────
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -1194,7 +1251,7 @@ app.get("/api/contenders", (_: Request, res: Response) => {
   }
 });
 
-app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
+app.get("/api/tmdb-poster", tmdbLimiter, async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;
   const title = query.title;
@@ -1340,13 +1397,13 @@ app.delete("/api/profiles/:profileId/passphrase", requireProfileAuth, (req: Requ
   res.json({ ok: true });
 });
 
-app.get("/api/backtest", (_req: Request, res: Response) => {
+app.get("/api/backtest", backtestLimiter, (_req: Request, res: Response) => {
   res.json(getBacktestResult());
 });
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
-app.get("/api/scraper-events", (req: Request, res: Response) => {
+app.get("/api/scraper-events", sseLimiter, sseConnectionGuard, (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
