@@ -63,7 +63,14 @@ const TMDB_BASE_URL = "https://www.themoviedb.org";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BEARER = process.env.TMDB_API_READ_ACCESS_TOKEN || "";
-const TMDB_RELEASE_YEAR = 2026;
+const TMDB_RELEASE_YEAR = (() => {
+  try {
+    const c = JSON.parse(readFileSync(path.join(__dirname, "data", "contenders-2026.json"), "utf8")) as { year?: unknown };
+    return typeof c.year === "number" ? c.year : 2026;
+  } catch {
+    return 2026;
+  }
+})();
 const FORCE_HTTPS = process.env.FORCE_HTTPS === "true";
 const ENABLE_SOURCE_POLLER = process.env.ENABLE_SOURCE_POLLER === "true";
 const SOURCE_POLL_INTERVAL_MINUTES = Math.max(5, Number(process.env.SOURCE_POLL_INTERVAL_MINUTES || 30));
