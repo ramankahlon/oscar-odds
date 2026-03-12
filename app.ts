@@ -638,6 +638,22 @@ interface JointProbData {
   condRates: Record<string, Record<string, number>>;
 }
 let jointProbData: JointProbData | null = null;
+// Permutation Feature Importance data fetched from /api/feature-importance.
+interface FeatureImportanceData {
+  method: string;
+  learnedWeights: { precursor: number; history: number; buzz: number };
+  baseline: { winnerAccuracy: number; crossEntropyLoss: number; brierScore: number };
+  features: Array<{
+    name: string;
+    weightFraction: number;
+    importance: {
+      winnerAccuracy:   { mean: number; std: number; drop: number };
+      crossEntropyLoss: { mean: number; std: number; increase: number };
+      brierScore:       { mean: number; std: number; increase: number };
+    };
+  }>;
+}
+let featureImportanceData: FeatureImportanceData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -4456,6 +4472,50 @@ function populateBacktestFilter(categories: BacktestCategorySummary[]): void {
       .join("");
 }
 
+function renderFeatureImportance(): void {
+  const section = document.getElementById("featureImportanceSection");
+  const barsDiv = document.getElementById("featureImportanceBars");
+  if (!section || !barsDiv || !featureImportanceData) return;
+
+  const { features, baseline } = featureImportanceData;
+  const sorted = [...features].sort(
+    (a, b) => b.importance.winnerAccuracy.drop - a.importance.winnerAccuracy.drop
+  );
+  const maxDrop = sorted[0]?.importance.winnerAccuracy.drop ?? 1;
+
+  barsDiv.innerHTML = sorted.map((f) => {
+    const imp  = f.importance.winnerAccuracy;
+    const drop = imp.drop * 100;
+    const std  = imp.std  * 100;
+    const barW = maxDrop > 0 ? (imp.drop / maxDrop) * 100 : 0;
+    const wPct = (f.weightFraction * 100).toFixed(0);
+    const label =
+      f.name === "precursor" ? "Precursor Momentum"
+      : f.name === "history" ? "Historical Fit"
+      : "Buzz";
+    // Relative importance ratio (drop / baseline accuracy)
+    const relPct = (imp.drop / baseline.winnerAccuracy * 100).toFixed(0);
+
+    return (
+      `<div class="fi-row">` +
+        `<div class="fi-label">` +
+          `<span class="fi-name">${esc(label)}</span>` +
+          `<span class="fi-weight">${wPct}% weight</span>` +
+        `</div>` +
+        `<div class="fi-bar-wrap">` +
+          `<div class="fi-bar" style="--fi-w:${barW.toFixed(1)}%"></div>` +
+          `<span class="fi-bar-label">` +
+            `−${drop.toFixed(1)}% ±${std.toFixed(1)}%` +
+            ` <span class="fi-rel">(${relPct}% of baseline)</span>` +
+          `</span>` +
+        `</div>` +
+      `</div>`
+    );
+  }).join("");
+
+  section.hidden = false;
+}
+
 async function loadBacktest(): Promise<void> {
   if (backtestStatus) {
     backtestStatus.textContent = "Loading accuracy data…";
@@ -4474,6 +4534,17 @@ async function loadBacktest(): Promise<void> {
     backtestCategoryFilter?.addEventListener("change", () => {
       renderBacktestYearTable(data.byYear, backtestCategoryFilter.value);
     });
+    // Load feature importance alongside backtest — both live in the same panel.
+    fetch("/api/feature-importance")
+      .then(r => r.ok ? r.json() : null)
+      .then((fi: unknown) => {
+        if (!fi || typeof fi !== "object") return;
+        const d = fi as Record<string, unknown>;
+        if (!Array.isArray(d.features) || typeof d.baseline !== "object") return;
+        featureImportanceData = fi as FeatureImportanceData;
+        renderFeatureImportance();
+      })
+      .catch(() => { /* feature-importance.json not generated yet */ });
   } catch {
     if (backtestStatus) {
       backtestStatus.textContent = "Failed to load backtest data.";

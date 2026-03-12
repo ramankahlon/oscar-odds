@@ -1830,6 +1830,28 @@ a:focus-visible {
 .backtest-filter-bar label { font-weight: 700; color: var(--muted); }
 .backtest-filter-bar select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; background: var(--surface-2); color: var(--ink); }
 
+/* ── Feature importance ─────────────────────────────────────────────────────── */
+.fi-copy { margin-bottom: 14px; }
+.fi-row { display: grid; grid-template-columns: 200px 1fr; align-items: center; gap: 10px; margin-bottom: 14px; }
+.fi-label { display: flex; flex-direction: column; }
+.fi-name { font-weight: 700; font-size: 0.92rem; }
+.fi-weight { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+.fi-bar-wrap { display: flex; align-items: center; gap: 10px; }
+.fi-bar {
+  height: 20px;
+  width: var(--fi-w, 0%);
+  min-width: 2px;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  opacity: 0.85;
+}
+.fi-bar-label { font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.fi-rel { font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+@media (max-width: 480px) {
+  .fi-row { grid-template-columns: 1fr; gap: 4px; }
+}
+
 /* ── Sweep analysis panel ──────────────────────────────────────────────────── */
 .sweep-table-wrap { overflow-x: auto; margin-bottom: 16px; }
 .sweep-table { width: 100%; border-collapse: collapse; }

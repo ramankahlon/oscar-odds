@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2026-03-12T01:03:57.442Z",
+  "method": "within-category permutation, N=200",
+  "learnedWeights": {
+    "precursor": 0.4992,
+    "history": 0.1314,
+    "buzz": 0.3694
+  },
+  "baseline": {
+    "winnerAccuracy": 0.98,
+    "crossEntropyLoss": 0.30521301552861513,
+    "brierScore": 0.07818119342982563
+  },
+  "features": [
+    {
+      "name": "precursor",
+      "weightFraction": 0.4992,
+      "importance": {
+        "winnerAccuracy": {
+          "mean": 0.615966666666667,
+          "std": 0.035054861764573175,
+          "drop": 0.615966666666667
+        },
+        "crossEntropyLoss": {
+          "mean": 1.2835043697869595,
+          "std": 0.08650009326761664,
+          "increase": 1.2835043697869595
+        },
+        "brierScore": {
+          "mean": 0.08053216838185298,
+          "std": 0.0036284465330813777,
+          "increase": 0.08053216838185298
+        }
+      },
+      "permutedMeans": {
+        "winnerAccuracy": 0.364033333333333,
+        "crossEntropyLoss": 1.5887173853155745,
+        "brierScore": 0.1587133618116786
+      }
+    },
+    {
+      "name": "buzz",
+      "weightFraction": 0.3694,
+      "importance": {
+        "winnerAccuracy": {
+          "mean": 0.23809999999999976,
+          "std": 0.03544872666573828,
+          "drop": 0.23809999999999976
+        },
+        "crossEntropyLoss": {
+          "mean": 0.4699760310253249,
+          "std": 0.04071163695604963,
+          "increase": 0.4699760310253249
+        },
+        "brierScore": {
+          "mean": 0.035913768606466404,
+          "std": 0.0019682945216086796,
+          "increase": 0.035913768606466404
+        }
+      },
+      "permutedMeans": {
+        "winnerAccuracy": 0.7419000000000002,
+        "crossEntropyLoss": 0.77518904655394,
+        "brierScore": 0.11409496203629203
+      }
+    },
+    {
+      "name": "history",
+      "weightFraction": 0.1314,
+      "importance": {
+        "winnerAccuracy": {
+          "mean": 0.005600000000002159,
+          "std": 0.0041333333333333205,
+          "drop": 0.005600000000002159
+        },
+        "crossEntropyLoss": {
+          "mean": 0.025378360827426727,
+          "std": 0.0032545864439604165,
+          "increase": 0.025378360827426727
+        },
+        "brierScore": {
+          "mean": 0.002453625137970983,
+          "std": 0.00023789258363039395,
+          "increase": 0.002453625137970983
+        }
+      },
+      "permutedMeans": {
+        "winnerAccuracy": 0.9743999999999978,
+        "crossEntropyLoss": 0.33059137635604186,
+        "brierScore": 0.08063481856779661
+      }
+    }
+  ]
+}

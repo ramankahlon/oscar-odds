@@ -274,6 +274,12 @@
               <tbody id="backtestYearBody"></tbody>
             </table>
           </div>
+
+          <h3 class="backtest-section-heading">Feature Importance</h3>
+          <div id="featureImportanceSection" hidden>
+            <p class="panel-copy fi-copy">Permutation Feature Importance: how much winner accuracy drops when each feature's values are randomly shuffled within each category (N=200 replicates). A larger drop means the feature is more critical to the model's predictions.</p>
+            <div id="featureImportanceBars"></div>
+          </div>
         </div>
       </section>
 

@@ -23,7 +23,8 @@
     "optimize:weights": "tsx scripts/optimize-weights.ts",
     "calibrate": "tsx scripts/calibrate.ts",
     "bootstrap:ci": "tsx scripts/bootstrap-ci.ts",
-    "joint-probability": "tsx scripts/joint-probability.ts"
+    "joint-probability": "tsx scripts/joint-probability.ts",
+    "feature-importance": "tsx scripts/feature-importance.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
