@@ -1,0 +1,166 @@
+{
+  "generatedAt": "2026-03-12T00:59:36.479Z",
+  "totalYears": 25,
+  "yearRange": {
+    "first": 1999,
+    "last": 2023
+  },
+  "categories": [
+    "picture",
+    "director",
+    "actor",
+    "actress",
+    "supporting-actor",
+    "supporting-actress"
+  ],
+  "coWinCounts": {
+    "picture": {
+      "picture": 0,
+      "director": 16,
+      "actor": 5,
+      "actress": 3,
+      "supporting-actor": 7,
+      "supporting-actress": 4
+    },
+    "director": {
+      "picture": 16,
+      "director": 0,
+      "actor": 6,
+      "actress": 4,
+      "supporting-actor": 5,
+      "supporting-actress": 2
+    },
+    "actor": {
+      "picture": 5,
+      "director": 6,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 3,
+      "supporting-actress": 0
+    },
+    "actress": {
+      "picture": 3,
+      "director": 4,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 3,
+      "supporting-actress": 1
+    },
+    "supporting-actor": {
+      "picture": 7,
+      "director": 5,
+      "actor": 3,
+      "actress": 3,
+      "supporting-actor": 0,
+      "supporting-actress": 2
+    },
+    "supporting-actress": {
+      "picture": 4,
+      "director": 2,
+      "actor": 0,
+      "actress": 1,
+      "supporting-actor": 2,
+      "supporting-actress": 0
+    }
+  },
+  "coWinRates": {
+    "picture": {
+      "picture": 0,
+      "director": 0.64,
+      "actor": 0.2,
+      "actress": 0.12,
+      "supporting-actor": 0.28,
+      "supporting-actress": 0.16
+    },
+    "director": {
+      "picture": 0.64,
+      "director": 0,
+      "actor": 0.24,
+      "actress": 0.16,
+      "supporting-actor": 0.2,
+      "supporting-actress": 0.08
+    },
+    "actor": {
+      "picture": 0.2,
+      "director": 0.24,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 0.12,
+      "supporting-actress": 0
+    },
+    "actress": {
+      "picture": 0.12,
+      "director": 0.16,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 0.12,
+      "supporting-actress": 0.04
+    },
+    "supporting-actor": {
+      "picture": 0.28,
+      "director": 0.2,
+      "actor": 0.12,
+      "actress": 0.12,
+      "supporting-actor": 0,
+      "supporting-actress": 0.08
+    },
+    "supporting-actress": {
+      "picture": 0.16,
+      "director": 0.08,
+      "actor": 0,
+      "actress": 0.04,
+      "supporting-actor": 0.08,
+      "supporting-actress": 0
+    }
+  },
+  "condRates": {
+    "picture": {
+      "picture": 0,
+      "director": 0.64,
+      "actor": 0.2,
+      "actress": 0.12,
+      "supporting-actor": 0.28,
+      "supporting-actress": 0.16
+    },
+    "director": {
+      "picture": 0.64,
+      "director": 0,
+      "actor": 0.24,
+      "actress": 0.16,
+      "supporting-actor": 0.2,
+      "supporting-actress": 0.08
+    },
+    "actor": {
+      "picture": 0.2,
+      "director": 0.24,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 0.12,
+      "supporting-actress": 0
+    },
+    "actress": {
+      "picture": 0.12,
+      "director": 0.16,
+      "actor": 0,
+      "actress": 0,
+      "supporting-actor": 0.12,
+      "supporting-actress": 0.04
+    },
+    "supporting-actor": {
+      "picture": 0.28,
+      "director": 0.2,
+      "actor": 0.12,
+      "actress": 0.12,
+      "supporting-actor": 0,
+      "supporting-actress": 0.08
+    },
+    "supporting-actress": {
+      "picture": 0.16,
+      "director": 0.08,
+      "actor": 0,
+      "actress": 0.04,
+      "supporting-actor": 0.08,
+      "supporting-actress": 0
+    }
+  }
+}

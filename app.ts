@@ -629,6 +629,15 @@ let bootstrapSamples: Array<[number, number, number]> = [];
 const bootstrapCIByCategory = new Map<string, Map<string, {
   nomLow: number; nomHigh: number; winLow: number; winHigh: number
 }>>();
+// Joint probability data fetched from /api/joint-probability.
+// Enables sweep analysis (same film winning multiple categories).
+interface JointProbData {
+  totalYears: number;
+  categories: string[];
+  coWinRates: Record<string, Record<string, number>>;
+  condRates: Record<string, Record<string, number>>;
+}
+let jointProbData: JointProbData | null = null;
 // Summary bar card tracking — avoids querySelector and full rebuild on tab switches.
 const summaryCardMap        = new Map<string, HTMLElement>();
 let   activeSummaryCard: HTMLElement | null = null;
@@ -3983,6 +3992,144 @@ function renderSummaryBar() {
 
 const PERSON_CATEGORY_IDS = new Set(["director", "actor", "actress", "supporting-actor", "supporting-actress"]);
 
+// The six Oscar categories tracked in the historical co-win dataset.
+const SWEEP_CATEGORY_IDS = ["picture", "director", "actor", "actress", "supporting-actor", "supporting-actress"];
+
+/**
+ * Compute P(film wins A AND B) using the historical conditional co-win rate.
+ *
+ * Model: P(A ∩ B) = p_A × [r(B|A) + (1 − r(B|A)) × p_B]
+ * where r(B|A) = P(wins B | same film wins A) from history.
+ *
+ * When r(B|A) is high (e.g. 64% for picture+director), a strong A-favourite
+ * also gets a meaningful boost for B even if their raw p_B is moderate.
+ */
+function jointWinProb(
+  pA: number, pB: number,
+  catA: string, catB: string
+): number {
+  if (!jointProbData) return pA * pB;
+  const r = jointProbData.condRates[catA]?.[catB] ?? 0;
+  return pA * (r + (1 - r) * pB);
+}
+
+function renderSweepPanel(): void {
+  const panel    = document.getElementById("sweepPanel");
+  const tbody    = document.getElementById("sweepBody");
+  const corrDiv  = document.getElementById("sweepCorrelationTable");
+  if (!panel || !tbody || !corrDiv) return;
+
+  if (!jointProbData) { panel.hidden = true; return; }
+
+  // Build win-probability map for each film in each tracked category.
+  // filmWins: filmTitle → Map<categoryId, winPct>
+  const filmWins = new Map<string, Map<string, number>>();
+
+  for (const cat of categories) {
+    if (!SWEEP_CATEGORY_IDS.includes(cat.id)) continue;
+    const projs = buildProjections(cat);
+    for (const proj of projs) {
+      const filmKey = PERSON_CATEGORY_IDS.has(cat.id) ? proj.rawStudio : proj.rawTitle;
+      if (!filmKey) continue;
+      const existing = filmWins.get(filmKey) ?? new Map<string, number>();
+      existing.set(cat.id, proj.winner);
+      filmWins.set(filmKey, existing);
+    }
+  }
+
+  // Only show films competing in ≥ 2 tracked categories.
+  type SweepRow = {
+    film: string;
+    catWins: Map<string, number>;
+    expectedWins: number;
+    pAtLeastOne: number;
+    pPicDir: number | null;
+  };
+
+  const rows: SweepRow[] = [];
+
+  for (const [film, catWins] of filmWins) {
+    if (catWins.size < 2) continue;
+
+    // Expected wins: Σ p_c (linear — no independence assumption needed)
+    const expectedWins = [...catWins.values()].reduce((s, p) => s + p / 100, 0);
+
+    // P(at least 1 win) = 1 − Π(1 − p_c)   [independence approximation]
+    const pAtLeastOne = 1 - [...catWins.values()].reduce((prod, p) => prod * (1 - p / 100), 1);
+
+    // P(wins Picture AND Director) — the sweep milestone; only if film is in both.
+    const pPic = catWins.get("picture");
+    const pDir = catWins.get("director");
+    const pPicDir = (pPic != null && pDir != null)
+      ? jointWinProb(pPic / 100, pDir / 100, "picture", "director")
+      : null;
+
+    rows.push({ film, catWins, expectedWins, pAtLeastOne, pPicDir });
+  }
+
+  rows.sort((a, b) => b.expectedWins - a.expectedWins);
+
+  // Show panel only if there are multi-category contenders.
+  if (rows.length === 0) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  // Render sweep table.
+  tbody.innerHTML = rows.slice(0, 12).map((row) => {
+    const exp   = row.expectedWins.toFixed(2);
+    const p1    = (row.pAtLeastOne * 100).toFixed(0);
+    const picDir = row.pPicDir != null
+      ? `${(row.pPicDir * 100).toFixed(0)}%`
+      : `<span class="sweep-na">—</span>`;
+
+    // Category badges showing win% in each tracked category.
+    const badges = SWEEP_CATEGORY_IDS
+      .filter((c) => row.catWins.has(c))
+      .map((c) => {
+        const pct = row.catWins.get(c)!.toFixed(0);
+        const label = c === "supporting-actor" ? "Sup.Actor"
+          : c === "supporting-actress" ? "Sup.Actress"
+          : c.charAt(0).toUpperCase() + c.slice(1);
+        return `<span class="sweep-badge" title="${c}: ${pct}% win odds">${esc(label)} ${pct}%</span>`;
+      }).join("");
+
+    return (
+      `<tr class="sweep-row">` +
+        `<td class="sweep-film">${esc(row.film)}</td>` +
+        `<td class="sweep-num">${exp}</td>` +
+        `<td class="sweep-num">${p1}%</td>` +
+        `<td class="sweep-num">${picDir}</td>` +
+        `<td class="sweep-cats">${badges}</td>` +
+      `</tr>`
+    );
+  }).join("");
+
+  // Render correlation table.
+  const cats = jointProbData.categories;
+  const shortName = (c: string) =>
+    c === "supporting-actor" ? "Sup.Actor"
+    : c === "supporting-actress" ? "Sup.Actress"
+    : c.charAt(0).toUpperCase() + c.slice(1);
+
+  const headerCells = cats.map((c) => `<th>${esc(shortName(c))}</th>`).join("");
+  const dataRows = cats.map((a) => {
+    const cells = cats.map((b) => {
+      if (a === b) return `<td class="corr-self">—</td>`;
+      const r = (jointProbData!.coWinRates[a]?.[b] ?? 0) * 100;
+      const intensity = Math.round(r / 64 * 100); // 64% is max (pic+dir)
+      return `<td class="corr-cell" style="--corr:${intensity}%" title="${a} + ${b}: ${r.toFixed(0)}%">${r.toFixed(0)}%</td>`;
+    }).join("");
+    return `<tr><th>${esc(shortName(a))}</th>${cells}</tr>`;
+  }).join("");
+
+  corrDiv.innerHTML =
+    `<table class="corr-table">` +
+      `<caption class="sr-only">Historical co-win rates between Oscar categories</caption>` +
+      `<thead><tr><th></th>${headerCells}</tr></thead>` +
+      `<tbody>${dataRows}</tbody>` +
+    `</table>` +
+    `<p class="corr-note">Values show the fraction of ceremonies (${jointProbData.totalYears} total) where the same film won both categories.</p>`;
+}
+
 function renderLeaderboard(): void {
   if (!leaderboardBody) return;
   leaderboardBody.innerHTML = "";
@@ -4078,6 +4225,7 @@ function render() {
   updateOddsModeButton();
   renderSummaryBar();
   renderLeaderboard();
+  renderSweepPanel();
   renderCandidates(activeCategory, projections);
   renderSnapshotCompareDatePickers(activeCategory);
   renderActiveView(activeCategory, projections);
@@ -4370,6 +4518,19 @@ async function bootstrap() {
       renderWeightPresets();
     })
     .catch(() => { /* learned-weights not generated yet — silent fallback */ });
+
+  // Fetch joint-probability correlation data for sweep analysis.
+  // Fire-and-forget: sweep panel appears once data arrives.
+  fetch("/api/joint-probability")
+    .then(r => r.ok ? r.json() : null)
+    .then((data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const d = data as Record<string, unknown>;
+      if (!Array.isArray(d.categories) || typeof d.condRates !== "object") return;
+      jointProbData = data as JointProbData;
+      render();
+    })
+    .catch(() => { /* joint-probability.json not generated yet — silent fallback */ });
 
   // Fetch bootstrap weight samples for per-film confidence intervals.
   // Fire-and-forget: CI bands appear after the initial render once samples arrive.

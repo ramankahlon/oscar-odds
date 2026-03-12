@@ -209,6 +209,30 @@
         </div>
       </section>
 
+      <section class="panel sweep-panel" id="sweepPanel" aria-label="Cross-category sweep analysis" hidden>
+        <h2>Sweep Analysis</h2>
+        <p class="panel-copy">Films competing across multiple tracked categories (Picture, Director, Actor, Actress, Supporting Actor/Actress). Joint probabilities use historical co-win rates from 25 Oscar ceremonies (1999–2023).</p>
+        <div class="sweep-table-wrap">
+          <table class="sweep-table">
+            <caption class="sr-only">Films ranked by expected wins across tracked Oscar categories</caption>
+            <thead>
+              <tr>
+                <th scope="col">Film</th>
+                <th scope="col" class="sweep-num" title="Sum of win probabilities across all tracked categories">Exp. Wins</th>
+                <th scope="col" class="sweep-num" title="Probability of winning at least one tracked category">P(≥1 Win)</th>
+                <th scope="col" class="sweep-num" title="Probability of winning Picture and Director (historically 64% correlated)">P(Pic+Dir)</th>
+                <th scope="col">Categories</th>
+              </tr>
+            </thead>
+            <tbody id="sweepBody"></tbody>
+          </table>
+        </div>
+        <details class="sweep-correlation-details">
+          <summary>Historical co-win rates (1999–2023)</summary>
+          <div id="sweepCorrelationTable"></div>
+        </details>
+      </section>
+
       <section class="panel backtest-panel" id="backtestPanel" aria-label="Model accuracy backtesting">
         <h2>Model Accuracy (2000–2024)</h2>
         <p class="panel-copy">Retrospective accuracy across 25 Oscar cycles (72nd–96th ceremonies).

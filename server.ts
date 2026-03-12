@@ -1056,6 +1056,17 @@ app.get("/api/bootstrap-ci", (_: Request, res: Response) => {
   }
 });
 
+app.get("/api/joint-probability", (_: Request, res: Response) => {
+  try {
+    const raw = JSON.parse(
+      readFileSync(path.join(__dirname, "data", "joint-probability.json"), "utf8")
+    );
+    res.json(raw);
+  } catch {
+    sendError(res, 404, "Joint probability data not found. Run: npm run joint-probability");
+  }
+});
+
 app.get("/api/tmdb-poster", async (req: Request, res: Response) => {
   const query = parseBody(tmdbPosterQuerySchema, req.query, res);
   if (query === null) return;

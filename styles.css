@@ -1830,6 +1830,45 @@ a:focus-visible {
 .backtest-filter-bar label { font-weight: 700; color: var(--muted); }
 .backtest-filter-bar select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; background: var(--surface-2); color: var(--ink); }
 
+/* ── Sweep analysis panel ──────────────────────────────────────────────────── */
+.sweep-table-wrap { overflow-x: auto; margin-bottom: 16px; }
+.sweep-table { width: 100%; border-collapse: collapse; }
+.sweep-table th, .sweep-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 0.9rem; }
+.sweep-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.sweep-num { text-align: right; white-space: nowrap; }
+.sweep-film { font-weight: 600; }
+.sweep-na { color: var(--muted); }
+.sweep-cats { padding-left: 8px; }
+.sweep-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: 2px 3px 2px 0;
+  white-space: nowrap;
+}
+.sweep-correlation-details { margin-top: 8px; }
+.sweep-correlation-details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  user-select: none;
+  padding: 4px 0;
+}
+.corr-table { border-collapse: collapse; margin: 10px 0 6px; font-size: 0.82rem; }
+.corr-table th, .corr-table td { padding: 6px 10px; border: 1px solid var(--line); text-align: center; }
+.corr-table th { background: var(--surface-2); font-weight: 700; }
+.corr-self { color: var(--muted); }
+.corr-cell {
+  background: color-mix(in srgb, var(--accent) calc(var(--corr) * 0.35), transparent);
+  font-weight: 600;
+}
+.corr-note { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; }
+
 /* ── Auth dialog ───────────────────────────────────────────────────────────── */
 .auth-dialog {
   border: 1px solid var(--line); border-radius: 16px;
