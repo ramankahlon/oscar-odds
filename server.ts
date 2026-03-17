@@ -252,6 +252,29 @@ const tmdbPosterQuerySchema = z.object({
   title: z.string().min(1, "title is required").max(200, "title too long"),
 });
 
+// ── Contenders file schema ────────────────────────────────────────────────────
+
+const contenderFilmSchema = z.object({
+  title:    z.string().min(1, "title is required"),
+  studio:   z.string().min(1, "studio is required"),
+  precursor: z.number().int("precursor must be an integer").min(0, "precursor must be ≥ 0").max(100, "precursor must be ≤ 100"),
+  history:   z.number().int("history must be an integer").min(0, "history must be ≥ 0").max(100, "history must be ≤ 100"),
+  buzz:      z.number().int("buzz must be an integer").min(0, "buzz must be ≥ 0").max(100, "buzz must be ≤ 100"),
+  strength:  z.enum(["High", "Medium", "Low"], { error: 'strength must be "High", "Medium", or "Low"' }),
+});
+
+const contendersFileSchema = z.object({
+  ceremony: z.number().int().positive(),
+  year:     z.number().int().positive(),
+  categoryDefinitions: z.array(z.object({
+    id:         z.string().min(1),
+    name:       z.string().min(1),
+    nominees:   z.number().int().positive(),
+    winnerBase: z.number().min(0).max(1),
+  })).min(1),
+  categorySeeds: z.record(z.string(), z.array(contenderFilmSchema)),
+});
+
 function parseBody<T>(schema: z.ZodSchema<T>, body: unknown, res: Response): T | null {
   const result = schema.safeParse(body);
   if (!result.success) {
@@ -495,6 +518,33 @@ function startSourcePoller(): void {
       }, 5000);
     }
   });
+}
+
+function validateContenders(): void {
+  const filePath = path.join(__dirname, "data", "contenders-2026.json");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (err) {
+    logger.error({ err }, "Failed to read contenders-2026.json — cannot start");
+    process.exit(1);
+  }
+
+  const result = contendersFileSchema.safeParse(raw);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => (i.path.length ? `  ${i.path.join(".")}: ${i.message}` : `  ${i.message}`))
+      .join("\n");
+    logger.error(`contenders-2026.json failed validation — fix the file and restart:\n${issues}`);
+    process.exit(1);
+  }
+
+  const totalFilms = Object.values(result.data.categorySeeds)
+    .reduce((s, arr) => s + arr.length, 0);
+  logger.info(
+    { year: result.data.year, categories: Object.keys(result.data.categorySeeds).length, films: totalFilms },
+    "contenders validated"
+  );
 }
 
 function initDb(): void {
@@ -1557,6 +1607,7 @@ export { app };
 
 // Skip all startup side-effects when imported by the integration test suite.
 if (process.env.NODE_ENV !== "test") {
+  validateContenders();
   initDb();
 
   const server = app.listen(PORT, () => {
