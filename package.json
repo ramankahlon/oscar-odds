@@ -28,7 +28,8 @@
     "brier:decomposition": "tsx scripts/brier-decomposition.ts",
     "ab-test": "tsx scripts/ab-test-presets.ts",
     "pr-roc": "tsx scripts/pr-roc.ts",
-    "rolling-error": "tsx scripts/rolling-error.ts"
+    "rolling-error": "tsx scripts/rolling-error.ts",
+    "analyze": "tsx scripts/analyze.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
