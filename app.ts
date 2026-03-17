@@ -327,11 +327,13 @@ async function fetchComparePayload(profileId: string): Promise<StatePayload | nu
         return null;
       }
       const doc = await res.json();
-      if (!doc?.payload) return null;
       setBackendOfflineMode(false);
       if (comparePayloadCache.size >= 20) comparePayloadCache.delete(comparePayloadCache.keys().next().value!);
-      comparePayloadCache.set(profileId, doc.payload);
-      return doc.payload as StatePayload;
+      // Cache even when payload is null (fresh profile) so renderActiveView
+      // knows the load is complete and renders compare columns (with "—" deltas).
+      const payload = doc?.payload ?? {} as StatePayload;
+      comparePayloadCache.set(profileId, payload);
+      return payload;
     } catch {
       setBackendOfflineMode(true);
       return null;
@@ -356,7 +358,6 @@ async function fetchAndRenderCompare(): Promise<void> {
 
 async function fetchAndApplyExternalSignals(): Promise<void> {
   try {
-    setAppNotice("Syncing external source updates...", "loading");
     const response = await fetch(`${EXTERNAL_SIGNALS_URL}?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) {
       setAppNotice("External source snapshot unavailable. Showing latest saved forecast.", "error");
@@ -365,14 +366,14 @@ async function fetchAndApplyExternalSignals(): Promise<void> {
     const snapshot = await response.json();
     const changed = applyExternalSignalSnapshot(snapshot);
     if (!changed) {
-      setAppNotice("");
+      // Background sync found no new data — leave any existing notice undisturbed.
       return;
     }
     saveState();
     render();
     setAppNotice(`Applied source refresh from ${new Date((snapshot as { generatedAt?: string }).generatedAt || Date.now()).toLocaleString()}.`);
   } catch {
-    setAppNotice("Could not load external source snapshot. Showing latest saved forecast.", "error");
+    // Fail silently on network errors — external signals are best-effort.
   }
 }
 

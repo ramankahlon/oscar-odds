@@ -279,9 +279,14 @@ function sendError(res: Response, status: number, message: string): void {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Bypass rate limiting for localhost (dev + E2E test traffic).
+const skipLocalhost = (req: Request): boolean =>
+  req.ip === "::1" || req.ip === "127.0.0.1";
+
 const forecastWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please slow down." }
@@ -290,6 +295,7 @@ const forecastWriteLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many attempts. Try again later." }
@@ -298,6 +304,7 @@ const authLimiter = rateLimit({
 const clientErrorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many error reports." }
@@ -307,6 +314,7 @@ const clientErrorLimiter = rateLimit({
 const generalApiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests." }
@@ -316,6 +324,7 @@ const generalApiLimiter = rateLimit({
 const tmdbLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many poster requests." }
@@ -325,6 +334,7 @@ const tmdbLimiter = rateLimit({
 const backtestLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests." }
@@ -334,6 +344,7 @@ const backtestLimiter = rateLimit({
 const sseLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
+  skip: skipLocalhost,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many event stream connections." }
