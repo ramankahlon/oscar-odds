@@ -7,12 +7,18 @@ info:
     REST API for the Oscar Odds forecast lab — a browser tool that models
     nomination and winner probabilities for the 99th Academy Awards (2027).
 
-    Manages named **forecast profiles** stored in SQLite and exposes a
-    TMDB poster-resolution proxy. All write endpoints are rate-limited.
+    Manages named **forecast profiles** stored in SQLite, serves pre-computed
+    analysis data files, and exposes a TMDB poster-resolution proxy.
+    All write endpoints are rate-limited.
 
     ## Profile IDs
     Profile identifiers must match `^[a-z0-9_-]+$` (1–100 chars).
     The reserved profile `default` is created on first boot.
+
+    ## Analysis data files
+    The endpoints under the **analysis** tag serve pre-computed JSON files
+    produced by offline scripts (`npm run optimize:weights`, etc.).
+    They return `404` until the corresponding script has been run at least once.
 
 servers:
   - url: http://localhost:3000
@@ -22,9 +28,17 @@ tags:
   - name: status
     description: Health, runtime metrics, and scraper observability
   - name: profiles
-    description: List forecast profiles
+    description: List and authenticate forecast profiles
   - name: forecast
     description: Read and write per-profile forecast data
+  - name: contenders
+    description: Contender seeds and Oscar category definitions for the current season
+  - name: analysis
+    description: Pre-computed model analysis — weights, accuracy, and calibration data
+  - name: events
+    description: Server-Sent Events stream for real-time scraper notifications
+  - name: errors
+    description: Client-side error logging and server error log
   - name: media
     description: TMDB movie poster resolution (server-side proxy + cache)
 
@@ -111,6 +125,10 @@ components:
             ISO 8601 timestamp of the last PUT /api/forecast/{profileId} call;
             null if the profile was created but never written.
           example: "2025-03-15T10:22:00.000Z"
+        hasPassphrase:
+          type: boolean
+          description: Whether this profile is passphrase-protected.
+          example: false
 
     # Opaque forecast data blob ────────────────────────────────────────────────
     ForecastPayload:
@@ -127,6 +145,185 @@ components:
           sag_ensemble: 0.22
         trendWindow: 30
 
+    # Accuracy / Brier metrics shared by multiple analysis schemas ─────────────
+    AccuracyMetrics:
+      type: object
+      required:
+        - nominationAccuracyAvg
+        - winnerAccuracyPct
+        - nominationBrierAvg
+        - winnerBrierAvg
+      properties:
+        nominationAccuracyAvg:
+          type: number
+          format: float
+          description: Mean nomination top-N accuracy across years (0–1).
+          example: 0.9965
+        winnerAccuracyPct:
+          type: number
+          format: float
+          description: Fraction of years where the top-predicted winner won (0–1).
+          example: 0.98
+        nominationBrierAvg:
+          type: number
+          format: float
+          description: Mean Brier score for nomination predictions (lower = better).
+          example: 0.018
+        winnerBrierAvg:
+          type: number
+          format: float
+          description: Mean Brier score for winner predictions (lower = better).
+          example: 0.081
+
+    # Model weight triple ──────────────────────────────────────────────────────
+    WeightTriple:
+      type: object
+      required:
+        - precursor
+        - history
+        - buzz
+      properties:
+        precursor:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Precursor-momentum weight (fraction, sums to 1 with the others).
+          example: 0.58
+        history:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Historical-fit weight.
+          example: 0.30
+        buzz:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Buzz/sentiment weight.
+          example: 0.12
+
+    # Backtest per-category summary row ───────────────────────────────────────
+    BacktestCategorySummary:
+      type: object
+      required:
+        - categoryId
+        - nominationAccuracyAvg
+        - winnerAccuracyPct
+        - nominationBrierAvg
+        - winnerBrierAvg
+      properties:
+        categoryId:
+          type: string
+          description: Oscar category identifier.
+          example: picture
+        nominationAccuracyAvg:
+          type: number
+          format: float
+          example: 0.9960
+        winnerAccuracyPct:
+          type: number
+          format: float
+          example: 0.96
+        nominationBrierAvg:
+          type: number
+          format: float
+          example: 0.021
+        winnerBrierAvg:
+          type: number
+          format: float
+          example: 0.075
+
+    # Backtest per-category per-year result ───────────────────────────────────
+    BacktestYearResult:
+      type: object
+      required:
+        - year
+        - ceremony
+        - categoryId
+        - nominationAccuracy
+        - winnerCorrect
+        - nominationBrierScore
+        - winnerBrierScore
+        - topPredicted
+        - actualWinner
+      properties:
+        year:
+          type: integer
+          description: Oscar eligibility year.
+          example: 2023
+        ceremony:
+          type: integer
+          description: Academy Awards ceremony number.
+          example: 96
+        categoryId:
+          type: string
+          example: picture
+        nominationAccuracy:
+          type: number
+          format: float
+          description: Fraction of nominees correctly ranked in the top N.
+          example: 1.0
+        winnerCorrect:
+          type: boolean
+          description: Whether the top-ranked film was the actual winner.
+          example: true
+        nominationBrierScore:
+          type: number
+          format: float
+          example: 0.018
+        winnerBrierScore:
+          type: number
+          format: float
+          example: 0.07
+        topPredicted:
+          type: string
+          description: Title of the film ranked #1 by the model.
+          example: "Oppenheimer"
+        actualWinner:
+          type: string
+          description: Title of the actual Oscar winner.
+          example: "Oppenheimer"
+
+    # Client error entry ───────────────────────────────────────────────────────
+    ClientError:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Error message.
+          example: "Cannot read properties of undefined (reading 'films')"
+        source:
+          type: string
+          nullable: true
+          description: Script URL where the error occurred.
+          example: "http://localhost:3000/app.js"
+        lineno:
+          type: integer
+          nullable: true
+          description: Line number within the source file.
+          example: 1
+        colno:
+          type: integer
+          nullable: true
+          description: Column number within the source file.
+          example: 42
+        stack:
+          type: string
+          nullable: true
+          description: Full stack trace string.
+        context:
+          type: string
+          nullable: true
+          description: >
+            App-defined label for where the error originated
+            (e.g. "bootstrap:/" or "saveState").
+          example: "bootstrap:/"
+
 # ── Paths ──────────────────────────────────────────────────────────────────────
 paths:
 
@@ -139,7 +336,9 @@ paths:
       summary: Liveness check
       description: >
         Returns ok: true, the current timestamp, server uptime in seconds,
-        and the state of the optional background source-polling process.
+        OpenTelemetry tracing status, the state of the optional background
+        source-polling process, and freshness metadata for each pre-computed
+        analysis data file.
         Suitable for use as a health-check probe.
       responses:
         "200":
@@ -152,7 +351,9 @@ paths:
                   - ok
                   - now
                   - uptimeSeconds
+                  - tracing
                   - poller
+                  - analysis
                 properties:
                   ok:
                     type: boolean
@@ -167,18 +368,61 @@ paths:
                     minimum: 0
                     description: Seconds elapsed since the server process started.
                     example: 3600
+                  tracing:
+                    type: object
+                    required:
+                      - enabled
+                      - exporter
+                    properties:
+                      enabled:
+                        type: boolean
+                        description: Whether OpenTelemetry tracing is active.
+                        example: false
+                      exporter:
+                        type: string
+                        enum: [otlp, console, none]
+                        description: >
+                          "otlp" when OTEL_EXPORTER_OTLP_ENDPOINT is set,
+                          "console" when tracing is on but no OTLP endpoint,
+                          "none" when disabled.
+                        example: none
                   poller:
                     $ref: "#/components/schemas/PollerState"
-              example:
-                ok: true
-                now: "2025-03-15T10:22:00.000Z"
-                uptimeSeconds: 3600
-                poller:
-                  enabled: false
-                  running: false
-                  startedAt: null
-                  lastExitCode: null
-                  restarts: 0
+                  analysis:
+                    type: object
+                    description: >
+                      Freshness metadata for each pre-computed analysis file,
+                      keyed by the script name. Each value reports when the file
+                      was last generated and how many minutes ago that was.
+                    additionalProperties:
+                      type: object
+                      required:
+                        - generatedAt
+                        - ageMinutes
+                      properties:
+                        generatedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          description: >
+                            Timestamp embedded in the analysis file; null if the
+                            file does not exist or has no generatedAt field.
+                        ageMinutes:
+                          type: integer
+                          nullable: true
+                          description: >
+                            Minutes since generatedAt (rounded); null when
+                            generatedAt is null.
+                    example:
+                      backtest:
+                        generatedAt: "2026-03-10T10:00:00.000Z"
+                        ageMinutes: 1440
+                      learned-weights:
+                        generatedAt: "2026-03-10T10:51:54.000Z"
+                        ageMinutes: 1433
+                      pr-roc:
+                        generatedAt: null
+                        ageMinutes: null
 
   # GET /api/metrics ────────────────────────────────────────────────────────────
   /api/metrics:
@@ -320,8 +564,299 @@ paths:
                 profiles:
                   - id: default
                     updatedAt: "2025-03-15T10:00:00.000Z"
+                    hasPassphrase: false
                   - id: optimistic
                     updatedAt: "2025-03-14T18:30:00.000Z"
+                    hasPassphrase: true
+
+  # /api/profiles/{profileId}/auth-status ───────────────────────────────────────
+  /api/profiles/{profileId}/auth-status:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    get:
+      operationId: getProfileAuthStatus
+      tags:
+        - profiles
+      summary: Check passphrase protection and session state
+      description: >
+        Returns whether the profile has a passphrase set and, if so, whether
+        the current request carries a valid authenticated session cookie.
+        Used by the client to decide whether to show the lock/unlock UI.
+      responses:
+        "200":
+          description: Authentication status for the profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profileId
+                  - hasPassphrase
+                  - authenticated
+                properties:
+                  profileId:
+                    type: string
+                    example: default
+                  hasPassphrase:
+                    type: boolean
+                    description: Whether the profile has a passphrase set.
+                    example: false
+                  authenticated:
+                    type: boolean
+                    description: >
+                      Whether the caller holds a valid session for this profile.
+                      Always false when hasPassphrase is false.
+                    example: false
+        "400":
+          description: profileId fails pattern validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile not found.
+
+  # /api/profiles/{profileId}/login ─────────────────────────────────────────────
+  /api/profiles/{profileId}/login:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    post:
+      operationId: loginProfile
+      tags:
+        - profiles
+      summary: Authenticate with a profile passphrase
+      description: >
+        Verifies the supplied passphrase against the stored bcrypt hash.
+        On success, sets an HttpOnly session cookie (`oscar-odds-session`)
+        valid for 7 days and returns `{ ok: true }`.
+
+        Rate limit: 10 attempts per 15 minutes per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - passphrase
+              properties:
+                passphrase:
+                  type: string
+                  minLength: 1
+                  description: The profile passphrase to verify.
+                  example: "my-secret"
+      responses:
+        "200":
+          description: Login successful. Session cookie is set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid profileId or profile is not password-protected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile is not password protected.
+        "401":
+          description: Incorrect passphrase.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Incorrect passphrase.
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile not found.
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Too many attempts. Try again later.
+
+  # /api/profiles/{profileId}/logout ────────────────────────────────────────────
+  /api/profiles/{profileId}/logout:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    post:
+      operationId: logoutProfile
+      tags:
+        - profiles
+      summary: Invalidate the current session
+      description: >
+        Deletes the server-side session record tied to the caller's cookie and
+        clears the session cookie. Always returns `{ ok: true }`, even if no
+        session existed.
+      responses:
+        "200":
+          description: Session cleared (or was already absent).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          description: profileId fails pattern validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # /api/profiles/{profileId}/passphrase ────────────────────────────────────────
+  /api/profiles/{profileId}/passphrase:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+
+    post:
+      operationId: setProfilePassphrase
+      tags:
+        - profiles
+      summary: Set or change the profile passphrase
+      description: >
+        Hashes the supplied passphrase with bcrypt and stores it on the profile.
+        All existing sessions for the profile are invalidated.
+
+        Requires authentication if the profile already has a passphrase (i.e. the
+        caller must hold a valid session cookie). Profiles without a passphrase
+        can be locked by any caller.
+
+        Rate limit: 10 requests per 15 minutes per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - passphrase
+              properties:
+                passphrase:
+                  type: string
+                  minLength: 1
+                  description: New passphrase to set.
+                  example: "new-secret"
+      responses:
+        "200":
+          description: Passphrase set successfully. All prior sessions invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid profileId or missing passphrase in body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required (profile already has a passphrase).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required.
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile not found.
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Too many attempts. Try again later.
+
+    delete:
+      operationId: removeProfilePassphrase
+      tags:
+        - profiles
+      summary: Remove the profile passphrase
+      description: >
+        Clears the passphrase hash from the profile, making it unprotected.
+        All existing sessions for the profile are invalidated.
+
+        Requires a valid session cookie (caller must be authenticated).
+      responses:
+        "200":
+          description: Passphrase removed. Profile is now unprotected.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          description: profileId invalid or profile has no passphrase set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile does not have a passphrase.
+        "401":
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required.
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Profile not found.
 
   # /api/forecast/{profileId} ───────────────────────────────────────────────────
   /api/forecast/{profileId}:
@@ -656,6 +1191,1084 @@ paths:
                   Profile ID must contain only lowercase letters, numbers,
                   hyphens, or underscores
 
+  # GET /api/contenders ─────────────────────────────────────────────────────────
+  /api/contenders:
+    get:
+      operationId: getContenders
+      tags:
+        - contenders
+      summary: Contender seeds and category definitions
+      description: >
+        Returns the full contenders dataset for the current Oscar season from
+        `data/contenders-2026.json`. Contains Oscar category definitions
+        (nominee count, winner-base probability) and the initial film scores
+        (precursor, history, buzz) used to seed the forecast.
+
+        Returns 404 until the data file exists.
+      responses:
+        "200":
+          description: Contender data for the current season.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ceremony
+                  - year
+                  - categoryDefinitions
+                  - categorySeeds
+                properties:
+                  ceremony:
+                    type: integer
+                    description: Academy Awards ceremony number.
+                    example: 98
+                  year:
+                    type: integer
+                    description: Oscar eligibility year.
+                    example: 2026
+                  categoryDefinitions:
+                    type: array
+                    description: Metadata for each tracked Oscar category.
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - name
+                        - nominees
+                        - winnerBase
+                      properties:
+                        id:
+                          type: string
+                          description: Stable category identifier.
+                          example: picture
+                        name:
+                          type: string
+                          description: Display name for the category.
+                          example: Best Picture
+                        nominees:
+                          type: integer
+                          description: Number of nominees in this category.
+                          example: 10
+                        winnerBase:
+                          type: number
+                          format: float
+                          description: >
+                            Base winner-conversion factor applied before
+                            model-weight scaling.
+                          example: 0.16
+                  categorySeeds:
+                    type: object
+                    description: >
+                      Per-category array of film seeds, keyed by category ID.
+                      Each film carries pre-scored precursor, history, and buzz
+                      values (0–100) and a qualitative strength label.
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - title
+                          - studio
+                          - precursor
+                          - history
+                          - buzz
+                          - strength
+                        properties:
+                          title:
+                            type: string
+                            example: "The Odyssey"
+                          studio:
+                            type: string
+                            example: "Universal"
+                          precursor:
+                            type: number
+                            format: float
+                            minimum: 0
+                            maximum: 100
+                            example: 88
+                          history:
+                            type: number
+                            format: float
+                            minimum: 0
+                            maximum: 100
+                            example: 83
+                          buzz:
+                            type: number
+                            format: float
+                            minimum: 0
+                            maximum: 100
+                            example: 86
+                          strength:
+                            type: string
+                            enum: [High, Medium, Low]
+                            example: High
+        "404":
+          description: Contenders data file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Contenders data not found.
+
+  # GET /api/backtest ───────────────────────────────────────────────────────────
+  /api/backtest:
+    get:
+      operationId: getBacktest
+      tags:
+        - analysis
+      summary: Historical accuracy backtest
+      description: >
+        Runs (or returns a cached result of) the full 25-year retrospective
+        backtest of the current model weights across all six tracked Oscar
+        categories. The result is cached in memory after the first call and
+        reused for subsequent requests within the same server process.
+
+        Rate limit: 30 requests per minute per IP (the computation is CPU-bound).
+      responses:
+        "200":
+          description: Backtest result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - computedAt
+                  - yearsBacktested
+                  - yearRange
+                  - weights
+                  - overall
+                  - byCategory
+                  - byYear
+                properties:
+                  computedAt:
+                    type: string
+                    format: date-time
+                    description: When the backtest was run.
+                    example: "2026-03-10T10:00:00.000Z"
+                  yearsBacktested:
+                    type: integer
+                    description: Number of Oscar years included in the backtest.
+                    example: 25
+                  yearRange:
+                    type: object
+                    required:
+                      - from
+                      - to
+                    properties:
+                      from:
+                        type: integer
+                        description: First eligibility year in the test set.
+                        example: 1999
+                      to:
+                        type: integer
+                        description: Last eligibility year in the test set.
+                        example: 2023
+                  weights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  overall:
+                    $ref: "#/components/schemas/AccuracyMetrics"
+                  byCategory:
+                    type: array
+                    description: Per-category accuracy summaries.
+                    items:
+                      $ref: "#/components/schemas/BacktestCategorySummary"
+                  byYear:
+                    type: array
+                    description: Per-category per-year detailed results.
+                    items:
+                      $ref: "#/components/schemas/BacktestYearResult"
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Too many requests.
+
+  # GET /api/learned-weights ────────────────────────────────────────────────────
+  /api/learned-weights:
+    get:
+      operationId: getLearnedWeights
+      tags:
+        - analysis
+      summary: ML-optimized model weights
+      description: >
+        Returns the weight triple learned by gradient descent + grid search
+        over the 25-year historical data set, along with leave-one-year-out
+        cross-validation metrics.
+
+        Produced by `npm run optimize:weights`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Learned weights and cross-validation summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - learnedAt
+                  - method
+                  - yearsUsed
+                  - yearRange
+                  - weights
+                  - baseline
+                  - cv
+                properties:
+                  learnedAt:
+                    type: string
+                    format: date-time
+                    description: When the optimization was run.
+                    example: "2026-03-10T10:51:54.654Z"
+                  method:
+                    type: string
+                    description: Optimization method identifier.
+                    example: "winner-softmax-ce-grid-gd-loyo-cv"
+                  yearsUsed:
+                    type: integer
+                    description: Number of historical years used for training.
+                    example: 25
+                  yearRange:
+                    type: object
+                    required:
+                      - from
+                      - to
+                    properties:
+                      from:
+                        type: integer
+                        example: 1999
+                      to:
+                        type: integer
+                        example: 2023
+                  weights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  baseline:
+                    $ref: "#/components/schemas/WeightTriple"
+                  cv:
+                    type: object
+                    description: Leave-one-year-out cross-validation results.
+                    required:
+                      - folds
+                      - method
+                    properties:
+                      folds:
+                        type: integer
+                        description: Number of CV folds (= yearsUsed).
+                        example: 25
+                      method:
+                        type: string
+                        example: "leave-one-year-out"
+                      nominationAccuracy:
+                        type: object
+                        properties:
+                          baseline:
+                            type: number
+                            format: float
+                            example: 0.9965
+                          optimized:
+                            type: number
+                            format: float
+                            example: 0.9965
+                      winnerAccuracy:
+                        type: object
+                        properties:
+                          baseline:
+                            type: number
+                            format: float
+                            example: 0.9733
+                          optimized:
+                            type: number
+                            format: float
+                            example: 0.98
+                      brierScore:
+                        type: object
+                        properties:
+                          baseline:
+                            type: number
+                            format: float
+                            example: 0.081
+                          optimized:
+                            type: number
+                            format: float
+                            example: 0.0784
+              example:
+                learnedAt: "2026-03-10T10:51:54.654Z"
+                method: "winner-softmax-ce-grid-gd-loyo-cv"
+                yearsUsed: 25
+                yearRange:
+                  from: 1999
+                  to: 2023
+                weights:
+                  precursor: 0.4992
+                  history: 0.1314
+                  buzz: 0.3694
+                baseline:
+                  precursor: 0.58
+                  history: 0.30
+                  buzz: 0.12
+                cv:
+                  folds: 25
+                  method: leave-one-year-out
+                  winnerAccuracy:
+                    baseline: 0.9733
+                    optimized: 0.98
+                  brierScore:
+                    baseline: 0.081
+                    optimized: 0.0784
+        "404":
+          description: Learned weights file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Learned weights not found. Run: npm run optimize:weights"
+
+  # GET /api/calibration ────────────────────────────────────────────────────────
+  /api/calibration:
+    get:
+      operationId: getCalibration
+      tags:
+        - analysis
+      summary: Probability calibration data
+      description: >
+        Returns isotonic-regression calibration curves for nomination and winner
+        probabilities, used to convert raw model scores into calibrated
+        percentages.
+
+        Produced by `npm run calibrate`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Calibration curves and metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - calibratedAt
+                  - method
+                properties:
+                  calibratedAt:
+                    type: string
+                    format: date-time
+                    description: When the calibration was computed.
+                    example: "2026-03-10T11:00:00.000Z"
+                  method:
+                    type: string
+                    description: Calibration method used.
+                    example: "isotonic-regression"
+                  weightsUsed:
+                    $ref: "#/components/schemas/WeightTriple"
+                  samples:
+                    type: integer
+                    description: Total number of training samples used.
+                    example: 750
+                  nomination:
+                    type: object
+                    description: Calibration table for nomination probabilities.
+                    additionalProperties: true
+                  winner:
+                    type: object
+                    description: Calibration table for winner probabilities.
+                    additionalProperties: true
+        "404":
+          description: Calibration file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Calibration not found. Run: npm run calibrate"
+
+  # GET /api/bootstrap-ci ───────────────────────────────────────────────────────
+  /api/bootstrap-ci:
+    get:
+      operationId: getBootstrapCi
+      tags:
+        - analysis
+      summary: Bootstrap confidence intervals for model weights
+      description: >
+        Returns B bootstrap weight samples and percentile confidence intervals
+        for each model weight dimension, giving a sense of how stable the
+        learned weights are across different year-subsets of the training data.
+
+        Produced by `npm run bootstrap:ci`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Bootstrap samples and CI summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - computedAt
+                  - B
+                  - globalWeights
+                  - samples
+                  - summary
+                  - metrics
+                properties:
+                  computedAt:
+                    type: string
+                    format: date-time
+                    description: When the bootstrap was run.
+                    example: "2026-03-11T09:53:12.624Z"
+                  B:
+                    type: integer
+                    description: Number of bootstrap iterations.
+                    example: 500
+                  globalWeights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  samples:
+                    type: array
+                    description: >
+                      Array of B weight triples, each as [precursor, history, buzz].
+                    items:
+                      type: array
+                      items:
+                        type: number
+                        format: float
+                      minItems: 3
+                      maxItems: 3
+                  summary:
+                    type: object
+                    description: Per-dimension percentile summary across all bootstrap samples.
+                    properties:
+                      precursor:
+                        $ref: "#/components/schemas/BootstrapDimSummary"
+                      history:
+                        $ref: "#/components/schemas/BootstrapDimSummary"
+                      buzz:
+                        $ref: "#/components/schemas/BootstrapDimSummary"
+                  metrics:
+                    type: object
+                    description: Percentile accuracy metrics across bootstrap samples.
+                    properties:
+                      winnerAccuracy:
+                        $ref: "#/components/schemas/BootstrapPercentiles"
+                      nominationAccuracy:
+                        $ref: "#/components/schemas/BootstrapPercentiles"
+                      brierScore:
+                        $ref: "#/components/schemas/BootstrapPercentiles"
+        "404":
+          description: Bootstrap CI file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Bootstrap CI not found. Run: npm run bootstrap:ci"
+
+  # GET /api/joint-probability ──────────────────────────────────────────────────
+  /api/joint-probability:
+    get:
+      operationId: getJointProbability
+      tags:
+        - analysis
+      summary: Cross-category co-win rates
+      description: >
+        Returns historical co-win counts and conditional win-rate matrices across
+        the six tracked Oscar categories, computed from the 25-year training set.
+        The client uses this to display an inter-category sweep panel.
+
+        Produced by `npm run joint-probability`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Joint probability and conditional rate matrices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - totalYears
+                  - yearRange
+                  - categories
+                  - coWinCounts
+                  - coWinRates
+                  - condRates
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-12T00:59:36.479Z"
+                  totalYears:
+                    type: integer
+                    description: Number of Oscar years analysed.
+                    example: 25
+                  yearRange:
+                    type: object
+                    properties:
+                      first:
+                        type: integer
+                        example: 1999
+                      last:
+                        type: integer
+                        example: 2023
+                  categories:
+                    type: array
+                    description: Ordered list of category IDs in the matrix.
+                    items:
+                      type: string
+                    example:
+                      - picture
+                      - director
+                      - actor
+                      - actress
+                      - supporting-actor
+                      - supporting-actress
+                  coWinCounts:
+                    type: object
+                    description: >
+                      Integer co-win counts keyed by category pair.
+                      `coWinCounts[A][B]` is the number of years in which
+                      the same film won both category A and B.
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: integer
+                  coWinRates:
+                    type: object
+                    description: >
+                      Co-win rates (0–1) keyed by category pair.
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: number
+                        format: float
+                  condRates:
+                    type: object
+                    description: >
+                      Conditional win rates: P(win B | win A) keyed by [A][B].
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: number
+                        format: float
+        "404":
+          description: Joint probability file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Joint probability data not found. Run: npm run joint-probability"
+
+  # GET /api/feature-importance ─────────────────────────────────────────────────
+  /api/feature-importance:
+    get:
+      operationId: getFeatureImportance
+      tags:
+        - analysis
+      summary: Feature importance rankings
+      description: >
+        Returns permutation-based feature-importance scores for the three model
+        features (precursor, history, buzz) relative to a baseline, indicating
+        how much each feature contributes to winner prediction accuracy.
+
+        Produced by `npm run feature-importance`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Feature importance report.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - method
+                  - learnedWeights
+                  - baseline
+                  - features
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-10T11:30:00.000Z"
+                  method:
+                    type: string
+                    description: Importance calculation method.
+                    example: "permutation"
+                  learnedWeights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  baseline:
+                    type: object
+                    description: Baseline accuracy metrics (no permutation).
+                    properties:
+                      winnerAccuracy:
+                        type: number
+                        format: float
+                        example: 0.98
+                      brierScore:
+                        type: number
+                        format: float
+                        example: 0.0784
+                  features:
+                    type: array
+                    description: >
+                      Features ranked from most to least important, with their
+                      accuracy drop and relative importance score.
+                    items:
+                      type: object
+                      required:
+                        - feature
+                        - accuracyDrop
+                        - importance
+                      properties:
+                        feature:
+                          type: string
+                          example: precursor
+                        accuracyDrop:
+                          type: number
+                          format: float
+                          description: >
+                            Decrease in winner accuracy when this feature is
+                            randomly permuted (higher = more important).
+                          example: 0.12
+                        importance:
+                          type: number
+                          format: float
+                          description: Relative importance (0–1, sum to 1).
+                          example: 0.63
+        "404":
+          description: Feature importance file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Feature importance data not found. Run: npm run feature-importance"
+
+  # GET /api/brier-decomposition ────────────────────────────────────────────────
+  /api/brier-decomposition:
+    get:
+      operationId: getBrierDecomposition
+      tags:
+        - analysis
+      summary: Brier score decomposition
+      description: >
+        Returns the Murphy–Epstein decomposition of the model's Brier score into
+        reliability, resolution, and uncertainty components for both nomination
+        and winner predictions, broken down by Oscar category.
+
+        Produced by `npm run brier:decomposition`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Brier decomposition report.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - method
+                  - weights
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-10T12:00:00.000Z"
+                  method:
+                    type: string
+                    example: "murphy-epstein"
+                  weights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  nomination:
+                    type: object
+                    description: Brier decomposition for nomination predictions.
+                    additionalProperties: true
+                  winner:
+                    type: object
+                    description: Brier decomposition for winner predictions.
+                    additionalProperties: true
+        "404":
+          description: Brier decomposition file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Brier decomposition not found. Run: npm run brier:decomposition"
+
+  # GET /api/rolling-error ──────────────────────────────────────────────────────
+  /api/rolling-error:
+    get:
+      operationId: getRollingError
+      tags:
+        - analysis
+      summary: Rolling accuracy and Brier score by year
+      description: >
+        Returns year-by-year and rolling-window accuracy metrics and Brier
+        scores across all six Oscar categories, plus linear trend lines.
+        Powers the rolling-error heatmap and time-series charts in the analytics
+        panel.
+
+        Produced by `npm run rolling-error`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: Rolling error report.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - weights
+                  - yearRange
+                  - years
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-10T12:30:00.000Z"
+                  weights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  yearRange:
+                    type: object
+                    properties:
+                      first:
+                        type: integer
+                        example: 1999
+                      last:
+                        type: integer
+                        example: 2023
+                  trend:
+                    type: object
+                    description: Linear trend metadata for Brier and accuracy series.
+                    additionalProperties: true
+                  years:
+                    type: array
+                    description: Per-year accuracy and Brier data points.
+                    items:
+                      type: object
+                      required:
+                        - year
+                      properties:
+                        year:
+                          type: integer
+                          example: 2023
+                      additionalProperties: true
+        "404":
+          description: Rolling error file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Rolling error data not found. Run: npm run rolling-error"
+
+  # GET /api/pr-roc ─────────────────────────────────────────────────────────────
+  /api/pr-roc:
+    get:
+      operationId: getPrRoc
+      tags:
+        - analysis
+      summary: Precision-recall and ROC curves
+      description: >
+        Returns precision-recall (PR) and receiver-operating-characteristic (ROC)
+        curve data for both nomination and winner predictions, along with AUC
+        scores and per-category breakdowns.
+
+        Produced by `npm run pr-roc`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: PR and ROC curve data.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - weights
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-10T13:00:00.000Z"
+                  weights:
+                    $ref: "#/components/schemas/WeightTriple"
+                  overall:
+                    type: object
+                    description: Overall PR/ROC metrics.
+                    additionalProperties: true
+                  roc:
+                    type: array
+                    description: ROC curve data points (false-positive rate, true-positive rate).
+                    items:
+                      type: object
+                      additionalProperties: true
+                  pr:
+                    type: array
+                    description: PR curve data points (recall, precision).
+                    items:
+                      type: object
+                      additionalProperties: true
+        "404":
+          description: PR/ROC file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "PR/ROC data not found. Run: npm run pr-roc"
+
+  # GET /api/ab-test ────────────────────────────────────────────────────────────
+  /api/ab-test:
+    get:
+      operationId: getAbTest
+      tags:
+        - analysis
+      summary: A/B weight-preset comparison results
+      description: >
+        Returns pairwise statistical test results comparing all built-in weight
+        presets against each other, using a paired permutation test on Brier
+        scores across the historical data set.
+
+        Produced by `npm run ab-test`.
+        Returns 404 until that script has been run.
+      responses:
+        "200":
+          description: A/B test comparison report.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - alpha
+                  - totalPairs
+                  - presets
+                  - testResults
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    example: "2026-03-10T13:30:00.000Z"
+                  alpha:
+                    type: number
+                    format: float
+                    description: Significance threshold used for the tests.
+                    example: 0.05
+                  totalPairs:
+                    type: integer
+                    description: Number of preset pairs tested.
+                    example: 6
+                  presets:
+                    type: array
+                    description: Names of the presets that were compared.
+                    items:
+                      type: string
+                    example:
+                      - Balanced
+                      - Precursor-heavy
+                      - History-heavy
+                      - Buzz-driven
+                  testResults:
+                    type: array
+                    description: One entry per preset pair.
+                    items:
+                      type: object
+                      additionalProperties: true
+        "404":
+          description: A/B test file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "A/B test data not found. Run: npm run ab-test"
+
+  # GET /api/scraper-events ─────────────────────────────────────────────────────
+  /api/scraper-events:
+    get:
+      operationId: getScraperEvents
+      tags:
+        - events
+      summary: Server-Sent Events stream for scraper notifications
+      description: >
+        Opens a persistent Server-Sent Events (SSE) connection. The server
+        pushes a `data: scraper-update` event after each completed scraper run
+        and sends a `: keepalive` comment every 30 seconds to prevent
+        proxy/load-balancer timeouts.
+
+        The client subscribes to this stream to know when to refresh
+        `/api/scrape-observability`.
+
+        Rate limit: 10 new connections per minute per IP.
+        Concurrent connection limit: 5 per IP.
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: >
+            Standard SSE reconnect header. Not used for replay — included for
+            protocol compliance.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            SSE stream. The response body is a never-ending text/event-stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >
+                  Each event is a standard SSE frame. Data events carry the
+                  literal string `scraper-update`.
+              example: |
+                : connected
+
+                : keepalive
+
+                data: scraper-update
+
+        "429":
+          description: Rate limit or concurrent-connection limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Too many event stream connections.
+
+  # POST /api/client-errors ─────────────────────────────────────────────────────
+  /api/client-errors:
+    post:
+      operationId: postClientErrors
+      tags:
+        - errors
+      summary: Log browser-side errors
+      description: >
+        Accepts a batch of client-side error reports (window.onerror,
+        unhandledrejection, or explicit catches) and persists them in the
+        `client_errors` SQLite table.
+
+        Rate limit: 30 requests per minute per IP.
+      requestBody:
+        required: true
+        description: Batch of one or more error reports.
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/ClientError"
+            example:
+              - message: "Cannot read properties of undefined (reading 'films')"
+                source: "http://localhost:3000/app.js"
+                lineno: 1
+                colno: 42
+                stack: "TypeError: Cannot read properties...\n    at bootstrap (/app.js:1:42)"
+                context: "bootstrap:/"
+      responses:
+        "204":
+          description: Errors recorded. No response body.
+        "400":
+          description: Request body is not a valid array of error objects.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Too many error reports.
+
+  # GET /api/errors ─────────────────────────────────────────────────────────────
+  /api/errors:
+    get:
+      operationId: getErrors
+      tags:
+        - errors
+      summary: Recent error log
+      description: >
+        Returns the 50 most recent client-side errors from the SQLite
+        `client_errors` table (most-recent first), plus any server-side
+        errors captured in the in-memory error ring buffer.
+      responses:
+        "200":
+          description: Error log snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - generatedAt
+                  - serverErrors
+                  - clientErrors
+                properties:
+                  generatedAt:
+                    type: string
+                    format: date-time
+                    description: When this snapshot was generated.
+                  serverErrors:
+                    type: array
+                    description: Server-side errors from the in-memory ring buffer.
+                    items:
+                      type: object
+                      additionalProperties: true
+                  clientErrors:
+                    type: array
+                    description: >
+                      Up to 50 most-recent client errors, most-recent first.
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - occurred_at
+                        - message
+                      properties:
+                        id:
+                          type: integer
+                          description: Auto-increment row ID.
+                          example: 42
+                        occurred_at:
+                          type: string
+                          format: date-time
+                          description: Server time when the error was received.
+                          example: "2026-03-10T10:00:00.000Z"
+                        message:
+                          type: string
+                          example: "Cannot read properties of undefined"
+                        source:
+                          type: string
+                          nullable: true
+                          example: "http://localhost:3000/app.js"
+                        lineno:
+                          type: integer
+                          nullable: true
+                          example: 1
+                        colno:
+                          type: integer
+                          nullable: true
+                          example: 42
+                        stack:
+                          type: string
+                          nullable: true
+                        context:
+                          type: string
+                          nullable: true
+                          example: "bootstrap:/"
+                        user_agent:
+                          type: string
+                          nullable: true
+                          example: "Mozilla/5.0 ..."
+
   # GET /api/tmdb-poster ────────────────────────────────────────────────────────
   /api/tmdb-poster:
     get:
@@ -753,3 +2366,46 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: "TMDB search failed: 503"
+
+# ── Helper schemas (referenced inline above) ──────────────────────────────────
+# These are defined here rather than inline to keep the path entries readable.
+x-schema-appendix:
+  BootstrapDimSummary:
+    type: object
+    required:
+      - mean
+      - std
+      - p025
+      - p975
+    properties:
+      mean:
+        type: number
+        format: float
+        example: 0.5062
+      std:
+        type: number
+        format: float
+        example: 0.0034
+      p025:
+        type: number
+        format: float
+        description: 2.5th percentile.
+        example: 0.5002
+      p975:
+        type: number
+        format: float
+        description: 97.5th percentile.
+        example: 0.5134
+  BootstrapPercentiles:
+    type: object
+    properties:
+      p025:
+        type: number
+        format: float
+      p500:
+        type: number
+        format: float
+        description: Median.
+      p975:
+        type: number
+        format: float
