@@ -25,9 +25,12 @@ import {
   hashPassphrase,
   verifyPassphrase,
   generateSessionToken,
+  generateCsrfToken,
   sessionExpiresAt,
   isSessionExpired,
   SESSION_COOKIE,
+  SESSION_TTL_MS,
+  CSRF_COOKIE,
 } from "./auth-utils.js";
 import swaggerUi from "swagger-ui-express";
 import yaml from "js-yaml";
@@ -601,6 +604,32 @@ function initDb(): void {
   }
 }
 
+/**
+ * CSRF protection via the double-submit cookie pattern.
+ *
+ * On every HTML delivery the server sets a non-httpOnly `oscar_csrf` cookie.
+ * Client JS reads that cookie and echoes it in the `X-CSRF-Token` request header.
+ * Here we verify they match.  A cross-origin attacker cannot read the cookie
+ * (same-origin policy) and cannot set a custom header without a CORS preflight
+ * (which the server does not allow for foreign origins).
+ *
+ * Bypassed for:
+ *   - localhost requests (dev server + E2E test runner direct API calls)
+ *   - NODE_ENV=test (supertest integration test suite, no real HTTP)
+ */
+function requireCsrf(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.NODE_ENV === "test" || skipLocalhost(req)) { next(); return; }
+
+  const cookieToken = (req.cookies as Record<string, string>)[CSRF_COOKIE];
+  const headerToken = req.headers["x-csrf-token"];
+
+  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+    sendError(res, 403, "CSRF token missing or invalid.");
+    return;
+  }
+  next();
+}
+
 function requireProfileAuth(req: Request, res: Response, next: NextFunction): void {
   const profileId = req.params.profileId;
   const row = db
@@ -1051,7 +1080,7 @@ app.get("/api/forecast/:profileId", (req: Request, res: Response) => {
   res.json({ profileId, ...profile });
 });
 
-app.put("/api/forecast/:profileId", forecastWriteLimiter, requireProfileAuth, (req: Request, res: Response) => {
+app.put("/api/forecast/:profileId", forecastWriteLimiter, requireCsrf, requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
   trace.getActiveSpan()?.setAttribute("app.profile_id", profileId);
@@ -1106,7 +1135,7 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, requireProfileAuth, (r
   res.json({ profileId, updatedAt, payload });
 });
 
-app.delete("/api/forecast/:profileId", requireProfileAuth, (req: Request, res: Response) => {
+app.delete("/api/forecast/:profileId", requireCsrf, requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
   if (!db.prepare("SELECT id FROM profiles WHERE id = ?").get(profileId)) {
@@ -1135,7 +1164,7 @@ app.delete("/api/forecast/:profileId", requireProfileAuth, (req: Request, res: R
   res.json({ deleted: profileId, activeProfileId });
 });
 
-app.patch("/api/forecast/:profileId/rename", requireProfileAuth, (req: Request, res: Response) => {
+app.patch("/api/forecast/:profileId/rename", requireCsrf, requireProfileAuth, (req: Request, res: Response) => {
   const oldId = parseParam(profileIdSchema, req.params.profileId, res);
   if (oldId === null) return;
   const body = parseBody(renameBodySchema, req.body, res);
@@ -1365,7 +1394,7 @@ app.get("/api/profiles/:profileId/auth-status", (req: Request, res: Response) =>
   res.json({ profileId, hasPassphrase, authenticated });
 });
 
-app.post("/api/profiles/:profileId/login", authLimiter, asyncHandler(async (req: Request, res: Response) => {
+app.post("/api/profiles/:profileId/login", authLimiter, requireCsrf, asyncHandler(async (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
 
@@ -1421,7 +1450,7 @@ app.post("/api/profiles/:profileId/logout", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth, asyncHandler(async (req: Request, res: Response) => {
+app.post("/api/profiles/:profileId/passphrase", authLimiter, requireCsrf, requireProfileAuth, asyncHandler(async (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
 
@@ -1442,7 +1471,7 @@ app.post("/api/profiles/:profileId/passphrase", authLimiter, requireProfileAuth,
   res.json({ ok: true });
 }));
 
-app.delete("/api/profiles/:profileId/passphrase", requireProfileAuth, (req: Request, res: Response) => {
+app.delete("/api/profiles/:profileId/passphrase", requireCsrf, requireProfileAuth, (req: Request, res: Response) => {
   const profileId = parseParam(profileIdSchema, req.params.profileId, res);
   if (profileId === null) return;
 
@@ -1553,10 +1582,18 @@ app.get("/api/errors", (_req: Request, res: Response) => {
 //
 // On hydration, app.js calls renderLeaderboard() which overwrites these rows
 // with the fully-interactive version including per-film experience boosts.
-app.get("/", (_: Request, res: Response) => {
+app.get("/", (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   // No long-lived cache: the leaderboard reflects the current profile state.
   res.setHeader("Cache-Control", "no-cache");
+  // Refresh the CSRF token on every full page load.
+  res.cookie(CSRF_COOKIE, generateCsrfToken(), {
+    httpOnly: false,      // JS must be able to read and echo this value
+    sameSite: "strict",
+    secure: FORCE_HTTPS,
+    path: "/",
+    maxAge: SESSION_TTL_MS,
+  });
 
   const parts = getSplitHtml();
 
@@ -1582,7 +1619,15 @@ app.get("/", (_: Request, res: Response) => {
 // ── SPA catch-all ─────────────────────────────────────────────────────────────
 // All non-API, non-file routes return the bare index.html so client-side routing
 // (share links, direct-URL navigation) works without SSR overhead.
-app.get("*", (_: Request, res: Response) => {
+app.get("*", (req: Request, res: Response) => {
+  // Share-URL and other SPA routes land here — set CSRF cookie the same way.
+  res.cookie(CSRF_COOKIE, generateCsrfToken(), {
+    httpOnly: false,
+    sameSite: "strict",
+    secure: FORCE_HTTPS,
+    path: "/",
+    maxAge: SESSION_TTL_MS,
+  });
   res.sendFile(path.join(__dirname, "index.html"));
 });
 

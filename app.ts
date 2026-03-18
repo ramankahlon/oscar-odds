@@ -95,6 +95,7 @@ import {
   setSaveStateToApiRef,
   setGetLocalStorageKeyForProfileRef,
   setGetForecastApiUrlRef,
+  setCsrfTokenRef,
   reportClientError,
   bindWindowErrorHandlers,
   bindWeightSliders,
@@ -131,6 +132,12 @@ function getLocalStorageKeyForProfile(profileId = state.profileId): string {
 
 function getForecastApiUrl(profileId = state.profileId): string {
   return `${API_FORECAST_BASE_URL}/${encodeURIComponent(profileId)}`;
+}
+
+/** Reads the CSRF token from the `oscar_csrf` cookie set by the server on HTML delivery. */
+function getCsrfToken(): string {
+  const m = document.cookie.match(/(?:^|;\s*)oscar_csrf=([^;]+)/);
+  return m?.[1] ?? "";
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -192,7 +199,7 @@ async function saveStateToApi(): Promise<boolean> {
   try {
     const response = await fetch(getForecastApiUrl(), {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-csrf-token": getCsrfToken() },
       body: JSON.stringify(serializeStatePayload()),
     });
     if (response.status === 401) {
@@ -514,6 +521,7 @@ async function bootstrap(): Promise<void> {
   setSaveStateToApiRef(saveStateToApi);
   setGetLocalStorageKeyForProfileRef(getLocalStorageKeyForProfile);
   setGetForecastApiUrlRef(getForecastApiUrl);
+  setCsrfTokenRef(getCsrfToken);
 
   bindWindowErrorHandlers();
 

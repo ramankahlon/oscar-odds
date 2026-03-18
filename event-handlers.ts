@@ -136,6 +136,7 @@ let _fetchAndRenderCompare: () => Promise<void> = async () => {};
 let _saveStateToApi: () => Promise<boolean> = async () => false;
 let _getLocalStorageKeyForProfile: (profileId?: string) => string = () => "";
 let _getForecastApiUrl: (profileId?: string) => string = () => "";
+let _getCsrfToken: () => string = () => "";
 
 export function setLoadStateRef(fn: () => void): void { _loadState = fn; }
 export function setLoadStateFromApiRef(fn: () => Promise<void>): void { _loadStateFromApi = fn; }
@@ -146,6 +147,7 @@ export function setFetchAndRenderCompareRef(fn: () => Promise<void>): void { _fe
 export function setSaveStateToApiRef(fn: () => Promise<boolean>): void { _saveStateToApi = fn; }
 export function setGetLocalStorageKeyForProfileRef(fn: (profileId?: string) => string): void { _getLocalStorageKeyForProfile = fn; }
 export function setGetForecastApiUrlRef(fn: (profileId?: string) => string): void { _getForecastApiUrl = fn; }
+export function setCsrfTokenRef(fn: () => string): void { _getCsrfToken = fn; }
 
 // ── Helpers used by bind functions ────────────────────────────────────────────
 
@@ -823,7 +825,10 @@ export function bindProfileLockButton(): void {
   authRemovePassphraseBtn?.addEventListener("click", async () => {
     const profileId = state.profileId;
     try {
-      const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/passphrase`, { method: "DELETE" });
+      const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/passphrase`, {
+        method: "DELETE",
+        headers: { "x-csrf-token": _getCsrfToken() },
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
         setAppNotice(err.error || "Failed to remove passphrase.", "error");
@@ -880,7 +885,7 @@ export function bindProfileLockButton(): void {
       try {
         const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/login`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-csrf-token": _getCsrfToken() },
           body: JSON.stringify({ passphrase }),
         });
         if (!res.ok) {
@@ -910,7 +915,7 @@ export function bindProfileLockButton(): void {
       try {
         const res = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/passphrase`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-csrf-token": _getCsrfToken() },
           body: JSON.stringify({ passphrase }),
         });
         if (!res.ok) {
@@ -922,7 +927,7 @@ export function bindProfileLockButton(): void {
         // Log in immediately after setting passphrase so the session cookie is established
         const loginRes = await fetch(`/api/profiles/${encodeURIComponent(profileId)}/login`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-csrf-token": _getCsrfToken() },
           body: JSON.stringify({ passphrase }),
         });
         if (loginRes.ok) await _refreshAuthStatus(profileId);
@@ -987,8 +992,8 @@ export function bindProfileControls(): void {
     const doRename = async (): Promise<void> => {
       const res = await fetch(`${_getForecastApiUrl(current)}/rename`, {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ newId })
+        headers: { "content-type": "application/json", "x-csrf-token": _getCsrfToken() },
+        body: JSON.stringify({ newId }),
       });
       if (res.status === 401) {
         const ok = await _promptUnlock(current);
@@ -1028,7 +1033,10 @@ export function bindProfileControls(): void {
     if (!window.confirm(`Delete profile "${current}"? This cannot be undone.`)) return;
 
     const doDelete = async (): Promise<void> => {
-      const res = await fetch(_getForecastApiUrl(current), { method: "DELETE" });
+      const res = await fetch(_getForecastApiUrl(current), {
+        method: "DELETE",
+        headers: { "x-csrf-token": _getCsrfToken() },
+      });
       if (res.status === 401) {
         const ok = await _promptUnlock(current);
         if (ok) await doDelete();
