@@ -379,8 +379,10 @@ async function fetchAndApplyExternalSignals(): Promise<void> {
     saveState();
     render();
     setAppNotice(`Applied source refresh from ${new Date((snapshot as { generatedAt?: string }).generatedAt || Date.now()).toLocaleString()}.`);
-  } catch {
-    // Fail silently on network errors — external signals are best-effort.
+  } catch (err) {
+    // External signals are best-effort; don't surface network errors in the UI,
+    // but log so developers can diagnose connectivity issues.
+    console.warn("[external-signals] fetch failed:", err);
   }
 }
 
@@ -540,49 +542,59 @@ async function bootstrap(): Promise<void> {
   await loadStateFromApi();
   setUserPresets(loadUserPresets());
 
+  // Helper: fetch an analytics JSON endpoint.
+  // 404 → null (file not generated yet, expected).
+  // Any other non-ok status or network/parse error → null + console.warn so
+  // developers can diagnose without showing noise in the user-facing UI.
+  async function fetchAnalytics(endpoint: string): Promise<unknown> {
+    try {
+      const r = await fetch(endpoint);
+      if (r.status === 404) return null;               // not generated yet — expected
+      if (!r.ok) {
+        console.warn(`[bootstrap] ${endpoint} returned HTTP ${r.status}`);
+        return null;
+      }
+      return await r.json();
+    } catch (err) {
+      console.warn(`[bootstrap] ${endpoint} failed:`, err);
+      return null;
+    }
+  }
+
   // Populate the Data-Driven preset with ML-learned weights if available.
-  fetch("/api/learned-weights")
-    .then(r => r.ok ? r.json() : null)
-    .then((data: unknown) => {
-      if (!data || typeof data !== "object") return;
-      const w = (data as Record<string, unknown>).weights as Record<string, unknown> | undefined;
-      if (typeof w?.precursor !== "number" || typeof w?.history !== "number" || typeof w?.buzz !== "number") return;
-      const p = Math.round((w.precursor as number) * 100);
-      const h = Math.round((w.history   as number) * 100);
-      const b = Math.round((w.buzz      as number) * 100);
-      if (p + h + b < 98 || p + h + b > 102) return;
-      DATA_DRIVEN_PRESET.precursor = p;
-      DATA_DRIVEN_PRESET.history   = h;
-      DATA_DRIVEN_PRESET.buzz      = b;
-      DATA_DRIVEN_PRESET.name = `Data-Driven (${p}/${h}/${b})`;
-      renderWeightPresets();
-    })
-    .catch(() => { /* learned-weights not generated yet — silent fallback */ });
+  void fetchAnalytics("/api/learned-weights").then((data: unknown) => {
+    if (!data || typeof data !== "object") return;
+    const w = (data as Record<string, unknown>).weights as Record<string, unknown> | undefined;
+    if (typeof w?.precursor !== "number" || typeof w?.history !== "number" || typeof w?.buzz !== "number") return;
+    const p = Math.round((w.precursor as number) * 100);
+    const h = Math.round((w.history   as number) * 100);
+    const b = Math.round((w.buzz      as number) * 100);
+    if (p + h + b < 98 || p + h + b > 102) return;
+    DATA_DRIVEN_PRESET.precursor = p;
+    DATA_DRIVEN_PRESET.history   = h;
+    DATA_DRIVEN_PRESET.buzz      = b;
+    DATA_DRIVEN_PRESET.name = `Data-Driven (${p}/${h}/${b})`;
+    renderWeightPresets();
+  });
 
   // Fetch joint-probability correlation data for sweep analysis.
-  fetch("/api/joint-probability")
-    .then(r => r.ok ? r.json() : null)
-    .then((data: unknown) => {
-      if (!data || typeof data !== "object") return;
-      const d = data as Record<string, unknown>;
-      if (!Array.isArray(d.categories) || typeof d.condRates !== "object") return;
-      setJointProbData(data as JointProbData);
-      render();
-    })
-    .catch(() => { /* joint-probability.json not generated yet — silent fallback */ });
+  void fetchAnalytics("/api/joint-probability").then((data: unknown) => {
+    if (!data || typeof data !== "object") return;
+    const d = data as Record<string, unknown>;
+    if (!Array.isArray(d.categories) || typeof d.condRates !== "object") return;
+    setJointProbData(data as JointProbData);
+    render();
+  });
 
   // Fetch bootstrap weight samples for per-film confidence intervals.
-  fetch("/api/bootstrap-ci")
-    .then(r => r.ok ? r.json() : null)
-    .then((data: unknown) => {
-      if (!data || typeof data !== "object") return;
-      const samples = (data as Record<string, unknown>).samples;
-      if (!Array.isArray(samples) || !samples.length) return;
-      setBootstrapSamples(samples as Array<[number, number, number]>);
-      bootstrapCIByCategory.clear();
-      render();
-    })
-    .catch(() => { /* bootstrap-ci.json not generated yet — silent fallback */ });
+  void fetchAnalytics("/api/bootstrap-ci").then((data: unknown) => {
+    if (!data || typeof data !== "object") return;
+    const samples = (data as Record<string, unknown>).samples;
+    if (!Array.isArray(samples) || !samples.length) return;
+    setBootstrapSamples(samples as Array<[number, number, number]>);
+    bootstrapCIByCategory.clear();
+    render();
+  });
 
   bindProfileControls();
   bindProfileLockButton();
