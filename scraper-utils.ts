@@ -29,7 +29,9 @@ interface Mention {
 interface AggregateItem {
   title: string;
   letterboxdScore: number;
+  goldderbyScore: number;
   thegamerScore: number;
+  indiewireScore: number;
   redditCount: number;
   redditScore: number;
   combinedScore: number;
@@ -225,6 +227,88 @@ export function extractLetterboxd(html: string): ScoreItem[] {
   }));
 }
 
+/**
+ * Extract ranked contenders from a Gold Derby odds page.
+ *
+ * Gold Derby lists contenders in ranked order inside elements with classes like
+ * `.contestant-name`, `.contender-name`, or plain `td` cells in an odds table.
+ * If fewer than 5 structured hits are found the function falls back to the same
+ * title-phrase extraction used by extractTheGamer so the source degrades
+ * gracefully if the page layout changes.
+ */
+export function extractGoldDerby(html: string): ScoreItem[] {
+  const $ = cheerio.load(html);
+  const candidates: string[] = [];
+
+  // Structured selectors Gold Derby has used for their odds tables.
+  const structured = $(
+    ".contestant-name, .contender-name, .name-text, .contestant .name, " +
+    ".odds-table td:first-child, .odds-row td:first-child, " +
+    "[class*='contestant'] [class*='name'], [class*='contender'] [class*='name']"
+  );
+  structured.each((_, el) => {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    if (text && isValidEntityCandidate(text)) candidates.push(text);
+  });
+
+  // Fall back to general article text extraction if structured parse found too few.
+  if (candidates.length < 5) {
+    $("h2, h3, li, td").each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      if (!text) return;
+      extractTitleLikePhrases(text).forEach((phrase) => {
+        if (isValidEntityCandidate(phrase)) candidates.push(phrase);
+      });
+    });
+  }
+
+  const unique = dedupeByNormalized(candidates.map((title) => ({ title })), (item) => item.title);
+  const total = Math.max(unique.length, 1);
+  return unique.slice(0, 30).map((item, index) => ({
+    title: canonicalizeEntity(item.title).title || item.title,
+    rank: index + 1,
+    score: Number(((total - index) / total).toFixed(4))
+  }));
+}
+
+/**
+ * Extract predicted contenders from an IndieWire awards predictions article.
+ *
+ * IndieWire's predictions use standard article markup (h2/h3 headings per
+ * category, <p> paragraphs, <li> bullet points) — the same selectors used by
+ * extractTheGamer.  Keeping this as a distinct export means IndieWire's scrape
+ * health is tracked independently.
+ */
+export function extractIndieWire(html: string): ScoreItem[] {
+  const $ = cheerio.load(html);
+  const lines: string[] = [];
+
+  $("main li, article li, main h2, main h3, article h2, article h3, article p, .entry-content p, .article-content p").each((_, el) => {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    if (!text) return;
+    lines.push(text);
+  });
+
+  const titleCounts = new Map<string, { title: string; score: number }>();
+  lines.forEach((line, index) => {
+    const weight = Math.max(1, 6 - Math.floor(index / 10));
+    extractTitleLikePhrases(line).forEach((title) => {
+      const canonical = canonicalizeEntity(title);
+      if (!canonical.title) return;
+      const key = normalizeTitle(canonical.title);
+      if (!key) return;
+      const entry = titleCounts.get(key) || { title: canonical.title, score: 0 };
+      entry.score += weight;
+      titleCounts.set(key, entry);
+    });
+  });
+
+  return [...titleCounts.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 30)
+    .map((item, index) => ({ title: item.title, rank: index + 1, score: item.score }));
+}
+
 export function extractTitleLikePhrases(text: string): string[] {
   const matches: string[] = [];
   const quoted = text.match(/"([^"]{2,80})"/g) || [];
@@ -324,67 +408,76 @@ export function extractReddit(data: unknown, nowMs = Date.now()): { posts: Reddi
 export function buildAggregate(
   letterboxdItems: ScoreItem[],
   redditMentions: Mention[],
-  thegamerItems: ScoreItem[]
+  thegamerItems: ScoreItem[],
+  goldderbyItems: ScoreItem[] = [],
+  indiewireItems: ScoreItem[] = []
 ): AggregateItem[] {
   const aggregate = new Map<string, AggregateItem>();
 
-  letterboxdItems.forEach((item) => {
-    const canonical = canonicalizeEntity(item.title);
-    if (!canonical.title) return;
+  function getOrCreate(title: string): AggregateItem | null {
+    const canonical = canonicalizeEntity(title);
+    if (!canonical.title) return null;
     const key = normalizeTitle(canonical.title);
-    if (!key) return;
-    aggregate.set(key, {
-      title: canonical.title,
-      letterboxdScore: item.score,
-      thegamerScore: 0,
-      redditCount: 0,
-      redditScore: 0,
-      combinedScore: 0
-    });
-  });
-
-  thegamerItems.forEach((item, index) => {
-    const canonical = canonicalizeEntity(item.title);
-    if (!canonical.title) return;
-    const key = normalizeTitle(canonical.title);
-    if (!key) return;
-    const current =
-      aggregate.get(key) || {
+    if (!key) return null;
+    if (!aggregate.has(key)) {
+      aggregate.set(key, {
         title: canonical.title,
         letterboxdScore: 0,
+        goldderbyScore: 0,
         thegamerScore: 0,
+        indiewireScore: 0,
         redditCount: 0,
         redditScore: 0,
         combinedScore: 0
-      };
-    current.thegamerScore = Math.max(current.thegamerScore, Math.max(0, (30 - index) / 30));
-    aggregate.set(key, current);
+      });
+    }
+    return aggregate.get(key)!;
+  }
+
+  letterboxdItems.forEach((item) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.letterboxdScore = item.score;
+  });
+
+  goldderbyItems.forEach((item, index) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.goldderbyScore = Math.max(entry.goldderbyScore, Math.max(0, (30 - index) / 30));
+  });
+
+  thegamerItems.forEach((item, index) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.thegamerScore = Math.max(entry.thegamerScore, Math.max(0, (30 - index) / 30));
+  });
+
+  indiewireItems.forEach((item, index) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.indiewireScore = Math.max(entry.indiewireScore, Math.max(0, (30 - index) / 30));
   });
 
   const maxReddit = Math.max(...redditMentions.map((item) => item.count), 1);
   redditMentions.forEach((item) => {
-    const canonical = canonicalizeEntity(item.title);
-    if (!canonical.title) return;
-    const key = normalizeTitle(canonical.title);
-    if (!key) return;
-    const current =
-      aggregate.get(key) || {
-        title: canonical.title,
-        letterboxdScore: 0,
-        thegamerScore: 0,
-        redditCount: 0,
-        redditScore: 0,
-        combinedScore: 0
-      };
-    current.redditCount = item.count;
-    current.redditScore = item.count / maxReddit;
-    aggregate.set(key, current);
+    const entry = getOrCreate(item.title);
+    if (!entry) return;
+    entry.redditCount = item.count;
+    entry.redditScore = item.count / maxReddit;
   });
 
+  // Combined score weights (must sum to 1.0):
+  //   Gold Derby  0.30 — explicit odds from the most authoritative prediction aggregator
+  //   Letterboxd  0.25 — curated ranked list (strong precursor signal)
+  //   IndieWire   0.15 — editorial predictions coverage
+  //   TheGamer    0.15 — general predictions article coverage
+  //   Reddit      0.15 — community discussion / social buzz
   return [...aggregate.values()]
     .map((item) => ({
       ...item,
-      combinedScore: Number((item.letterboxdScore * 0.45 + item.thegamerScore * 0.25 + item.redditScore * 0.3).toFixed(4))
+      combinedScore: Number((
+        item.goldderbyScore  * 0.30 +
+        item.letterboxdScore * 0.25 +
+        item.indiewireScore  * 0.15 +
+        item.thegamerScore   * 0.15 +
+        item.redditScore     * 0.15
+      ).toFixed(4))
     }))
     .sort((a, b) => b.combinedScore - a.combinedScore)
     .slice(0, 80);
