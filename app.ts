@@ -233,9 +233,9 @@ async function mergeServerHistory(profileId: string): Promise<void> {
     const doc = await res.json();
     if (!doc || !Array.isArray(doc.snapshots) || doc.snapshots.length === 0) return;
 
-    const existingDates = new Set<string>();
+    const existingTimestamps = new Set<string>();
     for (const snap of trendHistory.snapshots) {
-      existingDates.add(`${snap.categoryId}::${snap.capturedAt.slice(0, 10)}`);
+      existingTimestamps.add(`${snap.categoryId}::${snap.capturedAt}`);
     }
 
     const serverSnaps: TrendSnapshot[] = [];
@@ -246,10 +246,10 @@ async function mergeServerHistory(profileId: string): Promise<void> {
       const snappedAt  = typeof snap.snappedAt  === "string" ? snap.snappedAt  : null;
       const entries    = Array.isArray(snap.entries) ? snap.entries : [];
       if (!categoryId || !snappedAt) continue;
-      if (existingDates.has(`${categoryId}::${snappedAt}`)) continue;
+      if (existingTimestamps.has(`${categoryId}::${snappedAt}`)) continue;
       serverSnaps.push({
         categoryId,
-        capturedAt: `${snappedAt}T12:00:00.000Z`,
+        capturedAt: snappedAt,
         sourceSnapshotId: null,
         entries: (entries as unknown[]).flatMap((e) => {
           if (!e || typeof e !== "object") return [];

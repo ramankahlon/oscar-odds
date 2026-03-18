@@ -1098,7 +1098,6 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, requireCsrf, requirePr
         const capturedAt = typeof snap.capturedAt === "string" ? snap.capturedAt : null;
         const entries = Array.isArray(snap.entries) ? snap.entries : [];
         if (!categoryId || !capturedAt) continue;
-        const snappedAt = capturedAt.slice(0, 10);
         for (const rawEntry of entries) {
           if (!rawEntry || typeof rawEntry !== "object") continue;
           const entry = rawEntry as Record<string, unknown>;
@@ -1107,7 +1106,7 @@ app.put("/api/forecast/:profileId", forecastWriteLimiter, requireCsrf, requirePr
           const nomination = typeof entry.nomination === "number" ? entry.nomination : 0;
           const winner = typeof entry.winner === "number" ? entry.winner : 0;
           if (!key) continue;
-          upsertSnap.run(profileId, categoryId, key, title, nomination, winner, snappedAt);
+          upsertSnap.run(profileId, categoryId, key, title, nomination, winner, capturedAt);
         }
       }
     })();
