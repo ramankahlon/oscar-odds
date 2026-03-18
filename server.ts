@@ -17,6 +17,7 @@ import { spawn, ChildProcess } from "node:child_process";
 import * as cheerio from "cheerio";
 import Database from "better-sqlite3";
 import { z } from "zod";
+import { contenderFilmSchema, contendersFileSchema } from "./schemas.js";
 import type { Logger } from "pino";
 import { logger } from "./logger.js";
 import { getBacktestResult } from "./backtest.js";
@@ -256,27 +257,7 @@ const tmdbPosterQuerySchema = z.object({
 });
 
 // ── Contenders file schema ────────────────────────────────────────────────────
-
-const contenderFilmSchema = z.object({
-  title:    z.string().min(1, "title is required"),
-  studio:   z.string().min(1, "studio is required"),
-  precursor: z.number().int("precursor must be an integer").min(0, "precursor must be ≥ 0").max(100, "precursor must be ≤ 100"),
-  history:   z.number().int("history must be an integer").min(0, "history must be ≥ 0").max(100, "history must be ≤ 100"),
-  buzz:      z.number().int("buzz must be an integer").min(0, "buzz must be ≥ 0").max(100, "buzz must be ≤ 100"),
-  strength:  z.enum(["High", "Medium", "Low"], { error: 'strength must be "High", "Medium", or "Low"' }),
-});
-
-const contendersFileSchema = z.object({
-  ceremony: z.number().int().positive(),
-  year:     z.number().int().positive(),
-  categoryDefinitions: z.array(z.object({
-    id:         z.string().min(1),
-    name:       z.string().min(1),
-    nominees:   z.number().int().positive(),
-    winnerBase: z.number().min(0).max(1),
-  })).min(1),
-  categorySeeds: z.record(z.string(), z.array(contenderFilmSchema)),
-});
+// Imported from schemas.ts (shared with the browser client)
 
 function parseBody<T>(schema: z.ZodSchema<T>, body: unknown, res: Response): T | null {
   const result = schema.safeParse(body);

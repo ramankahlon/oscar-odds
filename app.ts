@@ -20,6 +20,7 @@ import LZString from "lz-string";
 import { clamp } from "./forecast-utils.js";
 import type { Strength } from "./types.js";
 import { initScoringWasm } from "./scoring-wasm.js";
+import { contenderFilmSchema } from "./schemas.js";
 
 // ── State module ───────────────────────────────────────────────────────────────
 import {
@@ -443,7 +444,14 @@ async function loadContenders(): Promise<void> {
   const seeds = Object.fromEntries(
     Object.entries(data.categorySeeds).map(([id, films]) => [
       id,
-      films.map((f) => ({ ...f, strength: f.strength as Strength })),
+      (films as unknown[]).flatMap((f) => {
+        const result = contenderFilmSchema.safeParse(f);
+        if (!result.success) {
+          console.warn(`[loadContenders] dropping invalid film in "${id}":`, result.error.issues);
+          return [];
+        }
+        return [result.data];
+      }),
     ])
   );
   setCategorySeeds(seeds);
