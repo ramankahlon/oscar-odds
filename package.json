@@ -8,6 +8,7 @@
     "dev": "tsx server.ts",
     "smoke": "sh -c 'tsx server.ts & PID=$!; trap \"kill $PID 2>/dev/null || true\" EXIT; sleep 2; curl -fsS -i http://localhost:3000/api/profiles'",
     "scrape:sources": "tsx scripts/poll-sources.ts --once",
+    "reset-passphrase": "tsx scripts/reset-passphrase.ts",
     "poll:sources": "tsx scripts/poll-sources.ts --interval-minutes 30",
     "typecheck": "tsc --noEmit",
     "build:wasm": "asc wasm/scoring.ts --outFile wasm/scoring.wasm --runtime stub --initialMemory 1 --optimizeLevel 3",
