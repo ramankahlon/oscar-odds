@@ -44,7 +44,15 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { scoreFilm } from "../scoring-utils.js";
+import {
+  scoreFilm,
+  NOMINATION_PERCENT_UPLIFT,
+  WINNER_PERCENT_UPLIFT,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+  WIN_ODDS_MIN,
+  WIN_ODDS_MAX,
+} from "../scoring-utils.js";
 import { calculateNominationOdds, calculateWinnerOdds } from "../app-logic.js";
 import type { NormalizedWeights } from "../types.js";
 
@@ -58,13 +66,13 @@ const CATEGORY_IDS = [
   "supporting-actor", "supporting-actress"
 ] as const;
 
-// Must match the values used in backtest.ts
-const NOM_UPLIFT    = 1.14;
-const WIN_UPLIFT    = 1.2;
-const NOM_MIN       = 0.6;
-const NOM_MAX       = 99;
-const WIN_MIN       = 0.4;
-const WIN_MAX       = 92;
+// Uplift and clamp bounds are imported from scoring-utils.ts — single source of truth.
+const NOM_UPLIFT = NOMINATION_PERCENT_UPLIFT;
+const WIN_UPLIFT = WINNER_PERCENT_UPLIFT;
+const NOM_MIN    = NOM_ODDS_MIN;
+const NOM_MAX    = NOM_ODDS_MAX;
+const WIN_MIN    = WIN_ODDS_MIN;
+const WIN_MAX    = WIN_ODDS_MAX;
 
 const N_BINS        = 10;   // reliability diagram resolution
 const PLATT_LR      = 0.05; // gradient descent learning rate for Platt fitting

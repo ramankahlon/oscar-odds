@@ -9,6 +9,15 @@ import {
 } from "./app-logic.js";
 import type { Category, Film, NormalizedWeights, Projection, ScoreResult, Strength } from "./types.js";
 import { initScoringWasm, isScoringWasmReady, scoreFilmWasm } from "./scoring-wasm.js";
+import {
+  NOMINATION_PERCENT_UPLIFT,
+  WINNER_PERCENT_UPLIFT,
+  WINNER_TO_NOMINATION_CAP,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+  WIN_ODDS_MIN,
+  WIN_ODDS_MAX,
+} from "./scoring-utils.js";
 
 /** Escape user-supplied strings before interpolating into innerHTML. */
 export function esc(s: string): string {
@@ -165,9 +174,8 @@ export const CONSENSUS_BOTTOM_FLOOR = 10; // minimum score the bottom-ranked fil
 export const CONSENSUS_SCORE_MIN  =  5; // hard clamp floor applied after step distribution
 export const CONSENSUS_SCORE_MAX  = 95; // hard clamp ceiling applied after step distribution
 export const TREND_WINDOW_OPTIONS = [7, 15, 30];
-export const NOMINATION_PERCENT_UPLIFT = 1.14;
-export const WINNER_PERCENT_UPLIFT = 1.2;
-export const WINNER_TO_NOMINATION_CAP = 0.5;
+// Re-exported so callers that already import from state.ts don't need a new import.
+export { NOMINATION_PERCENT_UPLIFT, WINNER_PERCENT_UPLIFT, WINNER_TO_NOMINATION_CAP } from "./scoring-utils.js";
 
 export const state: AppState = {
   profileId: "default",
@@ -1372,8 +1380,8 @@ export function buildProjections(category: Category, overrides: BuildProjections
         nominationTotal,
         nomineeScale,
         uplift: NOMINATION_PERCENT_UPLIFT,
-        min: 0.6,
-        max: 99
+        min: NOM_ODDS_MIN,
+        max: NOM_ODDS_MAX,
       });
       const winner = calculateWinnerOdds({
         winnerRaw: film.winnerRaw,
@@ -1381,8 +1389,8 @@ export function buildProjections(category: Category, overrides: BuildProjections
         nomination,
         winnerBase: category.winnerBase,
         uplift: WINNER_PERCENT_UPLIFT,
-        min: 0.4,
-        max: 92
+        min: WIN_ODDS_MIN,
+        max: WIN_ODDS_MAX,
       });
 
       return {
@@ -1473,8 +1481,8 @@ export function computeCategoryBootstrapCI(
         nominationTotal,
         nomineeScale,
         uplift: NOMINATION_PERCENT_UPLIFT,
-        min: 0.6,
-        max: 99
+        min: NOM_ODDS_MIN,
+        max: NOM_ODDS_MAX,
       });
       const win = calculateWinnerOdds({
         winnerRaw: s.winnerRaw,
@@ -1482,8 +1490,8 @@ export function computeCategoryBootstrapCI(
         nomination: nom,
         winnerBase: category.winnerBase,
         uplift: WINNER_PERCENT_UPLIFT,
-        min: 0.4,
-        max: 92
+        min: WIN_ODDS_MIN,
+        max: WIN_ODDS_MAX,
       });
       const entry = perFilm.get(s.film.title);
       if (entry) { entry.noms.push(nom); entry.wins.push(win); }

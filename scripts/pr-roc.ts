@@ -20,7 +20,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scoreFilm } from "../scoring-utils.js";
+import {
+  scoreFilm,
+  NOMINATION_PERCENT_UPLIFT,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+} from "../scoring-utils.js";
 import { calculateNominationOdds } from "../app-logic.js";
 import type { NormalizedWeights } from "../types.js";
 
@@ -108,9 +113,9 @@ for (const rawYear of rawHistory.years) {
         nominationRaw:   s.nominationRaw,
         nominationTotal,
         nomineeScale,
-        uplift: 1.14,
-        min:    0.6,
-        max:    99,
+        uplift: NOMINATION_PERCENT_UPLIFT,
+        min:    NOM_ODDS_MIN,
+        max:    NOM_ODDS_MAX,
       });
       const sample: Sample = { score: nomOdds / 100, label: s.c.nominated ? 1 : 0, category: catId };
       all.push(sample);

@@ -42,7 +42,16 @@ import { clamp } from "./forecast-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-import { scoreFilm } from "./scoring-utils.js";
+import {
+  scoreFilm,
+  NOMINATION_PERCENT_UPLIFT,
+  WINNER_PERCENT_UPLIFT,
+  WINNER_TO_NOMINATION_CAP,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+  WIN_ODDS_MIN,
+  WIN_ODDS_MAX,
+} from "./scoring-utils.js";
 import { calculateNominationOdds, calculateWinnerOdds, rebalanceCategory } from "./app-logic.js";
 import type { Film, NormalizedWeights } from "./types.js";
 import type Database from "better-sqlite3";
@@ -75,10 +84,8 @@ const PERSON_CATEGORY_IDS = new Set([
   "director", "actor", "actress", "supporting-actor", "supporting-actress",
 ]);
 
-// Must match the constants in app.ts so SSR numbers are consistent with client.
-const NOMINATION_PERCENT_UPLIFT = 1.14;
-const WINNER_PERCENT_UPLIFT     = 1.2;
-const WINNER_TO_NOMINATION_CAP  = 0.5;
+// NOMINATION_PERCENT_UPLIFT, WINNER_PERCENT_UPLIFT, WINNER_TO_NOMINATION_CAP,
+// and the odds clamp bounds are imported from scoring-utils.ts — single source of truth.
 
 // ── HTML safety ───────────────────────────────────────────────────────────────
 // Film titles come from user-controlled data stored in the DB.  All values
@@ -210,8 +217,8 @@ export function buildSsrLeaderboard(db: Database.Database): LeaderboardRow[] {
         nominationTotal,
         nomineeScale,
         uplift: NOMINATION_PERCENT_UPLIFT,
-        min: 0.6,
-        max: 99,
+        min: NOM_ODDS_MIN,
+        max: NOM_ODDS_MAX,
       });
       const winner = calculateWinnerOdds({
         winnerRaw:  film.winnerRaw,
@@ -219,8 +226,8 @@ export function buildSsrLeaderboard(db: Database.Database): LeaderboardRow[] {
         nomination,
         winnerBase: meta.winnerBase,
         uplift: WINNER_PERCENT_UPLIFT,
-        min: 0.4,
-        max: 92,
+        min: WIN_ODDS_MIN,
+        max: WIN_ODDS_MAX,
       });
       return { rawTitle: film.title, rawStudio: film.studio, nomination, winner };
     }).sort((a, b) => b.winner - a.winner);

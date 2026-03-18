@@ -2,7 +2,15 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { scoreFilm } from "./scoring-utils.js";
+import {
+  scoreFilm,
+  NOMINATION_PERCENT_UPLIFT,
+  WINNER_PERCENT_UPLIFT,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+  WIN_ODDS_MIN,
+  WIN_ODDS_MAX,
+} from "./scoring-utils.js";
 import { calculateNominationOdds, calculateWinnerOdds } from "./app-logic.js";
 import type { Film, NormalizedWeights } from "./types.js";
 
@@ -145,18 +153,18 @@ function scoreYear(
       nominationRaw: s.nominationRaw,
       nominationTotal,
       nomineeScale,
-      uplift: 1.14,
-      min: 0.6,
-      max: 99
+      uplift: NOMINATION_PERCENT_UPLIFT,
+      min: NOM_ODDS_MIN,
+      max: NOM_ODDS_MAX,
     });
     const winnerOdds = calculateWinnerOdds({
       winnerRaw: s.winnerRaw,
       winnerTotal,
       nomination: nominationOdds,
       winnerBase: histCat.winnerBase,
-      uplift: 1.2,
-      min: 0.4,
-      max: 92
+      uplift: WINNER_PERCENT_UPLIFT,
+      min: WIN_ODDS_MIN,
+      max: WIN_ODDS_MAX,
     });
     return { contender: s.contender, nominationOdds, winnerOdds };
   });

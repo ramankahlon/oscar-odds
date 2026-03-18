@@ -34,7 +34,15 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scoreFilm } from "../scoring-utils.js";
+import {
+  scoreFilm,
+  NOMINATION_PERCENT_UPLIFT,
+  WINNER_PERCENT_UPLIFT,
+  NOM_ODDS_MIN,
+  NOM_ODDS_MAX,
+  WIN_ODDS_MIN,
+  WIN_ODDS_MAX,
+} from "../scoring-utils.js";
 import { calculateNominationOdds, calculateWinnerOdds } from "../app-logic.js";
 import type { NormalizedWeights } from "../types.js";
 
@@ -234,18 +242,18 @@ function collectPredictions(weights: NormalizedWeights): {
           nominationRaw:   s.nominationRaw,
           nominationTotal,
           nomineeScale,
-          uplift: 1.14,
-          min: 0.6,
-          max: 99,
+          uplift: NOMINATION_PERCENT_UPLIFT,
+          min: NOM_ODDS_MIN,
+          max: NOM_ODDS_MAX,
         });
         const winOdds = calculateWinnerOdds({
           winnerRaw:   s.winnerRaw,
           winnerTotal,
           nomination:  nomOdds,
           winnerBase:  rawCat.winnerBase,
-          uplift: 1.2,
-          min: 0.4,
-          max: 92,
+          uplift: WINNER_PERCENT_UPLIFT,
+          min: WIN_ODDS_MIN,
+          max: WIN_ODDS_MAX,
         });
 
         nomData.push({ p: nomOdds / 100, o: s.contender.nominated ? 1 : 0 });
@@ -285,8 +293,8 @@ function collectByCategory(
       const nomineeScale    = rawCat.nominees / Math.max(1, contenders.length);
 
       for (const s of scored) {
-        const nomOdds = calculateNominationOdds({ nominationRaw: s.nominationRaw, nominationTotal, nomineeScale, uplift: 1.14, min: 0.6, max: 99 });
-        const winOdds = calculateWinnerOdds({ winnerRaw: s.winnerRaw, winnerTotal, nomination: nomOdds, winnerBase: rawCat.winnerBase, uplift: 1.2, min: 0.4, max: 92 });
+        const nomOdds = calculateNominationOdds({ nominationRaw: s.nominationRaw, nominationTotal, nomineeScale, uplift: NOMINATION_PERCENT_UPLIFT, min: NOM_ODDS_MIN, max: NOM_ODDS_MAX });
+        const winOdds = calculateWinnerOdds({ winnerRaw: s.winnerRaw, winnerTotal, nomination: nomOdds, winnerBase: rawCat.winnerBase, uplift: WINNER_PERCENT_UPLIFT, min: WIN_ODDS_MIN, max: WIN_ODDS_MAX });
         nomData.push({ p: nomOdds / 100, o: s.contender.nominated ? 1 : 0 });
         winData.push({ p: winOdds / 100, o: s.contender.winner    ? 1 : 0 });
       }
