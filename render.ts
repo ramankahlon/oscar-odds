@@ -1015,7 +1015,7 @@ export function renderSearchResults(query: string): void {
 
   if (matches.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="results-empty" colspan="${oddsMode === "both" ? 3 : 2}">No contenders match "${query}".</td>`;
+    row.innerHTML = `<td class="results-empty" colspan="${oddsMode === "both" ? 3 : 2}">No contenders match "${esc(query)}".</td>`;
     resultsBody.appendChild(row);
   } else {
     matches.forEach((entry) => {

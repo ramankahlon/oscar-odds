@@ -290,8 +290,8 @@ export function renderAbTest(): void {
   // Populate selectors once (idempotent — clear + refill)
   const names = abTestData.presets.map(p => p.name);
   if (selA.options.length !== names.length) {
-    selA.innerHTML = names.map(n => `<option>${n}</option>`).join("");
-    selB.innerHTML = names.map(n => `<option>${n}</option>`).join("");
+    selA.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("");
+    selB.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("");
     // Default: first two presets
     selB.selectedIndex = Math.min(1, names.length - 1);
     selA.addEventListener("change", renderAbTest);
@@ -341,10 +341,10 @@ export function renderAbTest(): void {
   let verdictClass = "ab-verdict--tie";
   if (sig(tP) || sig(wP)) {
     if (bsDelta > 0) {
-      verdict = `<strong>${nameA}</strong> has significantly lower (better) Brier Score.`;
+      verdict = `<strong>${esc(nameA)}</strong> has significantly lower (better) Brier Score.`;
       verdictClass = "ab-verdict--a";
     } else {
-      verdict = `<strong>${nameB}</strong> has significantly lower (better) Brier Score.`;
+      verdict = `<strong>${esc(nameB)}</strong> has significantly lower (better) Brier Score.`;
       verdictClass = "ab-verdict--b";
     }
   }
