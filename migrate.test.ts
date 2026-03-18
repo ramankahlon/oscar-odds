@@ -133,4 +133,80 @@ describe("runMigrations", () => {
       "003_add_sessions.sql",
     ]);
   });
+
+  it("006_add_foreign_keys: orphaned rows are pruned and FK constraints are enforced after PRAGMA foreign_keys = ON", async () => {
+    const db = new Database(":memory:");
+    const dir = makeTempDir();
+    temps.push({ db, dir });
+
+    // Build the schema that existed before migration 006.
+    db.exec(`
+      CREATE TABLE profiles (
+        id TEXT PRIMARY KEY, updated_at TEXT, payload TEXT, passphrase_hash TEXT
+      );
+      CREATE TABLE snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id TEXT NOT NULL, category_id TEXT NOT NULL,
+        contender_key TEXT NOT NULL, contender_title TEXT NOT NULL,
+        nom_pct REAL NOT NULL, win_pct REAL NOT NULL, snapped_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_snapshots_unique
+        ON snapshots(profile_id, category_id, contender_key, snapped_at);
+      CREATE INDEX idx_snapshots_lookup
+        ON snapshots(profile_id, category_id, snapped_at);
+      CREATE TABLE sessions (
+        token TEXT PRIMARY KEY, profile_id TEXT NOT NULL,
+        created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_sessions_profile_id ON sessions(profile_id);
+    `);
+
+    // Seed: one valid profile, one orphaned snapshot and session (no matching profile).
+    db.exec(`
+      INSERT INTO profiles VALUES ('alice', '2026-01-01', '{}', NULL);
+      INSERT INTO snapshots (profile_id, category_id, contender_key, contender_title, nom_pct, win_pct, snapped_at)
+        VALUES ('alice', 'picture', 'film-a', 'Film A', 80.0, 30.0, '2026-03-01T12:00:00.000Z');
+      INSERT INTO snapshots (profile_id, category_id, contender_key, contender_title, nom_pct, win_pct, snapped_at)
+        VALUES ('ghost', 'picture', 'film-b', 'Film B', 50.0, 10.0, '2026-03-01T12:00:00.000Z');
+      INSERT INTO sessions VALUES ('tok-alice', 'alice', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');
+      INSERT INTO sessions VALUES ('tok-ghost', 'ghost', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');
+    `);
+
+    // Fast-forward 001–003 so the shim doesn't re-run them, then run migration 006.
+    db.exec(`
+      CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_migrations VALUES ('001_initial_schema.sql', '2026-01-01');
+      INSERT INTO schema_migrations VALUES ('002_add_passphrase.sql', '2026-01-01');
+      INSERT INTO schema_migrations VALUES ('003_add_sessions.sql',   '2026-01-01');
+      INSERT INTO schema_migrations VALUES ('004_add_client_errors.sql', '2026-01-01');
+      INSERT INTO schema_migrations VALUES ('005_snapshots_datetime.sql', '2026-01-01');
+    `);
+
+    const { DEFAULT_MIGRATIONS_DIR } = await import("./migrate.js");
+    expect(() => runMigrations(db, DEFAULT_MIGRATIONS_DIR)).not.toThrow();
+
+    // Orphaned rows must be gone.
+    const snapRows = db.prepare("SELECT profile_id FROM snapshots").all() as Array<{ profile_id: string }>;
+    expect(snapRows.every((r) => r.profile_id === "alice")).toBe(true);
+    const sessRows = db.prepare("SELECT profile_id FROM sessions").all() as Array<{ profile_id: string }>;
+    expect(sessRows.every((r) => r.profile_id === "alice")).toBe(true);
+
+    // Valid alice rows must be preserved.
+    expect(snapRows).toHaveLength(1);
+    expect(sessRows).toHaveLength(1);
+
+    // After enabling FK enforcement, inserting a row that references a
+    // non-existent profile must be rejected.
+    db.pragma("foreign_keys = ON");
+    expect(() =>
+      db.prepare(
+        "INSERT INTO snapshots (profile_id, category_id, contender_key, contender_title, nom_pct, win_pct, snapped_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run("nobody", "picture", "x", "X", 1, 1, "2026-03-02T12:00:00.000Z")
+    ).toThrow();
+
+    // Deleting the profile must cascade-delete its snapshots and sessions.
+    db.prepare("DELETE FROM profiles WHERE id = ?").run("alice");
+    expect(db.prepare("SELECT COUNT(*) AS n FROM snapshots").get() as { n: number }).toEqual({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM sessions").get() as { n: number }).toEqual({ n: 0 });
+  });
 });

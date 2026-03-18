@@ -541,6 +541,10 @@ function initDb(): void {
     logger.info({ migrations: newMigrations }, "db migrations applied");
   }
 
+  // Enable FK enforcement after migrations — constraints are now guaranteed to
+  // exist in the schema (added by 006_add_foreign_keys.sql).
+  db.pragma("foreign_keys = ON");
+
   // Purge expired sessions on startup.
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(new Date().toISOString());
   // Prune client errors older than 30 days.
