@@ -871,6 +871,25 @@ export function bindProfileLockButton(): void {
     cb?.(false);
   });
 
+  // Real-time confirm-field validation: show/clear the mismatch error as the user
+  // types, so they don't have to wait until submit to discover a typo.
+  // Only active in "set" / "change" mode; the confirm field is hidden in "unlock".
+  function validatePassphraseMatch(): void {
+    if (!authDialogError || !authPassphraseInput || !authPassphraseConfirm) return;
+    if (authDialogMode !== "set" && authDialogMode !== "change") return;
+    const pass    = authPassphraseInput.value;
+    const confirm = authPassphraseConfirm.value;
+    if (confirm && pass !== confirm) {
+      authDialogError.textContent = "Passphrases do not match.";
+    } else if (authDialogError.textContent === "Passphrases do not match.") {
+      // Only clear this specific error — leave length warnings untouched.
+      authDialogError.textContent = "";
+    }
+  }
+
+  authPassphraseInput?.addEventListener("input", validatePassphraseMatch);
+  authPassphraseConfirm?.addEventListener("input", validatePassphraseMatch);
+
   // Single submit listener — handles unlock / set / change based on authDialogMode
   authDialogSubmit?.addEventListener("click", async () => {
     const profileId = authDialogMode === "unlock" ? unlockProfileId || state.profileId : state.profileId;
