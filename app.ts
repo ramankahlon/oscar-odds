@@ -415,11 +415,11 @@ async function checkScraperHealth(): Promise<void> {
     const now = Date.now();
     const staleSourceNames = Object.entries(sources)
       .filter(([, rawMetrics]) => {
-        const metrics = rawMetrics as { consecutiveFailures?: number; lastSuccessAt?: string; attempts?: number };
+        const metrics = rawMetrics as { consecutiveFailures?: number; lastSuccessAt?: string | null; attempts?: number };
         if ((metrics.consecutiveFailures ?? 0) > 0) return true;
         if (metrics.lastSuccessAt) {
           const ageMinutes = (now - Date.parse(metrics.lastSuccessAt)) / 60000;
-          if (ageMinutes > SCRAPE_STALE_THRESHOLD_MINUTES) return true;
+          if (Number.isFinite(ageMinutes) && ageMinutes > SCRAPE_STALE_THRESHOLD_MINUTES) return true;
         } else if ((metrics.attempts ?? 0) > 0) {
           return true;
         }
