@@ -20,6 +20,62 @@ info:
     produced by offline scripts (`npm run optimize:weights`, etc.).
     They return `404` until the corresponding script has been run at least once.
 
+    ## CSV import — contender data
+
+    The **Import CSV** button accepts files that match the format produced by
+    **Export CSV**.  Required columns (header row, case-insensitive, any order):
+
+    | Column        | Type              | Allowed values                 |
+    |---------------|-------------------|--------------------------------|
+    | `category_id` | string            | Must match a known category ID (e.g. `picture`, `director`, `actor`) |
+    | `title`       | string            | Film or person title           |
+    | `studio`      | string            | Studio or distributor          |
+    | `precursor`   | integer 0 – 100   | Awards-circuit precursor score |
+    | `history`     | integer 0 – 100   | Historical Oscar pattern score |
+    | `buzz`        | integer 0 – 100   | Critical and social buzz score |
+    | `strength`    | enum              | Exactly `High`, `Medium`, or `Low` |
+
+    An optional `category_name` column is included in exports but is silently
+    ignored on import.  The file must use standard RFC 4180 CSV encoding
+    (double-quote escaping; UTF-8).
+
+    The easiest workflow: click **Export CSV**, edit the values, and re-import.
+    Only the categories present in the file are updated; other categories are
+    left unchanged.
+
+    Example:
+
+    ```csv
+    category_id,category_name,title,studio,precursor,history,buzz,strength
+    picture,Best Picture,The Brutalist,Focus Features,88,72,91,High
+    picture,Best Picture,A Complete Unknown,Fox Searchlight,71,60,80,Medium
+    director,Best Director,Brady Corbet,Focus Features,82,55,78,High
+    ```
+
+    ## Consensus import — ranked titles
+
+    The **Consensus Import** dialog accepts an ordered list of film titles for
+    the **currently selected category** and adjusts precursor scores so that
+    rank 1 gets the highest score, rank 2 the next, and so on.
+
+    Input format — one per line **or** comma-separated (or mixed):
+
+    ```
+    The Brutalist
+    A Complete Unknown
+    Emilia Pérez, Conclave, Anora
+    ```
+
+    Matching rules:
+    - Case-insensitive.
+    - Punctuation, articles, bracketed annotations, and trailing year suffixes
+      are stripped before comparison.
+    - Titles that do not match any film in the active category are reported as
+      "unmatched" and skipped without error.
+
+    **Tip:** click **Export CSV** to see the exact film titles the model knows
+    for each category, then copy-paste from there into the consensus dialog.
+
 servers:
   - url: http://localhost:3000
     description: Local development

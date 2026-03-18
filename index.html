@@ -172,9 +172,10 @@
             <button id="surpriseMeButton" class="action-button action-button--surprise" type="button" title="Add ±5–15 pt random noise to buzz scores and re-run the model">Surprise me</button>
             <button id="restoreBuzzButton" class="action-button action-button--ghost" type="button" hidden>Restore buzz</button>
             <button id="exportCsvButton" class="action-button" type="button">Export CSV</button>
-            <button id="importCsvButton" class="action-button" type="button">Import CSV</button>
+            <button id="importCsvButton" class="action-button" type="button"
+                    title="Import a CSV file. Required columns: category_id, title, studio, precursor (0–100), history (0–100), buzz (0–100), strength (High/Medium/Low). Use Export CSV to get a valid template.">Import CSV</button>
             <button id="consensusImportButton" class="action-button" type="button"
-                    title="Adjust precursor scores to match a published ranking">Consensus Import</button>
+                    title="Paste a ranked list of film titles to adjust precursor scores for the active category">Consensus Import</button>
             <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
             <p class="tool-status" id="csvStatus" role="status" aria-live="polite"></p>
             <div id="buzzSyncBanner" class="buzz-sync-banner" hidden>
@@ -421,9 +422,12 @@
             aria-labelledby="consensusImportTitle">
       <h3 id="consensusImportTitle" class="auth-dialog-title">Consensus Import</h3>
       <p class="auth-dialog-desc">
-        Paste film titles ranked by odds — one per line or comma-separated
+        Paste film titles ranked best-to-worst — one per line or comma-separated
         (e.g. from Gold Derby, Variety). Precursor scores for matched contenders in
         <strong id="consensusImportCategory"></strong> will be adjusted to reflect this ordering.
+        Matching is case-insensitive and ignores punctuation; unrecognised titles are
+        skipped and listed in the status bar. Use <strong>Export CSV</strong> to see the
+        exact titles the model knows for this category.
       </p>
       <textarea id="consensusImportInput" class="consensus-import-textarea" rows="7"
         placeholder="Anora&#10;The Brutalist&#10;Emilia Pérez&#10;A Complete Unknown&#10;Conclave"
