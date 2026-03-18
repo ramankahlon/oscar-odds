@@ -195,6 +195,11 @@ async function loadProfiles(): Promise<void> {
 }
 
 // ── State persistence ─────────────────────────────────────────────────────────
+//
+// Timeout applied to every fetch that gates a visible "Syncing…" or
+// "Loading…" notice.  10 s is generous for a local/Render deployment while
+// still guaranteeing the notice clears even on a completely hung connection.
+const LOAD_STATE_TIMEOUT_MS = 10_000;
 
 async function saveStateToApi(): Promise<boolean> {
   try {
@@ -227,7 +232,7 @@ async function mergeServerHistory(profileId: string): Promise<void> {
   try {
     const res = await fetch(
       `${API_FORECAST_BASE_URL}/${encodeURIComponent(profileId)}/history`,
-      { cache: "no-store" }
+      { cache: "no-store", signal: AbortSignal.timeout(LOAD_STATE_TIMEOUT_MS) }
     );
     if (!res.ok) return;
     const doc = await res.json();
@@ -279,7 +284,10 @@ async function loadStateFromApi(): Promise<void> {
   const profileId = state.profileId;
   setAppNotice("Syncing…", "loading");
   try {
-    const response = await fetch(getForecastApiUrl(profileId), { cache: "no-store" });
+    const response = await fetch(getForecastApiUrl(profileId), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(LOAD_STATE_TIMEOUT_MS),
+    });
     if (!response.ok) {
       setBackendOfflineMode(true);
       return;
@@ -357,9 +365,12 @@ async function fetchComparePayload(profileId: string): Promise<StatePayload | nu
 async function fetchAndRenderCompare(): Promise<void> {
   if (!compareProfileId) return;
   setAppNotice("Loading comparison profile…", "loading");
-  await fetchComparePayload(compareProfileId);
-  setAppNotice("");
-  render();
+  try {
+    await fetchComparePayload(compareProfileId);
+    render();
+  } finally {
+    setAppNotice("");
+  }
 }
 
 // ── External signal polling ───────────────────────────────────────────────────
