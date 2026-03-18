@@ -269,6 +269,12 @@ export function runBacktest(weights: NormalizedWeights): BacktestResult {
 // ── In-memory cache ────────────────────────────────────────────────────────
 
 let cache: BacktestResult | null = null;
+/** Cache key: "p:h:b" formatted to 6 d.p. — cheap to compute and compare. */
+let cacheKey: string | null = null;
+
+function weightKey(w: NormalizedWeights): string {
+  return `${w.precursor.toFixed(6)}:${w.history.toFixed(6)}:${w.buzz.toFixed(6)}`;
+}
 
 /**
  * Loads ML-learned weights from data/learned-weights.json if available.
@@ -296,8 +302,11 @@ function loadLearnedWeightsOrDefault(): NormalizedWeights {
 }
 
 export function getBacktestResult(): BacktestResult {
-  if (!cache) {
-    cache = runBacktest(loadLearnedWeightsOrDefault());
+  const weights = loadLearnedWeightsOrDefault();
+  const key = weightKey(weights);
+  if (!cache || cacheKey !== key) {
+    cache    = runBacktest(weights);
+    cacheKey = key;
   }
   return cache;
 }
