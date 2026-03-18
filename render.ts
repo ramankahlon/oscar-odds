@@ -1766,25 +1766,33 @@ export function renderActiveView(activeCategory: Category, projections: Projecti
 // ── Main render function ──────────────────────────────────────────────────────
 
 export function render() {
-  setPanelsBusy(isBootstrapping);
-  const activeCategory = getActiveCategory();
-  updatePrintMeta();
-  const projections = buildProjections(activeCategory);
-  setLastOddsRecalculatedAt(new Date().toISOString());
-  updateOddsFreshnessLabel();
-  const capturedTrend = captureTrendSnapshot(activeCategory, projections);
-  if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
-  renderTabs();
-  renderWeightSliders();
-  renderWeightPresets();
-  updateOddsModeButton();
-  renderSummaryBar();
-  renderLeaderboard();
-  renderSweepPanel();
-  renderCandidates(activeCategory, projections);
-  renderSnapshotCompareDatePickers(activeCategory);
-  renderActiveView(activeCategory, projections);
-  if (capturedTrend) saveState();
+  try {
+    setPanelsBusy(isBootstrapping);
+    const activeCategory = getActiveCategory();
+    updatePrintMeta();
+    const projections = buildProjections(activeCategory);
+    setLastOddsRecalculatedAt(new Date().toISOString());
+    updateOddsFreshnessLabel();
+    const capturedTrend = captureTrendSnapshot(activeCategory, projections);
+    if (trendWindowSelect) trendWindowSelect.value = String(state.trendWindow);
+    renderTabs();
+    renderWeightSliders();
+    renderWeightPresets();
+    updateOddsModeButton();
+    renderSummaryBar();
+    renderLeaderboard();
+    renderSweepPanel();
+    renderCandidates(activeCategory, projections);
+    renderSnapshotCompareDatePickers(activeCategory);
+    renderActiveView(activeCategory, projections);
+    if (capturedTrend) saveState();
+  } catch (err) {
+    // Surface the error in the UI rather than leaving the app on a blank screen.
+    // The notice is persistent (no auto-dismiss) so the user knows something went wrong.
+    const message = err instanceof Error ? err.message : String(err);
+    setAppNotice(`Render error — try reloading the page. (${message})`, "error");
+    console.error("[render] uncaught error:", err);
+  }
 }
 
 // ── saveState forward reference ───────────────────────────────────────────────
