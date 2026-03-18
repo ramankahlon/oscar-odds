@@ -32,6 +32,70 @@ describe("calculateNominationOdds", () => {
     const value = calculateNominationOdds({ nominationRaw: 1, nominationTotal: 0, nomineeScale: 1 });
     expect(value).toBeGreaterThan(0);
   });
+
+  // ── Extreme inputs ───────────────────────────────────────────────────────────
+
+  it("zero nominationRaw returns the min floor", () => {
+    // raw=0 → formula produces 0 → clamp to default min 0.6
+    const result = calculateNominationOdds({ nominationRaw: 0, nominationTotal: 100, nomineeScale: 1 });
+    expect(result).toBe(0.6);
+  });
+
+  it("negative nominationRaw clamps to min", () => {
+    // negative raw → negative intermediate → clamp to min
+    const result = calculateNominationOdds({ nominationRaw: -50, nominationTotal: 100, nomineeScale: 1 });
+    expect(result).toBe(0.6); // default min
+  });
+
+  it("negative nominationTotal is treated as 1 (safe division)", () => {
+    // Math.max(negative, 1) === 1; result is the same as total=1
+    const withNeg = calculateNominationOdds({ nominationRaw: 0.5, nominationTotal: -999, nomineeScale: 1 });
+    const withOne = calculateNominationOdds({ nominationRaw: 0.5, nominationTotal: 1,    nomineeScale: 1 });
+    expect(withNeg).toBe(withOne);
+  });
+
+  it("nomineeScale of zero is coerced to 1 by the || 1 guard", () => {
+    // Number(0) || 1 === 1 — a scale of 0 is treated as 1, not a zeroing factor
+    const result = calculateNominationOdds({ nominationRaw: 0.4, nominationTotal: 1, nomineeScale: 0 });
+    const expected = calculateNominationOdds({ nominationRaw: 0.4, nominationTotal: 1, nomineeScale: 1 });
+    expect(result).toBe(expected);
+  });
+
+  it("uplift of zero drives result to min floor", () => {
+    // any positive raw × uplift=0 → 0 → clamp to min
+    const result = calculateNominationOdds({ nominationRaw: 50, nominationTotal: 100, nomineeScale: 1, uplift: 0 });
+    expect(result).toBe(0.6);
+  });
+
+  it("very large raw / small total clamps to max ceiling", () => {
+    const result = calculateNominationOdds({ nominationRaw: 1e9, nominationTotal: 1, nomineeScale: 1 });
+    expect(result).toBe(99); // default max
+  });
+
+  it("NaN nominationRaw is treated as 0 → returns min floor", () => {
+    const result = calculateNominationOdds({ nominationRaw: NaN, nominationTotal: 100, nomineeScale: 1 });
+    expect(result).toBe(0.6);
+  });
+
+  it("NaN nominationTotal is treated as 1 (safe division)", () => {
+    const withNaN = calculateNominationOdds({ nominationRaw: 0.5, nominationTotal: NaN, nomineeScale: 1 });
+    const withOne = calculateNominationOdds({ nominationRaw: 0.5, nominationTotal: 1,   nomineeScale: 1 });
+    expect(withNaN).toBe(withOne);
+  });
+
+  it("result is always within [min, max] regardless of extreme inputs", () => {
+    const cases: Parameters<typeof calculateNominationOdds>[0][] = [
+      { nominationRaw: Infinity,  nominationTotal: 1,    nomineeScale: 1, min: 1, max: 99 },
+      { nominationRaw: -Infinity, nominationTotal: 1,    nomineeScale: 1, min: 1, max: 99 },
+      { nominationRaw: 0,         nominationTotal: 0,    nomineeScale: 0, min: 1, max: 99 },
+      { nominationRaw: 1e15,      nominationTotal: 1e-9, nomineeScale: 5, min: 1, max: 99 },
+    ];
+    for (const c of cases) {
+      const r = calculateNominationOdds(c);
+      expect(r).toBeGreaterThanOrEqual(c.min ?? 0.6);
+      expect(r).toBeLessThanOrEqual(c.max ?? 99);
+    }
+  });
 });
 
 describe("calculateWinnerOdds", () => {
@@ -39,6 +103,73 @@ describe("calculateWinnerOdds", () => {
     const weak = calculateWinnerOdds({ winnerRaw: 0.2, winnerTotal: 1, nomination: 10, winnerBase: 0.16, uplift: 1.2 });
     const strong = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 1, nomination: 20, winnerBase: 0.16, uplift: 1.2 });
     expect(strong).toBeGreaterThan(weak);
+  });
+
+  // ── Extreme inputs ───────────────────────────────────────────────────────────
+
+  it("zero winnerRaw with zero nomination returns min floor", () => {
+    // blended = (0 + 0) / (1 + base) → 0 → uplift has no effect → clamp to min
+    const result = calculateWinnerOdds({ winnerRaw: 0, winnerTotal: 1, nomination: 0, winnerBase: 0.16 });
+    expect(result).toBe(0.4); // default min
+  });
+
+  it("zero winnerTotal is safe (treated as 1)", () => {
+    // Math.max(0, 1) === 1 — no division by zero
+    expect(() =>
+      calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 0, nomination: 20, winnerBase: 0.16 })
+    ).not.toThrow();
+    const withZero = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 0,  nomination: 20, winnerBase: 0.16 });
+    const withOne  = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 1,  nomination: 20, winnerBase: 0.16 });
+    expect(withZero).toBe(withOne);
+  });
+
+  it("negative winnerTotal is treated as 1", () => {
+    const withNeg = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: -999, nomination: 20, winnerBase: 0.16 });
+    const withOne = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 1,    nomination: 20, winnerBase: 0.16 });
+    expect(withNeg).toBe(withOne);
+  });
+
+  it("winnerBase of zero removes nomination context (pure raw share)", () => {
+    // denominator = 1 + 0 = 1; blended = (raw/total)*100 * uplift
+    const result   = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 1, nomination: 50, winnerBase: 0 });
+    const expected = calculateWinnerOdds({ winnerRaw: 0.5, winnerTotal: 1, nomination: 0,  winnerBase: 0 });
+    // nomination doesn't contribute when base=0
+    expect(result).toBe(expected);
+  });
+
+  it("very high nomination with high winnerBase can reach max ceiling", () => {
+    // nomination=99, winnerBase=10 → second term dominates; result should hit max
+    const result = calculateWinnerOdds({ winnerRaw: 1, winnerTotal: 1, nomination: 99, winnerBase: 10, uplift: 1.5 });
+    expect(result).toBe(92); // default max
+  });
+
+  it("uplift of zero drives result to min floor", () => {
+    const result = calculateWinnerOdds({ winnerRaw: 0.9, winnerTotal: 1, nomination: 90, winnerBase: 0.5, uplift: 0 });
+    expect(result).toBe(0.4);
+  });
+
+  it("negative winnerRaw clamps to min", () => {
+    const result = calculateWinnerOdds({ winnerRaw: -100, winnerTotal: 1, nomination: 0, winnerBase: 0 });
+    expect(result).toBe(0.4);
+  });
+
+  it("NaN winnerRaw and NaN nomination are treated as 0 → returns min floor", () => {
+    const result = calculateWinnerOdds({ winnerRaw: NaN, winnerTotal: 1, nomination: NaN, winnerBase: 0.16 });
+    expect(result).toBe(0.4);
+  });
+
+  it("result is always within [min, max] regardless of extreme inputs", () => {
+    const cases: Parameters<typeof calculateWinnerOdds>[0][] = [
+      { winnerRaw: Infinity,  winnerTotal: 1,    nomination: 99,  winnerBase: 1,   min: 1, max: 92 },
+      { winnerRaw: -Infinity, winnerTotal: 1,    nomination: 0,   winnerBase: 0,   min: 1, max: 92 },
+      { winnerRaw: 0,         winnerTotal: 0,    nomination: 0,   winnerBase: 0,   min: 1, max: 92 },
+      { winnerRaw: 1e15,      winnerTotal: 1e-9, nomination: 100, winnerBase: 100, min: 1, max: 92 },
+    ];
+    for (const c of cases) {
+      const r = calculateWinnerOdds(c);
+      expect(r).toBeGreaterThanOrEqual(c.min ?? 0.4);
+      expect(r).toBeLessThanOrEqual(c.max ?? 92);
+    }
   });
 });
 
