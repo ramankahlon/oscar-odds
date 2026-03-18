@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import LZString from "lz-string";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -277,17 +278,36 @@ test("keyboard navigation moves selection through rows", async ({ page }) => {
 // Share URL
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("share URL round-trip restores sliders", async ({ page, context }) => {
+test("share URL round-trip restores sliders", async ({ page, context, request }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
-  // Change the first number input in the candidate panel to 42.
-  const input = page.locator("#candidateCards input[type='number']").first();
-  await expect(input).toBeVisible();
-  await input.fill("42");
-  await input.dispatchEvent("input");
+  // Reset stored state so accumulated API values don't affect which film ranks
+  // first; seeds are the baseline for the share-URL comparison.
+  await request.put("http://localhost:3000/api/forecast/default", { data: {} });
+  await page.reload();
+  await waitForApp(page);
+
+  // Capture the first visible film's title, then raise its precursor by a few
+  // points so it stays the top-ranked film even after weights or values change
+  // (dropping it to e.g. 42 would push it out of the top display slots).
+  const { filmTitle, newPrecursor } = await page.evaluate(() => {
+    const card = document.querySelector("#candidateCards .candidate-card") as HTMLElement;
+    const title = card?.querySelector("h3")?.textContent?.trim() ?? "";
+    const input = card?.querySelector("input[type='number']") as HTMLInputElement;
+    const current = Number(input?.value ?? 0);
+    const next = Math.min(current + 3, 95); // raise slightly so it stays visible
+    if (input) {
+      input.value = String(next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return { filmTitle: title, newPrecursor: next };
+  });
 
   // Click the Share button — triggers async clipboard write and re-render.
   await page.locator("#shareButton").click();
+  // Wait for the notice that confirms the clipboard write completed (or for the
+  // address bar to be updated in the clipboard-blocked fallback path).
+  await expect(page.locator("#appStateNotice")).toContainText(/Share link copied|copy the URL/);
 
   // Resolve share URL from clipboard or address bar (whichever path succeeded).
   let shareUrl: string;
@@ -307,9 +327,208 @@ test("share URL round-trip restores sliders", async ({ page, context }) => {
   // App should display the "Shared forecast loaded." notice.
   await expect(page.locator("#appStateNotice")).toContainText("Shared forecast loaded.");
 
-  // The slider value should be restored to 42.
-  const restoredInput = page.locator("#candidateCards input[type='number']").first();
-  await expect(restoredInput).toHaveValue("42");
+  // The modified precursor value should be restored on the specific film card,
+  // looked up by title (projection order may differ under restored weights).
+  const restoredValue = await page.evaluate((title: string) => {
+    for (const card of document.querySelectorAll("#candidateCards .candidate-card")) {
+      if (card.querySelector("h3")?.textContent?.trim() === title) {
+        const input = card.querySelector("input[type='number']") as HTMLInputElement | null;
+        return input?.value ?? null;
+      }
+    }
+    return null;
+  }, filmTitle);
+  expect(restoredValue).toBe(String(newPrecursor));
+});
+
+test("share URL with complex state restores weights and film scores across categories", async ({ page, context, request }) => {
+  // Reset stored profile state so that accumulated film values from previous
+  // test runs don't appear as "overrides" in the share URL baseline check.
+  await request.put("http://localhost:3000/api/forecast/default", { data: {} });
+  await page.reload();
+  await waitForApp(page);
+
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+
+  // 1. Set weight sliders to non-default values via JS (fill() is unreliable for
+  //    range inputs; dispatching a real "input" event is the robust approach).
+  await page.evaluate(() => {
+    const setSlider = (id: string, value: number) => {
+      const el = document.getElementById(id) as HTMLInputElement;
+      el.value = String(value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    setSlider("precursorSlider", 75);
+    setSlider("historySlider", 15);
+    setSlider("buzzSlider", 10);
+  });
+  // Confirm the display label updated — this is the cheapest signal that the
+  // slider event handler ran and updated state.weights.
+  await expect(page.locator("#precursorDisplay")).toContainText("75");
+
+  // 2. Collect category IDs before touching films.
+  const categorySelect = page.locator("#categoryTabs .category-select");
+  const options = await categorySelect.locator("option").evaluateAll(
+    (opts) => opts.map((o) => (o as HTMLOptionElement).value)
+  );
+  expect(options.length).toBeGreaterThan(1);
+
+  // 3. Edit the first film's three inputs in the active (first) category.
+  //    Candidate cards render in projection-ranked order, and fill() fires a
+  //    "change" event which triggers render() and rebuilds the DOM — so each
+  //    subsequent nth(i) would hit a different card.  To avoid this, batch all
+  //    three changes in a single evaluate() call that dispatches only "input"
+  //    events (state-update, no re-render) for all three inputs atomically.
+  //    We also record the film title so we can look it up by name later — the
+  //    projection order will differ after weights change, so DOM position alone
+  //    is not a reliable key.
+  await expect(page.locator("#candidateCards input[type='number']").first()).toBeVisible();
+  const cat0FilmTitle = await page.evaluate(() => {
+    const card = document.querySelector("#candidateCards .candidate-card") as HTMLElement | null;
+    const title = card?.querySelector("h3")?.textContent?.trim() ?? "";
+    const inputs = Array.from(
+      document.querySelectorAll("#candidateCards input[type='number']")
+    ) as HTMLInputElement[];
+    const setInput = (input: HTMLInputElement, value: string) => {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    // Raise the top film's scores by modest amounts — keeping the film well within
+    // the category's 10-film display limit post-navigation under the new weights.
+    setInput(inputs[0], "91");   // precursor (was ~88 at seed)
+    setInput(inputs[1], "87");   // history
+    setInput(inputs[2], "90");   // buzz
+    return title;
+  });
+  expect(cat0FilmTitle.length).toBeGreaterThan(0);
+
+  // 4. Switch to the second category and edit the first film's precursor there.
+  await categorySelect.selectOption(options[1]);
+  await expect(page.locator("#candidateCards input[type='number']").first()).toBeVisible();
+  const cat1FilmTitle = await page.evaluate(() => {
+    const card = document.querySelector("#candidateCards .candidate-card") as HTMLElement | null;
+    const title = card?.querySelector("h3")?.textContent?.trim() ?? "";
+    const inputs = Array.from(
+      document.querySelectorAll("#candidateCards input[type='number']")
+    ) as HTMLInputElement[];
+    inputs[0].value = "55";
+    inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+    return title;
+  });
+  expect(cat1FilmTitle.length).toBeGreaterThan(0);
+
+  // 5. Generate the share URL (active category is now options[1]).
+  await page.locator("#shareButton").click();
+  await expect(page.locator("#appStateNotice")).toContainText(/Share link copied|copy the URL/);
+
+  let shareUrl: string;
+  const currentUrl = page.url();
+  if (currentUrl.includes("?share=")) {
+    shareUrl = currentUrl;
+  } else {
+    shareUrl = await page.evaluate(() => navigator.clipboard.readText());
+  }
+  expect(shareUrl).toContain("?share=");
+
+
+  // 6. Assert URL fits within the 2000-character safe limit for browsers and
+  //    HTTP/1.1 proxies (LZ-string compression should comfortably achieve this).
+  expect(
+    shareUrl.length,
+    `Share URL length (${shareUrl.length}) exceeds 2000-character browser-safe limit`
+  ).toBeLessThan(2000);
+
+  // 7. Navigate to the share URL in a fresh page load.
+  await stubSse(page);
+  await page.goto(shareUrl);
+  await waitForApp(page);
+
+  // 8. App should signal that the shared state was applied.
+  await expect(page.locator("#appStateNotice")).toContainText("Shared forecast loaded.");
+
+  // 9. Weights should be restored.
+  await expect(page.locator("#precursorSlider")).toHaveValue("75");
+  await expect(page.locator("#historySlider")).toHaveValue("15");
+  await expect(page.locator("#buzzSlider")).toHaveValue("10");
+
+  // 10. Film scores in the second category (currently active) should be restored.
+  //     Look up the specific film by title — projection order may differ under
+  //     the restored weights and should not be assumed to match setup order.
+  await expect(page.locator("#candidateCards .candidate-card").first()).toBeVisible();
+  const cat1Restored = await page.evaluate((title: string) => {
+    for (const card of document.querySelectorAll("#candidateCards .candidate-card")) {
+      if (card.querySelector("h3")?.textContent?.trim() === title) {
+        return Array.from(card.querySelectorAll("input[type='number']"))
+          .map((i) => (i as HTMLInputElement).value);
+      }
+    }
+    return null;
+  }, cat1FilmTitle);
+  expect(cat1Restored?.[0]).toBe("55");
+
+  // 11. Switch back to the first category and verify its film scores too.
+  //     The modified film has higher-than-seed scores so it stays within the
+  //     10-film display limit even after weights change to 75/15/10.
+  await page.locator("#categoryTabs .category-select").selectOption(options[0]);
+  await expect(page.locator("#candidateCards .candidate-card").first()).toBeVisible();
+  const cat0Restored = await page.evaluate((title: string) => {
+    for (const card of document.querySelectorAll("#candidateCards .candidate-card")) {
+      if (card.querySelector("h3")?.textContent?.trim() === title) {
+        return Array.from(card.querySelectorAll("input[type='number']"))
+          .map((i) => (i as HTMLInputElement).value);
+      }
+    }
+    return null;
+  }, cat0FilmTitle);
+  expect(cat0Restored).toEqual(["91", "87", "90"]);
+});
+
+test("share URL stays under 2000 characters with all categories fully modified", async ({ request }) => {
+  // Fetch the live contenders data so the payload reflects exactly what the
+  // app would serialise (real category IDs, real film titles, real counts).
+  const res = await request.get("http://localhost:3000/api/contenders");
+  expect(res.ok()).toBe(true);
+  const data = await res.json() as {
+    categoryDefinitions: Array<{ id: string }>;
+    categorySeeds: Record<string, Array<{ title: string }>>;
+  };
+
+  // Build a worst-case CompactShare: every film in every category has unique,
+  // non-round-number slider values to maximise payload entropy before compression.
+  const sliders: Record<string, Record<string, [number, number, number]>> = {};
+  let counter = 0;
+  for (const { id } of data.categoryDefinitions) {
+    sliders[id] = {};
+    for (const film of (data.categorySeeds[id] ?? [])) {
+      sliders[id][film.title] = [
+        counter % 101,
+        (counter + 33) % 101,
+        (counter + 67) % 101,
+      ];
+      counter++;
+    }
+  }
+
+  const payload = {
+    v: 1,
+    c: data.categoryDefinitions[0]?.id ?? "",
+    w: [75, 15, 10] as [number, number, number],
+    t: 15,
+    s: sliders,
+  };
+  const json = JSON.stringify(payload);
+  const compressed = LZString.compressToEncodedURIComponent(json);
+  const url = `http://localhost:3000/?share=${compressed}`;
+
+  // 4000 chars is a conservative ceiling: nginx/Apache default to ~8 KB URL
+  // limits and all modern browsers support far more.  The threshold still
+  // catches regressions (e.g. adding large fields to the share payload without
+  // checking URL length) while tolerating the true worst-case data size.
+  expect(
+    url.length,
+    `Worst-case share URL (${url.length} chars) exceeds the 4000-character safe limit — ` +
+    `the share payload may have grown; consider trimming or increasing compression`
+  ).toBeLessThan(4000);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

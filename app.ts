@@ -457,7 +457,11 @@ async function loadContenders(): Promise<void> {
   setCategorySeeds(seeds);
   setCategories(data.categoryDefinitions.map((cat) => ({
     ...cat,
-    films: seeds[cat.id] ? [...seeds[cat.id]] : createSeedFilms(),
+    // Deep-copy each film so that categorySeeds remains an immutable baseline
+    // for serializeSharePayload() comparisons.  A shallow [...array] copy shares
+    // the underlying film objects with categorySeeds, causing mutations made via
+    // the UI to silently zero-out the comparison delta.
+    films: seeds[cat.id] ? seeds[cat.id].map((f) => ({ ...f })) : createSeedFilms(),
   })));
   setPriorCategoryWins(data.experienceConfig.priorCategoryWins);
   setRecentWinnerPenalty(data.experienceConfig.recentWinnerPenalty);

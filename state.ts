@@ -1105,12 +1105,26 @@ export function buildPolylinePath(points: TrendPoint[], metric: "nomination" | "
 }
 
 export function serializeSharePayload(): CompactShare {
+  // Only encode films whose slider values differ from the loaded seed values.
+  // Omitting unchanged films keeps the LZ-compressed URL well under 2000 chars
+  // even when the full contenders dataset spans 20+ categories.
   const sliders: Record<string, Record<string, [number, number, number]>> = {};
   for (const cat of categories) {
-    sliders[cat.id] = {};
+    const seeds = categorySeeds[cat.id] ?? [];
+    const seedMap = new Map(seeds.map((f) => [f.title, f]));
+    const overrides: Record<string, [number, number, number]> = {};
     for (const film of cat.films) {
-      sliders[cat.id][film.title] = [film.precursor, film.history, film.buzz];
+      const seed = seedMap.get(film.title);
+      if (
+        !seed ||
+        film.precursor !== seed.precursor ||
+        film.history   !== seed.history   ||
+        film.buzz      !== seed.buzz
+      ) {
+        overrides[film.title] = [film.precursor, film.history, film.buzz];
+      }
     }
+    if (Object.keys(overrides).length > 0) sliders[cat.id] = overrides;
   }
   return {
     v: 1,
