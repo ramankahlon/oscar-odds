@@ -104,7 +104,11 @@ export function applySourceSignals({
 
       const combined              = clamp(Number(match.combinedScore          || 0), 0, 1);
       const letterboxdScore       = clamp(Number(match.letterboxdScore        || 0), 0, 1);
-      const goldderbyScore        = clamp(Number(match.goldderbyScore         || 0), 0, 1);
+      // Prefer the category-specific Gold Derby score (e.g. Best Director odds
+      // for a director contender) over the cross-category global max.
+      const goldderbyScore        = clamp(
+        Number(match.goldderbyByCategory?.[category.id] ?? match.goldderbyScore ?? 0), 0, 1
+      );
       const nextbestpictureScore  = clamp(Number(match.nextbestpictureScore   || 0), 0, 1);
       const awardsdailyScore      = clamp(Number(match.awardsdailyScore       || 0), 0, 1);
       const thegamerScore         = clamp(Number(match.thegamerScore          || 0), 0, 1);

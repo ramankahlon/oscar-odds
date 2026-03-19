@@ -68,6 +68,7 @@ export interface AggregateSignal {
   combinedScore?: number;
   letterboxdScore?: number;
   goldderbyScore?: number;
+  goldderbyByCategory?: Record<string, number>;
   nextbestpictureScore?: number;
   awardsdailyScore?: number;
   thegamerScore?: number;

@@ -3,12 +3,14 @@ import {
   buildAggregate,
   canonicalizeEntity,
   extractAwardsDaily,
+  extractGoldDerby,
   extractLetterboxd,
   extractNextBestPicture,
   extractReddit,
   extractTheGamer,
   isValidEntityCandidate,
-  recencyMultiplier
+  recencyMultiplier,
+  type GoldDerbyCategoryItem
 } from "./scraper-utils.js";
 
 describe("extractLetterboxd", () => {
@@ -167,6 +169,83 @@ describe("extractAwardsDaily", () => {
     expect(odyssey).toBeTruthy();
     expect(odyssey!.awardsdailyScore).toBeCloseTo(1.0);
     expect(odyssey!.combinedScore).toBeGreaterThan(0);
+  });
+});
+
+describe("Gold Derby multi-category", () => {
+  const pictureHtml = `
+    <table id="footable_1">
+      <tbody>
+        <tr><td class="contestant-name">The Odyssey</td></tr>
+        <tr><td class="contestant-name">Wild Horse Nine</td></tr>
+      </tbody>
+    </table>
+  `;
+
+  const directorHtml = `
+    <table id="footable_2">
+      <tbody>
+        <tr><td class="contestant-name">Christopher Nolan</td></tr>
+        <tr><td class="contestant-name">Ryan Coogler</td></tr>
+      </tbody>
+    </table>
+  `;
+
+  it("buildAggregate stores per-category scores in goldderbyByCategory", () => {
+    const categories: GoldDerbyCategoryItem[] = [
+      { categoryId: "picture",  items: extractGoldDerby(pictureHtml) },
+      { categoryId: "director", items: extractGoldDerby(directorHtml) }
+    ];
+
+    const aggregate = buildAggregate([], [], [], categories);
+
+    const odyssey = aggregate.find((a) => a.title.toLowerCase().includes("odyssey"));
+    expect(odyssey).toBeTruthy();
+    expect(odyssey!.goldderbyByCategory["picture"]).toBeGreaterThan(0);
+    expect(odyssey!.goldderbyByCategory["director"]).toBeUndefined();
+
+    const nolan = aggregate.find((a) => a.title.toLowerCase().includes("nolan"));
+    expect(nolan).toBeTruthy();
+    expect(nolan!.goldderbyByCategory["director"]).toBeGreaterThan(0);
+    expect(nolan!.goldderbyByCategory["picture"]).toBeUndefined();
+  });
+
+  it("goldderbyScore is the max across categories for an entity present in multiple", () => {
+    // Simulate a film that appears in both picture and adapted-screenplay.
+    const categories: GoldDerbyCategoryItem[] = [
+      { categoryId: "picture",             items: [{ title: "The Odyssey", rank: 1, score: 1.0 }] },
+      { categoryId: "adapted-screenplay",  items: [{ title: "The Odyssey", rank: 2, score: 0.6 }] }
+    ];
+
+    const aggregate = buildAggregate([], [], [], categories);
+    const odyssey = aggregate.find((a) => a.title.toLowerCase().includes("odyssey"))!;
+
+    // Global goldderbyScore should be the max (1.0), not the screenplay score.
+    expect(odyssey.goldderbyScore).toBeCloseTo(1.0);
+    expect(odyssey.goldderbyByCategory["picture"]).toBeCloseTo(1.0);
+    expect(odyssey.goldderbyByCategory["adapted-screenplay"]).toBeCloseTo(0.6);
+  });
+
+  it("top-ranked entity in each category scores higher than lower-ranked", () => {
+    const categories: GoldDerbyCategoryItem[] = [
+      { categoryId: "director", items: extractGoldDerby(directorHtml) }
+    ];
+
+    const aggregate = buildAggregate([], [], [], categories);
+    const nolan = aggregate.find((a) => a.title.toLowerCase().includes("nolan"))!;
+    const coogler = aggregate.find((a) => a.title.toLowerCase().includes("coogler"))!;
+
+    expect(nolan.goldderbyByCategory["director"]).toBeGreaterThan(
+      coogler.goldderbyByCategory["director"]
+    );
+  });
+
+  it("tolerates empty category results without throwing", () => {
+    const categories: GoldDerbyCategoryItem[] = [
+      { categoryId: "picture", items: [] },
+      { categoryId: "actor",   items: [] }
+    ];
+    expect(() => buildAggregate([], [], [], categories)).not.toThrow();
   });
 });
 

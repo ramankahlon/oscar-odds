@@ -26,10 +26,19 @@ interface Mention {
   weightedScore: number;
 }
 
+/** One Gold Derby category page's worth of ranked results. */
+export interface GoldDerbyCategoryItem {
+  categoryId: string;
+  items: ScoreItem[];
+}
+
 interface AggregateItem {
   title: string;
   letterboxdScore: number;
+  /** Max Gold Derby score across all categories this entity appears in. */
   goldderbyScore: number;
+  /** Per-category Gold Derby score, keyed by the app's category ID. */
+  goldderbyByCategory: Record<string, number>;
   nextbestpictureScore: number;
   awardsdailyScore: number;
   thegamerScore: number;
@@ -533,7 +542,7 @@ export function buildAggregate(
   letterboxdItems: ScoreItem[],
   redditMentions: Mention[],
   thegamerItems: ScoreItem[],
-  goldderbyItems: ScoreItem[] = [],
+  goldderbyCategories: GoldDerbyCategoryItem[] = [],
   indiewireItems: ScoreItem[] = [],
   nextbestpictureItems: ScoreItem[] = [],
   awardsdailyItems: ScoreItem[] = []
@@ -550,6 +559,7 @@ export function buildAggregate(
         title: canonical.title,
         letterboxdScore: 0,
         goldderbyScore: 0,
+        goldderbyByCategory: {},
         nextbestpictureScore: 0,
         awardsdailyScore: 0,
         thegamerScore: 0,
@@ -567,9 +577,20 @@ export function buildAggregate(
     if (entry) entry.letterboxdScore = item.score;
   });
 
-  goldderbyItems.forEach((item, index) => {
-    const entry = getOrCreate(item.title);
-    if (entry) entry.goldderbyScore = Math.max(entry.goldderbyScore, Math.max(0, (30 - index) / 30));
+  // Process each Gold Derby category page, storing both a global max score
+  // (used in combinedScore) and a per-category score for applySourceSignals.
+  // item.score is already rank-calibrated by extractGoldDerby, so use it
+  // directly (consistent with letterboxd and awardsdaily handling).
+  goldderbyCategories.forEach(({ categoryId, items }) => {
+    items.forEach((item) => {
+      const entry = getOrCreate(item.title);
+      if (!entry) return;
+      entry.goldderbyScore = Math.max(entry.goldderbyScore, item.score);
+      entry.goldderbyByCategory[categoryId] = Math.max(
+        entry.goldderbyByCategory[categoryId] ?? 0,
+        item.score
+      );
+    });
   });
 
   nextbestpictureItems.forEach((item, index) => {

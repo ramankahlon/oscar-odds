@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { buildAggregate, extractAwardsDaily, extractGoldDerby, extractIndieWire, extractLetterboxd, extractNextBestPicture, extractReddit, extractTheGamer } from "../scraper-utils.js";
+import { buildAggregate, extractAwardsDaily, extractGoldDerby, extractIndieWire, extractLetterboxd, extractNextBestPicture, extractReddit, extractTheGamer, GoldDerbyCategoryItem } from "../scraper-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,9 +14,6 @@ const SOURCE_URLS = {
   letterboxd: "https://letterboxd.com/000_leo/list/oscars-2027/",
   reddit: "https://www.reddit.com/r/oscarrace/hot.json?limit=75",
   thegamer: "https://www.thegamer.com/oscars-predictions-2026-2027/",
-  // Gold Derby: most authoritative Oscar prediction odds aggregator.
-  // Lists contenders in ranked order with consensus expert + user odds.
-  goldderby: "https://www.goldderby.com/odds/oscars-odds/best-picture/",
   // IndieWire: editorial awards predictions coverage.
   // Their predictions tracker is one of the most-cited industry sources.
   indiewire: "https://www.indiewire.com/award-predictions/oscars-predictions/",
@@ -29,6 +26,18 @@ const SOURCE_URLS = {
   // Using explicit percentages (÷ 100) rather than rank order gives finer
   // differentiation between adjacent contenders.
   awardsdaily: "https://www.awardsdaily.com"
+};
+
+// Gold Derby publishes a separate odds page per Oscar category.
+// Keys match the app's category IDs exactly so applySourceSignals can look up
+// category-specific scores without any additional mapping.
+const GOLDDERBY_CATEGORY_URLS: Record<string, string> = {
+  picture:            "https://www.goldderby.com/odds/oscars-odds/best-picture/",
+  director:           "https://www.goldderby.com/odds/oscars-odds/best-director/",
+  actor:              "https://www.goldderby.com/odds/oscars-odds/best-actor/",
+  actress:            "https://www.goldderby.com/odds/oscars-odds/best-actress/",
+  "supporting-actor": "https://www.goldderby.com/odds/oscars-odds/best-supporting-actor/",
+  "supporting-actress": "https://www.goldderby.com/odds/oscars-odds/best-supporting-actress/"
 };
 
 const USER_AGENT =
@@ -273,7 +282,19 @@ async function runOnce(): Promise<void> {
     letterboxd: async () => extractLetterboxd(await fetchText(SOURCE_URLS.letterboxd)),
     reddit: async () => extractReddit(await fetchRedditJson(SOURCE_URLS.reddit)),
     thegamer: async () => extractTheGamer(await fetchText(SOURCE_URLS.thegamer)),
-    goldderby: async () => extractGoldDerby(await fetchText(SOURCE_URLS.goldderby)),
+    // Fetch all Gold Derby category pages in parallel; tolerate individual
+    // page failures so a single 429/503 does not abort the whole batch.
+    goldderby: async (): Promise<GoldDerbyCategoryItem[]> => {
+      const results = await Promise.allSettled(
+        Object.entries(GOLDDERBY_CATEGORY_URLS).map(async ([categoryId, url]) => ({
+          categoryId,
+          items: extractGoldDerby(await fetchText(url))
+        }))
+      );
+      return results
+        .filter((r): r is PromiseFulfilledResult<GoldDerbyCategoryItem> => r.status === "fulfilled")
+        .map((r) => r.value);
+    },
     indiewire: async () => extractIndieWire(await fetchText(SOURCE_URLS.indiewire)),
     nextbestpicture: async () => extractNextBestPicture(await fetchText(SOURCE_URLS.nextbestpicture)),
     awardsdaily: async () => extractAwardsDaily(await fetchText(SOURCE_URLS.awardsdaily))
@@ -301,7 +322,7 @@ async function runOnce(): Promise<void> {
   const letterboxdItems = letterboxdRun?.ok ? (letterboxdRun.value as ReturnType<typeof extractLetterboxd>) : [];
   const redditExtracted = redditRun?.ok ? (redditRun.value as ReturnType<typeof extractReddit>) : { posts: [], mentions: [] };
   const thegamerItems = thegamerRun?.ok ? (thegamerRun.value as ReturnType<typeof extractTheGamer>) : [];
-  const goldderbyItems = goldderbyRun?.ok ? (goldderbyRun.value as ReturnType<typeof extractGoldDerby>) : [];
+  const goldderbyCategories = goldderbyRun?.ok ? (goldderbyRun.value as GoldDerbyCategoryItem[]) : [];
   const indiewireItems = indiewireRun?.ok ? (indiewireRun.value as ReturnType<typeof extractIndieWire>) : [];
   const nextbestpictureItems = nextbestpictureRun?.ok ? (nextbestpictureRun.value as ReturnType<typeof extractNextBestPicture>) : [];
   const awardsdailyItems = awardsdailyRun?.ok ? (awardsdailyRun.value as ReturnType<typeof extractAwardsDaily>) : [];
@@ -350,14 +371,17 @@ async function runOnce(): Promise<void> {
         items: thegamerItems
       },
       goldderby: {
-        url: SOURCE_URLS.goldderby,
+        url: "https://www.goldderby.com/odds/oscars-odds/",
         ok: Boolean(goldderbyRun?.ok),
         attempts: goldderbyRun?.attempts || 0,
         durationMs: goldderbyRun?.durationMs || null,
         error: goldderbyRun?.ok ? null : goldderbyRun?.error || "Unknown error",
         lastSuccessAt: observability.sources.goldderby.lastSuccessAt,
         freshnessMinutes: freshnessMinutes(observability.sources.goldderby.lastSuccessAt, generatedAt),
-        items: goldderbyItems
+        // Per-category item counts for observability.
+        categories: Object.fromEntries(
+          goldderbyCategories.map((c) => [c.categoryId, c.items.length])
+        )
       },
       indiewire: {
         url: SOURCE_URLS.indiewire,
@@ -390,7 +414,7 @@ async function runOnce(): Promise<void> {
         items: awardsdailyItems
       }
     },
-    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyItems, indiewireItems, nextbestpictureItems, awardsdailyItems),
+    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyCategories, indiewireItems, nextbestpictureItems, awardsdailyItems),
     observability: {
       runStatus: observability.lastRunStatus,
       runDurationMs,
@@ -457,7 +481,8 @@ async function runOnce(): Promise<void> {
       attempts: snapshot.sources.goldderby.attempts,
       successRate: observability.sources.goldderby.successRate,
       freshnessMinutes: snapshot.sources.goldderby.freshnessMinutes,
-      items: goldderbyItems.length
+      categories: Object.keys(GOLDDERBY_CATEGORY_URLS).length,
+      items: goldderbyCategories.reduce((sum, c) => sum + c.items.length, 0)
     },
     indiewire: {
       ok: snapshot.sources.indiewire.ok,
