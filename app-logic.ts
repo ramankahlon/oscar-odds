@@ -102,17 +102,18 @@ export function applySourceSignals({
         aggregateMap.get(normalizeSignalKey(film.studio));
       if (!match) return;
 
-      const combined       = clamp(Number(match.combinedScore   || 0), 0, 1);
-      const letterboxdScore = clamp(Number(match.letterboxdScore || 0), 0, 1);
-      const goldderbyScore  = clamp(Number(match.goldderbyScore  || 0), 0, 1);
-      const thegamerScore   = clamp(Number(match.thegamerScore   || 0), 0, 1);
-      const indiewireScore  = clamp(Number(match.indiewireScore  || 0), 0, 1);
-      const redditScore     = clamp(Number(match.redditScore     || 0), 0, 1);
+      const combined              = clamp(Number(match.combinedScore          || 0), 0, 1);
+      const letterboxdScore       = clamp(Number(match.letterboxdScore        || 0), 0, 1);
+      const goldderbyScore        = clamp(Number(match.goldderbyScore         || 0), 0, 1);
+      const nextbestpictureScore  = clamp(Number(match.nextbestpictureScore   || 0), 0, 1);
+      const thegamerScore         = clamp(Number(match.thegamerScore          || 0), 0, 1);
+      const indiewireScore        = clamp(Number(match.indiewireScore         || 0), 0, 1);
+      const redditScore           = clamp(Number(match.redditScore            || 0), 0, 1);
 
-      // Precursor: combined (includes Gold Derby's explicit odds) drives industry prediction signal.
-      // Gold Derby's direct odds add an additional boost when present.
+      // Precursor: combined score already weights Gold Derby + NextBestPicture heavily.
+      // Their individual scores provide an additional boost when both agree.
       film.precursor = clamp(
-        film.precursor + Math.round((combined + goldderbyScore * 0.3 - 0.35) * 8),
+        film.precursor + Math.round((combined + (goldderbyScore + nextbestpictureScore) * 0.2 - 0.35) * 7),
         0, 100
       );
       // History: editorial curation from Letterboxd (ranked list) and IndieWire (coverage depth).

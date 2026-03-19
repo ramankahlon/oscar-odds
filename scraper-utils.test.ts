@@ -3,6 +3,7 @@ import {
   buildAggregate,
   canonicalizeEntity,
   extractLetterboxd,
+  extractNextBestPicture,
   extractReddit,
   extractTheGamer,
   isValidEntityCandidate,
@@ -89,6 +90,74 @@ describe("extractReddit", () => {
     if (odyssey && dune) {
       expect(odyssey.weightedScore).toBeGreaterThan(dune.weightedScore);
     }
+  });
+});
+
+describe("extractNextBestPicture", () => {
+  it("ranks films by how many critics picked them in the predictions table", () => {
+    // 3 critics all pick The Odyssey; only 1 picks Dune — Odyssey should rank first.
+    const html = `
+      <table class="predictions-choice-table">
+        <thead><tr><th>Critic</th><th>Best Picture</th></tr></thead>
+        <tbody>
+          <tr><td>Critic A</td><td>The Odyssey</td></tr>
+          <tr><td>Critic B</td><td>The Odyssey</td></tr>
+          <tr><td>Critic C</td><td>The Odyssey</td></tr>
+          <tr><td>Critic D</td><td>Dune: Part Three</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    const items = extractNextBestPicture(html);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0].title).toBe("The Odyssey");
+    expect(items[0].rank).toBe(1);
+    const dune = items.find((i) => i.title.includes("Dune"));
+    expect(dune).toBeTruthy();
+    expect(dune!.rank).toBeGreaterThan(1);
+  });
+
+  it("falls back to article text extraction when table is absent", () => {
+    const html = `
+      <main>
+        <h2>Best Picture Contenders 2027</h2>
+        <p>The Odyssey is the frontrunner with strong precursor support.</p>
+        <p>Wild Horse Nine has been gaining momentum.</p>
+      </main>
+    `;
+
+    const items = extractNextBestPicture(html);
+    expect(items.length).toBeGreaterThan(0);
+    const odyssey = items.find((i) => i.title.toLowerCase().includes("odyssey"));
+    expect(odyssey).toBeTruthy();
+  });
+
+  it("assigns score=1.0 to the top-ranked film", () => {
+    const html = `
+      <table class="predictions-choice-table">
+        <tbody>
+          <tr><td>The Odyssey</td></tr>
+          <tr><td>The Odyssey</td></tr>
+          <tr><td>Wild Horse Nine</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    const items = extractNextBestPicture(html);
+    expect(items[0].score).toBe(1.0);
+  });
+
+  it("includes nextbestpictureScore in the aggregate combined score", () => {
+    const nbpItems = [
+      { title: "The Odyssey", rank: 1, score: 1.0 },
+      { title: "Wild Horse Nine", rank: 2, score: 0.5 }
+    ];
+
+    const aggregate = buildAggregate([], [], [], [], [], nbpItems);
+    const odyssey = aggregate.find((a) => a.title.toLowerCase().includes("odyssey"));
+    expect(odyssey).toBeTruthy();
+    expect(odyssey!.nextbestpictureScore).toBeGreaterThan(0);
+    expect(odyssey!.combinedScore).toBeGreaterThan(0);
   });
 });
 

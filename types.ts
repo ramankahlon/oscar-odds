@@ -68,6 +68,7 @@ export interface AggregateSignal {
   combinedScore?: number;
   letterboxdScore?: number;
   goldderbyScore?: number;
+  nextbestpictureScore?: number;
   thegamerScore?: number;
   indiewireScore?: number;
   redditScore?: number;

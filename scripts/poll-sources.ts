@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { buildAggregate, extractGoldDerby, extractIndieWire, extractLetterboxd, extractReddit, extractTheGamer } from "../scraper-utils.js";
+import { buildAggregate, extractGoldDerby, extractIndieWire, extractLetterboxd, extractNextBestPicture, extractReddit, extractTheGamer } from "../scraper-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +19,11 @@ const SOURCE_URLS = {
   goldderby: "https://www.goldderby.com/odds/oscars-odds/best-picture/",
   // IndieWire: editorial awards predictions coverage.
   // Their predictions tracker is one of the most-cited industry sources.
-  indiewire: "https://www.indiewire.com/award-predictions/oscars-predictions/"
+  indiewire: "https://www.indiewire.com/award-predictions/oscars-predictions/",
+  // Next Best Picture: dedicated Oscar site with a FooTable predictions table
+  // (table.predictions-choice-table) where each row is a critic and each cell
+  // is their category pick.  Consensus rank = most-picked film per category.
+  nextbestpicture: "https://www.nextbestpicture.com/oscar-predictions-best-picture"
 };
 
 const USER_AGENT =
@@ -150,7 +154,8 @@ function defaultObservability(): Observability {
       reddit: defaultSourceMetrics(),
       thegamer: defaultSourceMetrics(),
       goldderby: defaultSourceMetrics(),
-      indiewire: defaultSourceMetrics()
+      indiewire: defaultSourceMetrics(),
+      nextbestpicture: defaultSourceMetrics()
     },
     recentRuns: []
   };
@@ -169,7 +174,8 @@ async function readObservability(): Promise<Observability> {
         reddit: { ...defaultSourceMetrics(), ...(parsed.sources?.reddit || {}) },
         thegamer: { ...defaultSourceMetrics(), ...(parsed.sources?.thegamer || {}) },
         goldderby: { ...defaultSourceMetrics(), ...(parsed.sources?.goldderby || {}) },
-        indiewire: { ...defaultSourceMetrics(), ...(parsed.sources?.indiewire || {}) }
+        indiewire: { ...defaultSourceMetrics(), ...(parsed.sources?.indiewire || {}) },
+        nextbestpicture: { ...defaultSourceMetrics(), ...(parsed.sources?.nextbestpicture || {}) }
       },
       recentRuns: Array.isArray(parsed.recentRuns) ? parsed.recentRuns : []
     };
@@ -261,7 +267,8 @@ async function runOnce(): Promise<void> {
     reddit: async () => extractReddit(await fetchRedditJson(SOURCE_URLS.reddit)),
     thegamer: async () => extractTheGamer(await fetchText(SOURCE_URLS.thegamer)),
     goldderby: async () => extractGoldDerby(await fetchText(SOURCE_URLS.goldderby)),
-    indiewire: async () => extractIndieWire(await fetchText(SOURCE_URLS.indiewire))
+    indiewire: async () => extractIndieWire(await fetchText(SOURCE_URLS.indiewire)),
+    nextbestpicture: async () => extractNextBestPicture(await fetchText(SOURCE_URLS.nextbestpicture))
   };
 
   const sourceRuns = await Promise.all(
@@ -280,12 +287,14 @@ async function runOnce(): Promise<void> {
   const thegamerRun = sourceRuns.find((item) => item.sourceId === "thegamer");
   const goldderbyRun = sourceRuns.find((item) => item.sourceId === "goldderby");
   const indiewireRun = sourceRuns.find((item) => item.sourceId === "indiewire");
+  const nextbestpictureRun = sourceRuns.find((item) => item.sourceId === "nextbestpicture");
 
   const letterboxdItems = letterboxdRun?.ok ? (letterboxdRun.value as ReturnType<typeof extractLetterboxd>) : [];
   const redditExtracted = redditRun?.ok ? (redditRun.value as ReturnType<typeof extractReddit>) : { posts: [], mentions: [] };
   const thegamerItems = thegamerRun?.ok ? (thegamerRun.value as ReturnType<typeof extractTheGamer>) : [];
   const goldderbyItems = goldderbyRun?.ok ? (goldderbyRun.value as ReturnType<typeof extractGoldDerby>) : [];
   const indiewireItems = indiewireRun?.ok ? (indiewireRun.value as ReturnType<typeof extractIndieWire>) : [];
+  const nextbestpictureItems = nextbestpictureRun?.ok ? (nextbestpictureRun.value as ReturnType<typeof extractNextBestPicture>) : [];
 
   const runFailed = sourceRuns.some((item) => !item.ok);
   const runDurationMs = Date.now() - runStartedAt.getTime();
@@ -349,9 +358,19 @@ async function runOnce(): Promise<void> {
         lastSuccessAt: observability.sources.indiewire.lastSuccessAt,
         freshnessMinutes: freshnessMinutes(observability.sources.indiewire.lastSuccessAt, generatedAt),
         items: indiewireItems
+      },
+      nextbestpicture: {
+        url: SOURCE_URLS.nextbestpicture,
+        ok: Boolean(nextbestpictureRun?.ok),
+        attempts: nextbestpictureRun?.attempts || 0,
+        durationMs: nextbestpictureRun?.durationMs || null,
+        error: nextbestpictureRun?.ok ? null : nextbestpictureRun?.error || "Unknown error",
+        lastSuccessAt: observability.sources.nextbestpicture.lastSuccessAt,
+        freshnessMinutes: freshnessMinutes(observability.sources.nextbestpicture.lastSuccessAt, generatedAt),
+        items: nextbestpictureItems
       }
     },
-    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyItems, indiewireItems),
+    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyItems, indiewireItems, nextbestpictureItems),
     observability: {
       runStatus: observability.lastRunStatus,
       runDurationMs,
@@ -361,7 +380,8 @@ async function runOnce(): Promise<void> {
         reddit: observability.sources.reddit.successRate,
         thegamer: observability.sources.thegamer.successRate,
         goldderby: observability.sources.goldderby.successRate,
-        indiewire: observability.sources.indiewire.successRate
+        indiewire: observability.sources.indiewire.successRate,
+        nextbestpicture: observability.sources.nextbestpicture.successRate
       }
     }
   };
@@ -424,6 +444,13 @@ async function runOnce(): Promise<void> {
       successRate: observability.sources.indiewire.successRate,
       freshnessMinutes: snapshot.sources.indiewire.freshnessMinutes,
       items: indiewireItems.length
+    },
+    nextbestpicture: {
+      ok: snapshot.sources.nextbestpicture.ok,
+      attempts: snapshot.sources.nextbestpicture.attempts,
+      successRate: observability.sources.nextbestpicture.successRate,
+      freshnessMinutes: snapshot.sources.nextbestpicture.freshnessMinutes,
+      items: nextbestpictureItems.length
     },
     aggregate: snapshot.aggregate.length
   };

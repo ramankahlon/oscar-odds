@@ -30,6 +30,7 @@ interface AggregateItem {
   title: string;
   letterboxdScore: number;
   goldderbyScore: number;
+  nextbestpictureScore: number;
   thegamerScore: number;
   indiewireScore: number;
   redditCount: number;
@@ -309,6 +310,63 @@ export function extractIndieWire(html: string): ScoreItem[] {
     .map((item, index) => ({ title: item.title, rank: index + 1, score: item.score }));
 }
 
+/**
+ * Extract ranked contenders from a Next Best Picture predictions page.
+ *
+ * nextbestpicture.com uses a FooTable (table.predictions-choice-table) where
+ * each row is a critic/predictor and each cell is their pick for that category.
+ * Counting cell-value occurrences gives a consensus rank ordering: a film that
+ * 20 critics pick ranks ahead of one only 3 critics pick.
+ *
+ * If the table is absent or too sparse (< 5 distinct titles found) the function
+ * falls back to article-level text extraction, matching the TheGamer approach.
+ */
+export function extractNextBestPicture(html: string): ScoreItem[] {
+  const $ = cheerio.load(html);
+  const tally = new Map<string, { title: string; count: number }>();
+
+  function recordTitle(raw: string): void {
+    if (!isValidEntityCandidate(raw)) return;
+    const canonical = canonicalizeEntity(raw);
+    if (!canonical.title) return;
+    const key = normalizeTitle(canonical.title);
+    if (!key) return;
+    const entry = tally.get(key) || { title: canonical.title, count: 0 };
+    entry.count += 1;
+    tally.set(key, entry);
+  }
+
+  // Primary: FooTable predictions-choice-table.
+  // Selector covers both the named class and any footable-prefixed ID.
+  const table = $("table.predictions-choice-table, table[id^='footable']").first();
+  if (table.length) {
+    table.find("tbody tr").each((_, row) => {
+      $(row).find("td").each((_, cell) => {
+        const text = $(cell).text().replace(/\s+/g, " ").trim();
+        if (text) recordTitle(text);
+      });
+    });
+  }
+
+  // Fallback: article-style text extraction when the table is absent or sparse.
+  if (tally.size < 5) {
+    $("main li, article li, main h2, main h3, article h2, article h3, main p, article p, .entry-content p").each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      if (!text) return;
+      extractTitleLikePhrases(text).forEach((phrase) => recordTitle(phrase));
+    });
+  }
+
+  // Sort by consensus count descending; convert to normalised [0, 1] score.
+  const sorted = [...tally.values()].sort((a, b) => b.count - a.count).slice(0, 30);
+  const total = Math.max(sorted.length, 1);
+  return sorted.map((item, index) => ({
+    title: item.title,
+    rank: index + 1,
+    score: Number(((total - index) / total).toFixed(4))
+  }));
+}
+
 export function extractTitleLikePhrases(text: string): string[] {
   const matches: string[] = [];
   const quoted = text.match(/"([^"]{2,80})"/g) || [];
@@ -410,7 +468,8 @@ export function buildAggregate(
   redditMentions: Mention[],
   thegamerItems: ScoreItem[],
   goldderbyItems: ScoreItem[] = [],
-  indiewireItems: ScoreItem[] = []
+  indiewireItems: ScoreItem[] = [],
+  nextbestpictureItems: ScoreItem[] = []
 ): AggregateItem[] {
   const aggregate = new Map<string, AggregateItem>();
 
@@ -424,6 +483,7 @@ export function buildAggregate(
         title: canonical.title,
         letterboxdScore: 0,
         goldderbyScore: 0,
+        nextbestpictureScore: 0,
         thegamerScore: 0,
         indiewireScore: 0,
         redditCount: 0,
@@ -442,6 +502,11 @@ export function buildAggregate(
   goldderbyItems.forEach((item, index) => {
     const entry = getOrCreate(item.title);
     if (entry) entry.goldderbyScore = Math.max(entry.goldderbyScore, Math.max(0, (30 - index) / 30));
+  });
+
+  nextbestpictureItems.forEach((item, index) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.nextbestpictureScore = Math.max(entry.nextbestpictureScore, Math.max(0, (30 - index) / 30));
   });
 
   thegamerItems.forEach((item, index) => {
@@ -463,20 +528,22 @@ export function buildAggregate(
   });
 
   // Combined score weights (must sum to 1.0):
-  //   Gold Derby  0.30 — explicit odds from the most authoritative prediction aggregator
-  //   Letterboxd  0.25 — curated ranked list (strong precursor signal)
-  //   IndieWire   0.15 — editorial predictions coverage
-  //   TheGamer    0.15 — general predictions article coverage
-  //   Reddit      0.15 — community discussion / social buzz
+  //   Gold Derby       0.25 — explicit odds from the most authoritative prediction aggregator
+  //   NextBestPicture  0.20 — critic consensus count from dedicated Oscar prediction site
+  //   Letterboxd       0.20 — curated ranked list (strong precursor signal)
+  //   IndieWire        0.12 — editorial predictions coverage
+  //   TheGamer         0.12 — general predictions article coverage
+  //   Reddit           0.11 — community discussion / social buzz
   return [...aggregate.values()]
     .map((item) => ({
       ...item,
       combinedScore: Number((
-        item.goldderbyScore  * 0.30 +
-        item.letterboxdScore * 0.25 +
-        item.indiewireScore  * 0.15 +
-        item.thegamerScore   * 0.15 +
-        item.redditScore     * 0.15
+        item.goldderbyScore        * 0.25 +
+        item.nextbestpictureScore  * 0.20 +
+        item.letterboxdScore       * 0.20 +
+        item.indiewireScore        * 0.12 +
+        item.thegamerScore         * 0.12 +
+        item.redditScore           * 0.11
       ).toFixed(4))
     }))
     .sort((a, b) => b.combinedScore - a.combinedScore)
