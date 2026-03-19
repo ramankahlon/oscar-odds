@@ -31,6 +31,7 @@ interface AggregateItem {
   letterboxdScore: number;
   goldderbyScore: number;
   nextbestpictureScore: number;
+  awardsdailyScore: number;
   thegamerScore: number;
   indiewireScore: number;
   redditCount: number;
@@ -367,6 +368,71 @@ export function extractNextBestPicture(html: string): ScoreItem[] {
   }));
 }
 
+/**
+ * Extract ranked Best Picture contenders from the Awards Daily homepage.
+ *
+ * The homepage embeds a structured prediction widget:
+ *   ul.oscar-prediction-list
+ *     li.oscar-prediction-item
+ *       div.oscar-nominee-name   ← film title, sometimes with "(Studio)" suffix
+ *       div.oscar-percentage     ← e.g. "94.5%"
+ *
+ * Unlike rank-only sources this extractor uses the explicit percentage as the
+ * score (÷ 100), giving finer differentiation between adjacent contenders.
+ * Falls back to article-level text extraction if the widget is absent.
+ */
+export function extractAwardsDaily(html: string): ScoreItem[] {
+  const $ = cheerio.load(html);
+  const items: Array<{ title: string; score: number }> = [];
+
+  $("li.oscar-prediction-item").each((_, el) => {
+    // Strip studio name in parentheses: "Hamnet (Focus Features)" → "Hamnet"
+    const rawName = $(el).find(".oscar-nominee-name").text()
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const pctText = $(el).find(".oscar-percentage").text().trim();
+    const pct = parseFloat(pctText);
+
+    if (!rawName || !isValidEntityCandidate(rawName)) return;
+    const canonical = canonicalizeEntity(rawName);
+    if (!canonical.title) return;
+
+    // Use the explicit percentage as the score; fall back to rank-order if missing.
+    const score = Number.isFinite(pct) && pct > 0 ? Math.min(pct / 100, 1) : 0;
+    items.push({ title: canonical.title, score });
+  });
+
+  // Fallback: article text extraction when the widget is absent.
+  if (items.length < 5) {
+    const tally = new Map<string, { title: string; score: number }>();
+    $("main li, article li, main h2, main h3, article h2, article h3, main p, article p, .entry-content p").each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      if (!text) return;
+      extractTitleLikePhrases(text).forEach((phrase) => {
+        if (!isValidEntityCandidate(phrase)) return;
+        const canonical = canonicalizeEntity(phrase);
+        if (!canonical.title) return;
+        const key = normalizeTitle(canonical.title);
+        if (!key) return;
+        const entry = tally.get(key) || { title: canonical.title, score: 0 };
+        entry.score += 1;
+        tally.set(key, entry);
+      });
+    });
+    tally.forEach((entry) => items.push(entry));
+  }
+
+  items.sort((a, b) => b.score - a.score);
+  const topScore = items[0]?.score || 1;
+  return items.slice(0, 30).map((item, index) => ({
+    title: item.title,
+    rank: index + 1,
+    // Normalise so the top item is always 1.0 (consistent with other extractors).
+    score: Number((item.score / topScore).toFixed(4))
+  }));
+}
+
 export function extractTitleLikePhrases(text: string): string[] {
   const matches: string[] = [];
   const quoted = text.match(/"([^"]{2,80})"/g) || [];
@@ -469,7 +535,8 @@ export function buildAggregate(
   thegamerItems: ScoreItem[],
   goldderbyItems: ScoreItem[] = [],
   indiewireItems: ScoreItem[] = [],
-  nextbestpictureItems: ScoreItem[] = []
+  nextbestpictureItems: ScoreItem[] = [],
+  awardsdailyItems: ScoreItem[] = []
 ): AggregateItem[] {
   const aggregate = new Map<string, AggregateItem>();
 
@@ -484,6 +551,7 @@ export function buildAggregate(
         letterboxdScore: 0,
         goldderbyScore: 0,
         nextbestpictureScore: 0,
+        awardsdailyScore: 0,
         thegamerScore: 0,
         indiewireScore: 0,
         redditCount: 0,
@@ -509,6 +577,13 @@ export function buildAggregate(
     if (entry) entry.nextbestpictureScore = Math.max(entry.nextbestpictureScore, Math.max(0, (30 - index) / 30));
   });
 
+  // awardsdailyItems already carry a normalised [0,1] score derived from the
+  // explicit prediction percentage on the Awards Daily homepage widget.
+  awardsdailyItems.forEach((item) => {
+    const entry = getOrCreate(item.title);
+    if (entry) entry.awardsdailyScore = Math.max(entry.awardsdailyScore, item.score);
+  });
+
   thegamerItems.forEach((item, index) => {
     const entry = getOrCreate(item.title);
     if (entry) entry.thegamerScore = Math.max(entry.thegamerScore, Math.max(0, (30 - index) / 30));
@@ -528,22 +603,24 @@ export function buildAggregate(
   });
 
   // Combined score weights (must sum to 1.0):
-  //   Gold Derby       0.25 — explicit odds from the most authoritative prediction aggregator
-  //   NextBestPicture  0.20 — critic consensus count from dedicated Oscar prediction site
-  //   Letterboxd       0.20 — curated ranked list (strong precursor signal)
-  //   IndieWire        0.12 — editorial predictions coverage
-  //   TheGamer         0.12 — general predictions article coverage
-  //   Reddit           0.11 — community discussion / social buzz
+  //   Gold Derby       0.22 — explicit ranked odds, most authoritative aggregator
+  //   NextBestPicture  0.18 — critic consensus count from dedicated Oscar site
+  //   Letterboxd       0.18 — curated ranked list (strong precursor signal)
+  //   Awards Daily     0.14 — explicit prediction percentages, editorial authority
+  //   IndieWire        0.10 — editorial predictions coverage
+  //   TheGamer         0.10 — general predictions article coverage
+  //   Reddit           0.08 — community discussion / social buzz
   return [...aggregate.values()]
     .map((item) => ({
       ...item,
       combinedScore: Number((
-        item.goldderbyScore        * 0.25 +
-        item.nextbestpictureScore  * 0.20 +
-        item.letterboxdScore       * 0.20 +
-        item.indiewireScore        * 0.12 +
-        item.thegamerScore         * 0.12 +
-        item.redditScore           * 0.11
+        item.goldderbyScore        * 0.22 +
+        item.nextbestpictureScore  * 0.18 +
+        item.letterboxdScore       * 0.18 +
+        item.awardsdailyScore      * 0.14 +
+        item.indiewireScore        * 0.10 +
+        item.thegamerScore         * 0.10 +
+        item.redditScore           * 0.08
       ).toFixed(4))
     }))
     .sort((a, b) => b.combinedScore - a.combinedScore)

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAggregate,
   canonicalizeEntity,
+  extractAwardsDaily,
   extractLetterboxd,
   extractNextBestPicture,
   extractReddit,
@@ -90,6 +91,82 @@ describe("extractReddit", () => {
     if (odyssey && dune) {
       expect(odyssey.weightedScore).toBeGreaterThan(dune.weightedScore);
     }
+  });
+});
+
+describe("extractAwardsDaily", () => {
+  it("extracts films ranked by explicit prediction percentage", () => {
+    const html = `
+      <ul class="oscar-prediction-list">
+        <li class="oscar-prediction-item">
+          <div class="oscar-rank">1.</div>
+          <div class="oscar-nominee-name">The Odyssey (Warner Bros.)</div>
+          <div class="oscar-percentage">91.5%</div>
+        </li>
+        <li class="oscar-prediction-item">
+          <div class="oscar-rank">2.</div>
+          <div class="oscar-nominee-name">Wild Horse Nine</div>
+          <div class="oscar-percentage">67.2%</div>
+        </li>
+        <li class="oscar-prediction-item">
+          <div class="oscar-rank">3.</div>
+          <div class="oscar-nominee-name">Dune: Part Three (Legendary)</div>
+          <div class="oscar-percentage">45.0%</div>
+        </li>
+      </ul>
+    `;
+
+    const items = extractAwardsDaily(html);
+    expect(items.length).toBe(3);
+    // Top film should have score normalised to 1.0.
+    expect(items[0].score).toBe(1.0);
+    expect(items[0].title).toBe("The Odyssey");
+    // Studio suffix must be stripped from the title.
+    const dune = items.find((i) => i.title.includes("Dune"));
+    expect(dune).toBeTruthy();
+    // Lower percentage → lower score.
+    expect(items[1].score).toBeGreaterThan(items[2].score);
+  });
+
+  it("strips studio names in parentheses from film titles", () => {
+    const html = `
+      <ul class="oscar-prediction-list">
+        <li class="oscar-prediction-item">
+          <div class="oscar-nominee-name">The Odyssey (Universal Pictures)</div>
+          <div class="oscar-percentage">88.0%</div>
+        </li>
+      </ul>
+    `;
+
+    const items = extractAwardsDaily(html);
+    expect(items[0].title).toBe("The Odyssey");
+  });
+
+  it("falls back to article text extraction when widget is absent", () => {
+    const html = `
+      <article>
+        <p>The Odyssey remains the frontrunner for Best Picture.</p>
+        <li>Wild Horse Nine continues to gain traction.</li>
+      </article>
+    `;
+
+    const items = extractAwardsDaily(html);
+    expect(items.length).toBeGreaterThan(0);
+    const odyssey = items.find((i) => i.title.toLowerCase().includes("odyssey"));
+    expect(odyssey).toBeTruthy();
+  });
+
+  it("includes awardsdailyScore in the aggregate combined score", () => {
+    const adItems = [
+      { title: "The Odyssey", rank: 1, score: 1.0 },
+      { title: "Wild Horse Nine", rank: 2, score: 0.74 }
+    ];
+
+    const aggregate = buildAggregate([], [], [], [], [], [], adItems);
+    const odyssey = aggregate.find((a) => a.title.toLowerCase().includes("odyssey"));
+    expect(odyssey).toBeTruthy();
+    expect(odyssey!.awardsdailyScore).toBeCloseTo(1.0);
+    expect(odyssey!.combinedScore).toBeGreaterThan(0);
   });
 });
 

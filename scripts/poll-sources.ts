@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { buildAggregate, extractGoldDerby, extractIndieWire, extractLetterboxd, extractNextBestPicture, extractReddit, extractTheGamer } from "../scraper-utils.js";
+import { buildAggregate, extractAwardsDaily, extractGoldDerby, extractIndieWire, extractLetterboxd, extractNextBestPicture, extractReddit, extractTheGamer } from "../scraper-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +23,12 @@ const SOURCE_URLS = {
   // Next Best Picture: dedicated Oscar site with a FooTable predictions table
   // (table.predictions-choice-table) where each row is a critic and each cell
   // is their category pick.  Consensus rank = most-picked film per category.
-  nextbestpicture: "https://www.nextbestpicture.com/oscar-predictions-best-picture"
+  nextbestpicture: "https://www.nextbestpicture.com/oscar-predictions-best-picture",
+  // Awards Daily: homepage embeds a structured oscar-prediction-list widget
+  // (li.oscar-prediction-item) with explicit prediction percentages per film.
+  // Using explicit percentages (÷ 100) rather than rank order gives finer
+  // differentiation between adjacent contenders.
+  awardsdaily: "https://www.awardsdaily.com"
 };
 
 const USER_AGENT =
@@ -155,7 +160,8 @@ function defaultObservability(): Observability {
       thegamer: defaultSourceMetrics(),
       goldderby: defaultSourceMetrics(),
       indiewire: defaultSourceMetrics(),
-      nextbestpicture: defaultSourceMetrics()
+      nextbestpicture: defaultSourceMetrics(),
+      awardsdaily: defaultSourceMetrics()
     },
     recentRuns: []
   };
@@ -175,7 +181,8 @@ async function readObservability(): Promise<Observability> {
         thegamer: { ...defaultSourceMetrics(), ...(parsed.sources?.thegamer || {}) },
         goldderby: { ...defaultSourceMetrics(), ...(parsed.sources?.goldderby || {}) },
         indiewire: { ...defaultSourceMetrics(), ...(parsed.sources?.indiewire || {}) },
-        nextbestpicture: { ...defaultSourceMetrics(), ...(parsed.sources?.nextbestpicture || {}) }
+        nextbestpicture: { ...defaultSourceMetrics(), ...(parsed.sources?.nextbestpicture || {}) },
+        awardsdaily: { ...defaultSourceMetrics(), ...(parsed.sources?.awardsdaily || {}) }
       },
       recentRuns: Array.isArray(parsed.recentRuns) ? parsed.recentRuns : []
     };
@@ -268,7 +275,8 @@ async function runOnce(): Promise<void> {
     thegamer: async () => extractTheGamer(await fetchText(SOURCE_URLS.thegamer)),
     goldderby: async () => extractGoldDerby(await fetchText(SOURCE_URLS.goldderby)),
     indiewire: async () => extractIndieWire(await fetchText(SOURCE_URLS.indiewire)),
-    nextbestpicture: async () => extractNextBestPicture(await fetchText(SOURCE_URLS.nextbestpicture))
+    nextbestpicture: async () => extractNextBestPicture(await fetchText(SOURCE_URLS.nextbestpicture)),
+    awardsdaily: async () => extractAwardsDaily(await fetchText(SOURCE_URLS.awardsdaily))
   };
 
   const sourceRuns = await Promise.all(
@@ -288,6 +296,7 @@ async function runOnce(): Promise<void> {
   const goldderbyRun = sourceRuns.find((item) => item.sourceId === "goldderby");
   const indiewireRun = sourceRuns.find((item) => item.sourceId === "indiewire");
   const nextbestpictureRun = sourceRuns.find((item) => item.sourceId === "nextbestpicture");
+  const awardsdailyRun = sourceRuns.find((item) => item.sourceId === "awardsdaily");
 
   const letterboxdItems = letterboxdRun?.ok ? (letterboxdRun.value as ReturnType<typeof extractLetterboxd>) : [];
   const redditExtracted = redditRun?.ok ? (redditRun.value as ReturnType<typeof extractReddit>) : { posts: [], mentions: [] };
@@ -295,6 +304,7 @@ async function runOnce(): Promise<void> {
   const goldderbyItems = goldderbyRun?.ok ? (goldderbyRun.value as ReturnType<typeof extractGoldDerby>) : [];
   const indiewireItems = indiewireRun?.ok ? (indiewireRun.value as ReturnType<typeof extractIndieWire>) : [];
   const nextbestpictureItems = nextbestpictureRun?.ok ? (nextbestpictureRun.value as ReturnType<typeof extractNextBestPicture>) : [];
+  const awardsdailyItems = awardsdailyRun?.ok ? (awardsdailyRun.value as ReturnType<typeof extractAwardsDaily>) : [];
 
   const runFailed = sourceRuns.some((item) => !item.ok);
   const runDurationMs = Date.now() - runStartedAt.getTime();
@@ -368,9 +378,19 @@ async function runOnce(): Promise<void> {
         lastSuccessAt: observability.sources.nextbestpicture.lastSuccessAt,
         freshnessMinutes: freshnessMinutes(observability.sources.nextbestpicture.lastSuccessAt, generatedAt),
         items: nextbestpictureItems
+      },
+      awardsdaily: {
+        url: SOURCE_URLS.awardsdaily,
+        ok: Boolean(awardsdailyRun?.ok),
+        attempts: awardsdailyRun?.attempts || 0,
+        durationMs: awardsdailyRun?.durationMs || null,
+        error: awardsdailyRun?.ok ? null : awardsdailyRun?.error || "Unknown error",
+        lastSuccessAt: observability.sources.awardsdaily.lastSuccessAt,
+        freshnessMinutes: freshnessMinutes(observability.sources.awardsdaily.lastSuccessAt, generatedAt),
+        items: awardsdailyItems
       }
     },
-    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyItems, indiewireItems, nextbestpictureItems),
+    aggregate: buildAggregate(letterboxdItems, redditExtracted.mentions, thegamerItems, goldderbyItems, indiewireItems, nextbestpictureItems, awardsdailyItems),
     observability: {
       runStatus: observability.lastRunStatus,
       runDurationMs,
@@ -381,7 +401,8 @@ async function runOnce(): Promise<void> {
         thegamer: observability.sources.thegamer.successRate,
         goldderby: observability.sources.goldderby.successRate,
         indiewire: observability.sources.indiewire.successRate,
-        nextbestpicture: observability.sources.nextbestpicture.successRate
+        nextbestpicture: observability.sources.nextbestpicture.successRate,
+        awardsdaily: observability.sources.awardsdaily.successRate
       }
     }
   };
@@ -451,6 +472,13 @@ async function runOnce(): Promise<void> {
       successRate: observability.sources.nextbestpicture.successRate,
       freshnessMinutes: snapshot.sources.nextbestpicture.freshnessMinutes,
       items: nextbestpictureItems.length
+    },
+    awardsdaily: {
+      ok: snapshot.sources.awardsdaily.ok,
+      attempts: snapshot.sources.awardsdaily.attempts,
+      successRate: observability.sources.awardsdaily.successRate,
+      freshnessMinutes: snapshot.sources.awardsdaily.freshnessMinutes,
+      items: awardsdailyItems.length
     },
     aggregate: snapshot.aggregate.length
   };

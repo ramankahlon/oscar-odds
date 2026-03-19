@@ -106,6 +106,7 @@ export function applySourceSignals({
       const letterboxdScore       = clamp(Number(match.letterboxdScore        || 0), 0, 1);
       const goldderbyScore        = clamp(Number(match.goldderbyScore         || 0), 0, 1);
       const nextbestpictureScore  = clamp(Number(match.nextbestpictureScore   || 0), 0, 1);
+      const awardsdailyScore      = clamp(Number(match.awardsdailyScore       || 0), 0, 1);
       const thegamerScore         = clamp(Number(match.thegamerScore          || 0), 0, 1);
       const indiewireScore        = clamp(Number(match.indiewireScore         || 0), 0, 1);
       const redditScore           = clamp(Number(match.redditScore            || 0), 0, 1);
@@ -116,9 +117,10 @@ export function applySourceSignals({
         film.precursor + Math.round((combined + (goldderbyScore + nextbestpictureScore) * 0.2 - 0.35) * 7),
         0, 100
       );
-      // History: editorial curation from Letterboxd (ranked list) and IndieWire (coverage depth).
+      // History: split across two editorial sources so neither single site dominates.
+      // Awards Daily's explicit percentages complement IndieWire's coverage depth.
       film.history = clamp(
-        film.history + Math.round((letterboxdScore + indiewireScore - 0.55) * 8),
+        film.history + Math.round((letterboxdScore + indiewireScore * 0.6 + awardsdailyScore * 0.6 - 0.55) * 8),
         0, 100
       );
       // Buzz: community discussion (Reddit) and general web coverage (TheGamer).
